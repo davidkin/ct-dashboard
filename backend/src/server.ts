@@ -3,7 +3,9 @@ import Fastify, { FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import { getDb } from "./db/index";
 import { registerActivityRoutes } from "./routes/activity";
+import { registerAttributionRoutes } from "./routes/attribution";
 import { registerCreatorRoutes } from "./routes/creators";
+import { registerFanRoutes } from "./routes/fans";
 import { registerFinanceRoutes } from "./routes/finances";
 import { registerLinksRoutes } from "./routes/links";
 import { registerPartnerRoutes } from "./routes/partners";
@@ -33,6 +35,8 @@ async function main() {
   await registerTrendsRoutes(app);
   await registerFinanceRoutes(app);
   await registerWebhookRoutes(app);
+  await registerAttributionRoutes(app);
+  await registerFanRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
   await app.listen({ port, host: "0.0.0.0" });

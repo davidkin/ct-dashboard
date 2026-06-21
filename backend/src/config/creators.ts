@@ -1,18 +1,49 @@
 /**
  * Каждый Creator (модель) = отдельный OnlyFans-аккаунт.
- * Связка имени в Glossary с переменной окружения, где хранится acct_XXX.
+ * Связка имени в Glossary с env-переменной (acct_XXX), типом (free/vip) и model_group.
+ *
+ * model_group объединяет Free и Vip одной модели — нужен для Free→VIP аналитики
+ * и для inferred username-матчей в рамках одной модели.
  *
  * Когда появятся новые модели — добавь сюда строку и заведи env-переменную.
  */
-const CREATOR_ENV_MAP: Record<string, string> = {
-  "Nekoletta Free": "ONLYFANSAPI_ACCOUNT_FREE",
-  "Nekoletta Vip": "ONLYFANSAPI_ACCOUNT_VIP",
+export type CreatorType = "free" | "vip";
+
+interface CreatorConfig {
+  envKey: string;
+  type: CreatorType;
+  modelGroup: string;
+}
+
+const CREATOR_CONFIG: Record<string, CreatorConfig> = {
+  "Nekoletta Free": { envKey: "ONLYFANSAPI_ACCOUNT_FREE", type: "free", modelGroup: "Nekoletta" },
+  "Nekoletta Vip": { envKey: "ONLYFANSAPI_ACCOUNT_VIP", type: "vip", modelGroup: "Nekoletta" },
 };
 
 export function getAccountIdForCreator(name: string): string | null {
-  const envKey = CREATOR_ENV_MAP[name];
-  if (!envKey) return null;
-  return process.env[envKey] ?? null;
+  const cfg = CREATOR_CONFIG[name];
+  if (!cfg) return null;
+  return process.env[cfg.envKey] ?? null;
+}
+
+export function getCreatorType(name: string): CreatorType | null {
+  return CREATOR_CONFIG[name]?.type ?? null;
+}
+
+/**
+ * model_group по имени creator. Если creator не сконфигурирован — фолбэк на само имя
+ * (чтобы неизвестные модели не схлопывались в один group и не давали ложных матчей).
+ */
+export function getModelGroup(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return CREATOR_CONFIG[name]?.modelGroup ?? name;
+}
+
+/** Все creator в одном model_group (например Free + Vip одной модели). */
+export function creatorsInModelGroup(modelGroup: string): string[] {
+  return Object.entries(CREATOR_CONFIG)
+    .filter(([, cfg]) => cfg.modelGroup === modelGroup)
+    .map(([name]) => name);
 }
 
 export function creatorSlug(name: string): string {

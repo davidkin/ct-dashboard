@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql')\"",
     "start": "node dist/server.js",
     "import-glossary": "tsx src/glossary/import.ts",
-    "init-db": "tsx src/db/init.ts"
+    "init-db": "tsx src/db/init.ts",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
