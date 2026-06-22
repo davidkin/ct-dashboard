@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { runMigrations } from "./migrations";
 
 let dbInstance: Database.Database | null = null;
 
@@ -19,6 +20,7 @@ export function getDb(): Database.Database {
   db.exec(schema);
 
   migrate(db);
+  runMigrations(db);
 
   dbInstance = db;
   return db;
