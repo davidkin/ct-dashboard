@@ -31,6 +31,7 @@ interface SubRow {
   of_fan_id: string;
   username: string | null;
   fetched_at: string;
+  om_subscribed_at: string | null;   // реальная дата подписки из OnlyMonster (если есть)
   of_account_id: string | null;
   creator: string | null;
   partner_id: number | null;
@@ -52,7 +53,7 @@ export function reconcileFromCache(db: Database.Database): ReconcileResult {
 
   const subs = db
     .prepare(
-      `SELECT ls.link_id, ls.of_fan_id, ls.username, ls.fetched_at,
+      `SELECT ls.link_id, ls.of_fan_id, ls.username, ls.fetched_at, ls.om_subscribed_at,
               l.of_account_id, l.creator, l.partner_id
        FROM link_subscribers ls JOIN links l ON l.id = ls.link_id`,
     )
@@ -62,14 +63,17 @@ export function reconcileFromCache(db: Database.Database): ReconcileResult {
   db.transaction(() => {
     for (const s of subs) {
       const modelGroup = getModelGroup(s.creator);
+      /* om_subscribed_at = РЕАЛЬНАЯ дата подписки (OnlyMonster). Если есть — используем
+         как source_event_at; иначе остаёмся на null (OF API её не даёт). */
+      const realSubAt = s.om_subscribed_at ?? null;
       const r = resolveIdentity(db, {
         ofFanId: s.of_fan_id,
         username: s.username,
         ofAccountId: s.of_account_id,
         creator: s.creator,
         modelGroup,
-        sourceEndpoint: "tracking-links/subscribers",
-        sourceEventAt: null,
+        sourceEndpoint: realSubAt ? "om/tracking-link-users" : "tracking-links/subscribers",
+        sourceEventAt: realSubAt,
       });
       recordFanEvent(db, {
         fanId: r.fanId,
@@ -80,9 +84,9 @@ export function reconcileFromCache(db: Database.Database): ReconcileResult {
         modelGroup,
         linkId: s.link_id,
         partnerId: s.partner_id,
-        source: "tracking_link_sync",
-        observedAt: s.fetched_at,
-        sourceEventAt: null,
+        source: realSubAt ? "onlymonster" : "tracking_link_sync",
+        observedAt: realSubAt ?? s.fetched_at,
+        sourceEventAt: realSubAt,
         isInferred: false,
         dedupeKey: `sub:${s.link_id}:${s.of_fan_id}`,
       });

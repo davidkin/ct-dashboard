@@ -2,8 +2,31 @@ import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
 import { listTrackingLinkSubscribers } from "../of/client";
 import { syncAllCreators, syncCreator } from "../of/sync";
+import { syncOMAllCreators } from "../om/sync";
+import { reconcileFromCache } from "../fans/backfill";
 
 export async function registerSyncRoutes(app: FastifyInstance): Promise<void> {
+  /**
+   * POST /api/sync/onlymonster
+   * Тянет OnlyMonster tracking-link-users (реальная subscribed_at), transactions,
+   * chargebacks по всем моделям. Затем автоматически переиндексирует ledger,
+   * чтобы first_touch_at стал реальной датой подписки.
+   */
+  app.post("/api/sync/onlymonster", async (_req, reply) => {
+    if (!process.env.ONLYMONSTER_TOKEN) {
+      reply.code(503);
+      return { error: "ONLYMONSTER_TOKEN not configured" };
+    }
+    try {
+      const results = await syncOMAllCreators();
+      const ledger = reconcileFromCache(getDb());
+      return { data: { results, ledger } };
+    } catch (err) {
+      reply.code(500);
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   /**
    * POST /api/sync
    * Body (опц): { creator: "Nekoletta Free" }

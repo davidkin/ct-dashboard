@@ -11,19 +11,28 @@ export type CreatorType = "free" | "vip";
 
 interface CreatorConfig {
   envKey: string;
+  /** env-переменная с OnlyMonster platform_account_id (OF numeric id) */
+  omEnvKey: string;
   type: CreatorType;
   modelGroup: string;
 }
 
 const CREATOR_CONFIG: Record<string, CreatorConfig> = {
-  "Nekoletta Free": { envKey: "ONLYFANSAPI_ACCOUNT_FREE", type: "free", modelGroup: "Nekoletta" },
-  "Nekoletta Vip": { envKey: "ONLYFANSAPI_ACCOUNT_VIP", type: "vip", modelGroup: "Nekoletta" },
+  "Nekoletta Free": { envKey: "ONLYFANSAPI_ACCOUNT_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_FREE", type: "free", modelGroup: "Nekoletta" },
+  "Nekoletta Vip": { envKey: "ONLYFANSAPI_ACCOUNT_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_VIP", type: "vip", modelGroup: "Nekoletta" },
 };
 
 export function getAccountIdForCreator(name: string): string | null {
   const cfg = CREATOR_CONFIG[name];
   if (!cfg) return null;
   return process.env[cfg.envKey] ?? null;
+}
+
+/** OnlyMonster platform_account_id для creator. */
+export function getOMAccountForCreator(name: string): string | null {
+  const cfg = CREATOR_CONFIG[name];
+  if (!cfg) return null;
+  return process.env[cfg.omEnvKey] ?? null;
 }
 
 export function getCreatorType(name: string): CreatorType | null {

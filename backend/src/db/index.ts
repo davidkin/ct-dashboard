@@ -48,6 +48,44 @@ function migrate(db: Database.Database): void {
     db.exec("ALTER TABLE link_spenders ADD COLUMN first_seen_at TEXT");
     db.exec("UPDATE link_spenders SET first_seen_at = fetched_at WHERE first_seen_at IS NULL");
   }
+
+  /* om_subscribed_at — РЕАЛЬНАЯ дата подписки из OnlyMonster (не expiry, не наблюдение).
+     Заполняется om sync-ом, ledger использует как source_event_at. */
+  if (subsCols.length > 0 && !subsCols.some((c) => c.name === "om_subscribed_at")) {
+    db.exec("ALTER TABLE link_subscribers ADD COLUMN om_subscribed_at TEXT");
+  }
+
+  /* OnlyMonster transactions/chargebacks — реальная выручка с fan.id + датами. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS om_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      om_account_id TEXT NOT NULL,
+      creator TEXT,
+      of_id TEXT NOT NULL UNIQUE,
+      fan_id TEXT,
+      amount REAL,
+      type TEXT,
+      status TEXT,
+      occurred_at TEXT,
+      fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_om_tx_fan ON om_transactions(fan_id);
+    CREATE INDEX IF NOT EXISTS idx_om_tx_occurred ON om_transactions(occurred_at);
+
+    CREATE TABLE IF NOT EXISTS om_chargebacks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      om_account_id TEXT NOT NULL,
+      of_id TEXT NOT NULL UNIQUE,
+      fan_id TEXT,
+      amount REAL,
+      type TEXT,
+      status TEXT,
+      chargeback_at TEXT,
+      transaction_at TEXT,
+      fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_om_cb_fan ON om_chargebacks(fan_id);
+  `);
 }
 
 export function closeDb(): void {
