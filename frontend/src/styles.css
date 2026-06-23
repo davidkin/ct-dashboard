@@ -171,6 +171,7 @@ table.data th {
 }
 table.data tr:last-child td { border-bottom: none; }
 table.data tr:hover td { background: var(--hover-bg); }
+table.data th.num,
 table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.data td.muted, .muted { color: var(--muted); }
 
@@ -186,6 +187,148 @@ table.clickable-rows td.row-open {
 }
 table.clickable-rows tbody tr:hover td.row-open {
   background: var(--accent); color: white;
+}
+
+/* ===== HIERARCHICAL PARTNERS TABLE ===== */
+table.partners-table tbody tr.partner-row { cursor: pointer; }
+table.partners-table tbody tr.partner-row td { padding: 14px 16px; }
+table.partners-table tbody tr.partner-row:hover td { background: var(--hover-bg); }
+
+table.partners-table td.expand-cell {
+  width: 32px; text-align: center; padding: 0;
+  cursor: pointer; user-select: none;
+}
+table.partners-table .expand-arrow {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  color: var(--muted); font-size: 10px;
+  transition: transform 0.15s, background 0.15s, color 0.15s;
+}
+table.partners-table .expand-arrow.open {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+table.partners-table td.expand-cell:hover .expand-arrow {
+  background: var(--panel-hi); color: var(--accent);
+}
+
+/* Партнёр-блок: иконка + имя/телега */
+.partner-cell {
+  display: flex; align-items: center; gap: 12px;
+}
+.partner-cell.child { padding-left: 20px; }
+.partner-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--panel-hi); border: 1px solid var(--border);
+  font-size: 13px; flex-shrink: 0;
+}
+.partner-name-block { display: flex; flex-direction: column; min-width: 0; }
+.partner-name {
+  font-weight: 600; font-size: 14px; color: var(--text);
+  letter-spacing: 0; line-height: 1.3;
+}
+table.partners-table tr.partner-row:hover .partner-name { color: var(--accent); }
+.partner-telegram {
+  font-size: 11px; color: var(--muted); text-decoration: none;
+  margin-top: 1px;
+}
+.partner-telegram:hover { color: var(--accent); text-decoration: none; }
+.creator-name { font-size: 13px; color: var(--muted); font-style: italic; }
+
+/* Большие цифры в колонках */
+table.partners-table td.num.big {
+  font-size: 15px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+table.partners-table td.num.big.accent { color: var(--accent); }
+
+/* Child rows — приглушённый фон, чуть меньше */
+table.partners-table tr.partner-child-row td {
+  background: var(--bg);
+  padding: 9px 16px;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px solid var(--border);
+}
+table.partners-table tr.partner-child-row td.num.big { font-size: 13px; font-weight: 500; }
+table.partners-table tr.partner-child-row .creator-name { color: var(--text); font-style: normal; font-weight: 500; }
+
+.creator-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+  border: 1px solid var(--border); background: var(--bg);
+}
+
+/* ===== PAYOUT SYSTEM TABS ===== */
+.payout-tabs {
+  display: flex; gap: 0; margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.payout-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px;
+  background: transparent; border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 14px; font-weight: 500; color: var(--muted);
+  cursor: pointer; font-family: inherit;
+  transition: all 0.15s;
+  margin-bottom: -1px;
+}
+.payout-tab:hover { color: var(--text); background: var(--hover-bg); }
+.payout-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.payout-tab-note {
+  font-size: 11px; font-weight: 400; color: var(--muted);
+  text-transform: lowercase; letter-spacing: 0;
+}
+.badge-exp {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  background: rgba(255,179,0,0.2); color: var(--warn);
+  padding: 1px 6px; border-radius: 4px;
+}
+
+.period-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.period-row .input { max-width: 150px; }
+.period-presets { display: flex; gap: 6px; }
+.period-presets .chip { padding: 3px 10px; font-size: 12px; }
+
+/* Creator row — cursor pointer на expand */
+table.partners-table tr.creator-row td.expand-cell { cursor: pointer; }
+
+/* LEVEL 3: Link row — ещё глубже отступ, мельче типографика */
+table.partners-table tr.link-row td {
+  background: var(--bg-elevated);
+  padding: 7px 16px;
+  border-top: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+table.partners-table tr.link-row td.num { font-weight: 500; font-size: 12px; }
+table.partners-table tr.link-row td.num.accent { color: var(--accent); }
+.partner-cell.link { padding-left: 40px; }
+.link-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  background: transparent; font-size: 11px; flex-shrink: 0;
+}
+.link-name-block { display: flex; flex-direction: column; min-width: 0; }
+.link-campaign {
+  font-weight: 600; font-size: 12px;
+  color: var(--accent); text-decoration: none;
+  letter-spacing: 0; line-height: 1.2;
+}
+.link-campaign:hover { text-decoration: underline; }
+.link-url {
+  font-size: 10px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 180px;
 }
 
 .partner-link { color: var(--text); font-weight: 500; }
@@ -732,6 +875,44 @@ code {
 .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
 .modal-search-row {
   display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+}
+
+/* "По дням" view — компактные чипы фанов сгруппированные по дате */
+.day-group {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-elevated); margin-bottom: 10px;
+}
+.day-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel-hi);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.day-group-header .day-label {
+  font-weight: 600; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.day-group-fans {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 12px;
+}
+.fan-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--border);
+  font-size: 12px; color: var(--text); text-decoration: none;
+  transition: all 0.1s;
+}
+.fan-chip:hover {
+  background: var(--accent); color: white; border-color: var(--accent);
+  text-decoration: none;
+}
+.fan-chip .fan-spent {
+  font-size: 11px; font-weight: 600; color: var(--good);
+  padding-left: 6px; border-left: 1px solid var(--border); margin-left: 2px;
+}
+.fan-chip:hover .fan-spent {
+  color: white; border-left-color: rgba(255,255,255,0.3);
 }
 
 /* ===== ACTIVITY FEED / FINANCE WIDGETS ===== */

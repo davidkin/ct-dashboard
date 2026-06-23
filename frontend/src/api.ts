@@ -1,3 +1,32 @@
+export interface PartnerLinkSummary {
+  partner_id: number;
+  creator: string;
+  id: number;
+  campaign_code: string;
+  of_url: string;
+  of_created_at: string | null;
+  cpf_free: number | null;
+  cpf_paid: number | null;
+  revshare_pct: number | null;
+  clicks_count: number;
+  subscribers_count: number;
+  spenders_count: number;
+  revenue_total: number;
+  payout_total: number;
+}
+
+export interface PartnerCreatorBreakdown {
+  partner_id: number;
+  creator: string;
+  links_count: number;
+  clicks_total: number | null;
+  subs_total: number | null;
+  spenders_total: number | null;
+  revenue_total: number | null;
+  payout_total: number | null;
+  links: PartnerLinkSummary[];
+}
+
 export interface PartnerRow {
   id: number;
   display_name: string;
@@ -14,6 +43,8 @@ export interface PartnerRow {
   revenue_total: number | null;
   payout_total: number | null;
   last_synced_at: string | null;
+  by_creator: PartnerCreatorBreakdown[];
+  sparkline: Array<{ day: string; clicks: number }>;
 }
 
 export interface Link {
@@ -64,6 +95,9 @@ export interface Creator {
   last_synced_at: string | null;
   account_id: string | null;
   configured: boolean;
+  avatar: string | null;
+  header: string | null;
+  of_username: string | null;
 }
 
 export interface PartnerTrend {
@@ -148,8 +182,9 @@ export interface LinkSubscriber {
   link_id: number;
   of_fan_id: string;
   username: string | null;
-  subscribed_at: string | null;
+  subscribed_at: string | null;     // OF: subscribedByExpireDate — когда подписка ИСТЕКАЕТ
   is_active: number;
+  first_seen_at: string | null;      // когда МЫ впервые увидели → прокси-дата подписки
   fetched_at: string;
 }
 
@@ -160,6 +195,7 @@ export interface LinkSpender {
   username: string | null;
   revenue_total: number;
   calculated_at: string | null;
+  first_seen_at: string | null;
   fetched_at: string;
 }
 
@@ -217,6 +253,65 @@ export interface WebhookEvent {
   error: string | null;
 }
 
+/* === Attribution (Игорь) === */
+export interface AttributionPartner {
+  partner_id: number;
+  display_name: string;
+  first_touch_fans: number;
+  repeat_touch_fans: number;
+  overlap_fans: number;
+  cpf_eligible_fans: number;
+  cpf_component: number;
+  revshare_component: number;
+  payout_total: number;
+  free_to_vip_conversions: number;
+  gross_vip_revenue_from_free_fans: number;
+  agency_recoup_rate: number | null;
+}
+
+export interface AttributionLink {
+  link_id: number;
+  campaign_code: string;
+  of_url: string;
+  creator: string | null;
+  partner_id: number | null;
+  gross_subscribers: number;
+  unique_fans: number;
+  first_touch_fans: number;
+  repeat_overlap_fans: number;
+  spenders: number;
+  revenue: number;
+  attributed_purchases: number;
+  payout_breakdown: {
+    link_id: number;
+    cpf_component: number;
+    revshare_component: number;
+    payout_total: number;
+    cpf_eligible_fans?: number;
+  } | null;
+}
+
+export interface AttributionOverview {
+  total_unique_fans: number;
+  total_first_touch_fans: number;
+  total_repeat_touch_fans: number;
+  multi_touch_fans: number;
+  overlap_fans: number;
+  overlap_rate: number;
+  free_fans: number;
+  vip_fans: number;
+  free_to_vip_conversions: number;
+  free_to_vip_conversion_rate: number;
+  avg_time_to_vip_hours: number | null;
+  median_time_to_vip_hours: number | null;
+  gross_vip_revenue_from_free_fans: number;
+  free_cpf_cost: number;
+  agency_recoup_rate: number | null;
+  total_cpf_component: number;
+  total_revshare_component: number;
+  total_payout: number;
+}
+
 export interface SyncStatus {
   recent: unknown[];
   links_with_metrics: number;
@@ -254,7 +349,14 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status}`);
     return res.json();
   },
-  partners: (creator?: string) => get<PartnerRow[]>(withCreator("/api/partners", creator)),
+  partners: (creator?: string, from?: string, to?: string) => {
+    let url = withCreator("/api/partners", creator);
+    if (from && to) {
+      const sep = url.includes("?") ? "&" : "?";
+      url = `${url}${sep}from=${from}&to=${to}`;
+    }
+    return get<PartnerRow[]>(url);
+  },
   partner: (id: number, creator?: string) =>
     get<{ partner: Partner; links: Link[] }>(withCreator(`/api/partners/${id}`, creator)),
   syncStatus: () => get<SyncStatus>("/api/sync/status"),
@@ -276,6 +378,23 @@ export const api = {
   transactions: (days = 30) => get<Transaction[]>(`/api/transactions?days=${days}`),
   payouts: () => get<Payout[]>("/api/payouts"),
   webhookEvents: (limit = 50) => get<WebhookEvent[]>(`/api/webhooks/events?limit=${limit}`),
+  attributionPartners: (from?: string, to?: string) => {
+    const q = from && to ? `?from=${from}&to=${to}` : "";
+    return get<AttributionPartner[]>(`/api/attribution/partners${q}`);
+  },
+  attributionOverview: () => get<AttributionOverview>("/api/attribution/overview"),
+  attributionPartnerLinks: (partnerId: number, from?: string, to?: string) => {
+    const q = from && to ? `?from=${from}&to=${to}` : "";
+    return get<AttributionLink[]>(`/api/attribution/partners/${partnerId}/links${q}`);
+  },
+  syncFans: async () => {
+    const r = await fetch("/api/sync/fans", { method: "POST" });
+    return r.json();
+  },
+  pullAllSubscribers: async (force = false) => {
+    const r = await fetch(`/api/sync/all-subscribers${force ? "?force=1" : ""}`, { method: "POST" });
+    return r.json();
+  },
   forceFinanceSync: async () => {
     const r = await fetch("/api/finance/sync", { method: "POST" });
     return r.json();

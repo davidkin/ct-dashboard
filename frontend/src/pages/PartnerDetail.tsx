@@ -674,8 +674,12 @@ function CreatorLinksGroup({
         bv = (b[sortKey] as number) ?? 0;
       }
       let cmp = 0;
-      if (typeof av === "string" && typeof bv === "string") cmp = av.localeCompare(bv);
-      else cmp = Number(av) - Number(bv);
+      if (typeof av === "string" && typeof bv === "string") {
+        /* numeric: true даёт natural sort — "camp_2" < "camp_10" < "camp_55" */
+        cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+      } else {
+        cmp = Number(av) - Number(bv);
+      }
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [items, sortKey, sortDir]);

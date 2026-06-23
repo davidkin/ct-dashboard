@@ -31,10 +31,22 @@ export function getDb(): Database.Database {
  * SQLite не поддерживает ALTER ... IF NOT EXISTS, поэтому проверяем сами.
  */
 function migrate(db: Database.Database): void {
-  const cols = db.prepare("PRAGMA table_info(links)").all() as Array<{ name: string }>;
-  const has = (name: string) => cols.some((c) => c.name === name);
-  if (!has("of_created_at")) {
+  const linksCols = db.prepare("PRAGMA table_info(links)").all() as Array<{ name: string }>;
+  if (!linksCols.some((c) => c.name === "of_created_at")) {
     db.exec("ALTER TABLE links ADD COLUMN of_created_at TEXT");
+  }
+
+  /* first_seen_at — когда МЫ впервые увидели этого фана/спендера в OF API.
+     Это наша «прокси-дата подписки», т.к. OF API напрямую не отдаёт subscribed_at. */
+  const subsCols = db.prepare("PRAGMA table_info(link_subscribers)").all() as Array<{ name: string }>;
+  if (subsCols.length > 0 && !subsCols.some((c) => c.name === "first_seen_at")) {
+    db.exec("ALTER TABLE link_subscribers ADD COLUMN first_seen_at TEXT");
+    db.exec("UPDATE link_subscribers SET first_seen_at = fetched_at WHERE first_seen_at IS NULL");
+  }
+  const spendersCols = db.prepare("PRAGMA table_info(link_spenders)").all() as Array<{ name: string }>;
+  if (spendersCols.length > 0 && !spendersCols.some((c) => c.name === "first_seen_at")) {
+    db.exec("ALTER TABLE link_spenders ADD COLUMN first_seen_at TEXT");
+    db.exec("UPDATE link_spenders SET first_seen_at = fetched_at WHERE first_seen_at IS NULL");
   }
 }
 
