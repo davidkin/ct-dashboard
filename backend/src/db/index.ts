@@ -73,6 +73,22 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_daily_clicks_link_day ON daily_link_clicks(link_id, day);
   `);
 
+  /* daily_sheet_stats — точный снимок per-(link, day) из ручной таблицы Traffic
+     Tracking (клики + фаны как ввёл партнёр). В отчёте перебивает OM-derived,
+     чтобы цифры совпадали с таблицей. Источник правды по истории кликов. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS daily_sheet_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,                 /* YYYY-MM-DD */
+      clicks INTEGER NOT NULL DEFAULT 0,
+      fans INTEGER NOT NULL DEFAULT 0,
+      imported_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(link_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_sheet_link_day ON daily_sheet_stats(link_id, day);
+  `);
+
   /* OnlyMonster transactions/chargebacks — реальная выручка с fan.id + датами. */
   db.exec(`
     CREATE TABLE IF NOT EXISTS om_transactions (

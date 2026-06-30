@@ -180,7 +180,37 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     if (first && (!earliestCaptureDay || first < earliestCaptureDay)) earliestCaptureDay = first;
   }
 
-  /* === активные компании (есть саб/клик в диапазоне) === */
+  /* === оверлей: точный снимок из ручной таблицы Traffic Tracking ===
+     Импортированные клики+фаны перебивают OM-derived, чтобы цифры совпадали
+     с таблицей. Покрывает историю кликов, которую из OM не восстановить. */
+  const sheetByLinkDay = new Map<number, Map<string, { clicks: number; fans: number }>>();
+  let earliestSheetDay: string | null = null;
+  let latestSheetDay: string | null = null;
+  for (const s of db
+    .prepare(
+      `SELECT ds.link_id, ds.day, ds.clicks, ds.fans
+       FROM daily_sheet_stats ds JOIN links l ON l.id = ds.link_id
+       WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@partner IS NULL OR l.partner_id = @partner)`,
+    )
+    .all({ creator: creator ?? null, partner }) as Array<{
+      link_id: number;
+      day: string;
+      clicks: number;
+      fans: number;
+    }>) {
+    let m = sheetByLinkDay.get(s.link_id);
+    if (!m) { m = new Map(); sheetByLinkDay.set(s.link_id, m); }
+    m.set(s.day, { clicks: s.clicks, fans: s.fans });
+    if (!earliestSheetDay || s.day < earliestSheetDay) earliestSheetDay = s.day;
+    if (!latestSheetDay || s.day > latestSheetDay) latestSheetDay = s.day;
+  }
+  /* День внутри диапазона таблицы → для покрытых компаний берём ТОЛЬКО таблицу
+     (0 где нет строки), чтобы дневные тоталы совпадали с таблицей точь-в-точь. */
+  const inSheetSpan = (day: string) =>
+    earliestSheetDay != null && latestSheetDay != null && day >= earliestSheetDay && day <= latestSheetDay;
+
+  /* === активные компании (есть саб/клик/строка-из-таблицы в диапазоне) === */
   const inRange = (day: string) => day >= from && day <= to;
   const activeLinks = new Set<number>();
   if (opts.includeEmpty) {
@@ -197,6 +227,14 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     for (const [linkId, m] of deltaByLinkDay) {
       for (const [day, v] of m) {
         if (inRange(day) && v != null && v > 0) {
+          activeLinks.add(linkId);
+          break;
+        }
+      }
+    }
+    for (const [linkId, m] of sheetByLinkDay) {
+      for (const day of m.keys()) {
+        if (inRange(day)) {
           activeLinks.add(linkId);
           break;
         }
@@ -224,9 +262,20 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     let tPayout = 0;
 
     for (const camp of campaigns) {
-      const subs = subsByLinkDay.get(camp.link_id)?.get(date) ?? 0;
-      const dm = deltaByLinkDay.get(camp.link_id);
-      const clicks = dm && dm.has(date) ? dm.get(date)! : null;
+      const covered = sheetByLinkDay.has(camp.link_id);
+      const sheet = sheetByLinkDay.get(camp.link_id)?.get(date);
+      let subs: number;
+      let clicks: number | null;
+      if (covered && inSheetSpan(date)) {
+        /* покрыта таблицей и день в её диапазоне → только таблица (0 где нет строки) */
+        subs = sheet ? sheet.fans : 0;
+        clicks = sheet ? sheet.clicks : 0;
+      } else {
+        /* другие партнёры или дни вне диапазона таблицы → OM-derived */
+        subs = subsByLinkDay.get(camp.link_id)?.get(date) ?? 0;
+        const dm = deltaByLinkDay.get(camp.link_id);
+        clicks = dm && dm.has(date) ? dm.get(date)! : null;
+      }
       const cr = clicks != null && clicks > 0 ? subs / clicks : null;
       const payout = subs * camp.cpf;
       cells[String(camp.link_id)] = { clicks, subs, cr, payout };
@@ -256,6 +305,8 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     tz: TRACKING_TZ,
     campaigns,
     rows,
-    clicks_available_from: earliestCaptureDay,
+    clicks_available_from: [earliestSheetDay, earliestCaptureDay]
+      .filter((d): d is string => !!d)
+      .sort()[0] ?? null,
   };
 }

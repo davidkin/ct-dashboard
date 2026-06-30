@@ -14,9 +14,6 @@ const dayLabel = (d: string): string =>
 const dayLabelFull = (d: string): string =>
   new Date(`${d}T00:00:00`).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-const deltaFmt = (n: number | null): string => (n == null ? "—" : n > 0 ? `+${n}` : `${n}`);
-const deltaClass = (n: number | null): string => (n == null || n === 0 ? "" : n > 0 ? "delta-up" : "delta-down");
-
 interface PartnerGroup {
   key: string;
   partnerId: number | null;
@@ -56,7 +53,6 @@ function PartnerSection({
 }) {
   const { dayRows, foot, summary } = useMemo(() => {
     const campaigns = group.campaigns;
-    let prevSubs: number | null = null;
     const dayRows = rows.map((row) => {
       let clicks = 0, clicksHas = false, subs = 0, payout = 0;
       for (const c of campaigns) {
@@ -68,9 +64,7 @@ function PartnerSection({
       }
       const totalClicks = clicksHas ? clicks : null;
       const cr = totalClicks != null && totalClicks > 0 ? subs / totalClicks : null;
-      const subs_delta = prevSubs == null ? null : subs - prevSubs;
-      prevSubs = subs;
-      return { date: row.date, cells: row.cells, total: { clicks: totalClicks, subs, cr, payout, subs_delta } };
+      return { date: row.date, cells: row.cells, total: { clicks: totalClicks, subs, cr, payout } };
     });
 
     const perCamp = new Map<number, { clicks: number; clicksHas: boolean; subs: number; payout: number }>();
@@ -110,7 +104,7 @@ function PartnerSection({
             <thead>
               <tr>
                 <th className="daily-sticky" rowSpan={2}>Дата</th>
-                <th className="num daily-total-grp daily-bd" colSpan={5}>Total за день</th>
+                <th className="num daily-total-grp daily-bd" colSpan={4}>Total за день</th>
                 {group.campaigns.map((c) => (
                   <th key={c.link_id} className="num daily-camp-grp daily-bd" colSpan={4}>
                     {c.campaign_code}
@@ -126,7 +120,6 @@ function PartnerSection({
                 <th className="num">Фаны</th>
                 <th className="num">CR</th>
                 <th className="num">Сумма</th>
-                <th className="num">Δ<Hint text="Изменение дневного объёма фанов к предыдущему дню (разница со вчера)." /></th>
                 {group.campaigns.map((c) => (
                   <Fragment key={c.link_id}>
                     <th className="num daily-bd">Клики</th>
@@ -145,9 +138,6 @@ function PartnerSection({
                   <td className="num daily-total-cell strong">{intFmt(row.total.subs)}</td>
                   <td className="num daily-total-cell">{pctFmt(row.total.cr)}</td>
                   <td className="num daily-total-cell">{moneyFmt(row.total.payout)}</td>
-                  <td className={`num daily-total-cell ${deltaClass(row.total.subs_delta)}`}>
-                    {deltaFmt(row.total.subs_delta)}
-                  </td>
                   {group.campaigns.map((c) => (
                     <CampCells key={c.link_id} cell={row.cells[String(c.link_id)]} />
                   ))}
@@ -161,7 +151,6 @@ function PartnerSection({
                 <td className="num strong">{intFmt(foot.grand.subs)}</td>
                 <td className="num">{foot.grand.clicks ? pctFmt(foot.grand.subs / foot.grand.clicks) : "—"}</td>
                 <td className="num">{moneyFmt(foot.grand.payout)}</td>
-                <td className="num">—</td>
                 {group.campaigns.map((c) => {
                   const agg = foot.perCamp.get(c.link_id)!;
                   const clicks = agg.clicksHas ? agg.clicks : null;
@@ -193,6 +182,7 @@ export default function DailyTracking() {
   const [to, setTo] = useState("");
   const [showAll, setShowAll] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState(false);
@@ -214,6 +204,26 @@ export default function DailyTracking() {
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [creator, from, to, showAll, partnerId]);
+
+  const doImport = async () => {
+    setImporting(true);
+    setMsg(null);
+    try {
+      const res = await api.dailyImportSheet();
+      if (res.error) { setMsg(`Ошибка импорта: ${res.error}`); setErr(true); }
+      else {
+        const arr = (res.data as Array<{ tab: string; rows_imported: number; campaigns_matched: string[]; min_day: string | null; max_day: string | null }>) ?? [];
+        setErr(false);
+        setMsg("Импорт из таблицы: " + arr.map((r) => `${r.tab} — ${r.rows_imported} строк (${r.campaigns_matched.length} комп, ${r.min_day}…${r.max_day})`).join(" · "));
+        load();
+      }
+    } catch (e) {
+      setMsg(`Ошибка импорта: ${e}`);
+      setErr(true);
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const doCapture = async () => {
     setCapturing(true);
@@ -282,6 +292,9 @@ export default function DailyTracking() {
               {allCollapsed ? "Развернуть все" : "Свернуть все"}
             </button>
           )}
+          <button className="btn ghost" onClick={doImport} disabled={importing} title="Точный снимок ручной таблицы Traffic Tracking (клики + фаны)">
+            {importing ? "Импорт…" : "Импорт из таблицы"}
+          </button>
           <button className="btn" onClick={doCapture} disabled={capturing}>
             {capturing ? "Снимаю…" : "Снять снимок сейчас"}
           </button>

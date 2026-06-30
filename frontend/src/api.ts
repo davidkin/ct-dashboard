@@ -450,6 +450,10 @@ export const api = {
     const r = await fetch("/api/daily-tracking/capture", { method: "POST" });
     return r.json();
   },
+  dailyImportSheet: async (): Promise<{ data?: unknown; error?: string }> => {
+    const r = await fetch("/api/daily-tracking/import-sheet", { method: "POST" });
+    return r.json();
+  },
   updatePartner: async (id: number, patch: PartnerPatch): Promise<Partner> => {
     const res = await fetch(`/api/partners/${id}`, {
       method: "PATCH",
