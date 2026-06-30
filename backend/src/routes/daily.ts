@@ -10,15 +10,17 @@ export async function registerDailyRoutes(app: FastifyInstance): Promise<void> {
    * from/to — YYYY-MM-DD в TRACKING_TZ. По умолчанию последние 30 дней.
    * all=1 — показывать и компании без активности в периоде.
    */
-  app.get<{ Querystring: { creator?: string; from?: string; to?: string; all?: string } }>(
+  app.get<{ Querystring: { creator?: string; from?: string; to?: string; all?: string; partner?: string } }>(
     "/api/daily-tracking",
     async (req) => {
       const to = req.query.to || todayLocal();
       const from = req.query.from || addDays(to, -29);
+      const partnerNum = req.query.partner ? Number(req.query.partner) : null;
       const report = buildDailyReport({
         creator: req.query.creator || null,
         from,
         to,
+        partner: Number.isFinite(partnerNum) ? partnerNum : null,
         includeEmpty: req.query.all === "1",
       });
       return { data: report };

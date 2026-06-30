@@ -947,6 +947,22 @@ code {
 .app-nav-link.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 
 /* ===== DAILY TRACKING GRID ===== */
+/* секции партнёров (каждый партнёр = свой дневной мини-грид) */
+.daily-sections { display: flex; flex-direction: column; gap: 16px; }
+.daily-partner-section { border: 1px solid var(--border); border-radius: var(--radius, 12px); overflow: hidden; }
+.daily-partner-head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; cursor: pointer; color: var(--text);
+  background: var(--bg-elevated); border: none; border-bottom: 1px solid var(--border);
+  padding: 11px 16px; font-size: 14px;
+}
+.daily-partner-head:hover { background: var(--hover-bg); }
+.daily-partner-section.collapsed .daily-partner-head { border-bottom: none; }
+.daily-collapse { color: var(--muted); font-size: 12px; width: 14px; }
+.daily-partner-name { font-weight: 700; font-size: 15px; color: var(--accent); }
+.daily-partner-summary { color: var(--muted); font-size: 12px; margin-left: auto; }
+.daily-partner-section .daily-scroll { border: none; border-radius: 0; max-height: 70vh; }
+
 .daily-scroll {
   overflow: auto; max-height: 74vh;
   border: 1px solid var(--border); border-radius: var(--radius, 12px);
@@ -955,9 +971,10 @@ table.data.daily-table { margin: 0; border: none; border-radius: 0; min-width: 1
 .daily-table th, .daily-table td {
   padding: 7px 10px; white-space: nowrap; font-size: 13px;
 }
-/* sticky-шапка (внутри прокручиваемого контейнера) */
-.daily-table thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-elevated); }
-.daily-table thead tr:nth-child(2) th { top: 44px; } /* высота первой строки шапки (имя + CPF) */
+/* sticky-шапка из двух ярусов (компания → метрики) */
+.daily-table thead th { position: sticky; z-index: 1; background: var(--bg-elevated); }
+.daily-table thead tr:nth-child(1) th { top: 0; }
+.daily-table thead tr:nth-child(2) th { top: 40px; } /* высота строки с именем компании + CPF */
 /* группирующие заголовки блоков */
 .daily-table .daily-total-grp, .daily-table .daily-camp-grp {
   text-align: center; text-transform: none; letter-spacing: 0;
@@ -973,8 +990,9 @@ table.data.daily-table { margin: 0; border: none; border-radius: 0; min-width: 1
 }
 .daily-table thead .daily-sticky { z-index: 3; }
 .daily-table tbody tr:hover .daily-sticky { background: var(--hover-bg); }
-/* вертикальные разделители блоков */
+/* вертикальные разделители: толстый на стыке партнёров/Total, тонкий между компаниями */
 .daily-table .daily-bd { border-left: 2px solid var(--border); }
+.daily-table .daily-bd-camp { border-left: 1px solid var(--border); }
 /* подсветка блока Total */
 .daily-table .daily-total-cell { background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .daily-table td.strong { font-weight: 700; }

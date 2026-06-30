@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { api, DailyCell, DailyReport } from "../api";
+import { api, DailyCampaign, DailyCell, DailyReport, DailyRow, PartnerRow } from "../api";
 import { CreatorSwitcher } from "../components/CreatorSwitcher";
 import { PeriodPicker } from "../components/PeriodPicker";
 import { Hint } from "../components/Hint";
@@ -16,6 +16,13 @@ const dayLabelFull = (d: string): string =>
 
 const deltaFmt = (n: number | null): string => (n == null ? "—" : n > 0 ? `+${n}` : `${n}`);
 const deltaClass = (n: number | null): string => (n == null || n === 0 ? "" : n > 0 ? "delta-up" : "delta-down");
+
+interface PartnerGroup {
+  key: string;
+  partnerId: number | null;
+  name: string;
+  campaigns: DailyCampaign[];
+}
 
 /** Четыре ячейки одной компании за день: Клики · Фаны · CR · Сумма. */
 function CampCells({ cell }: { cell?: DailyCell }) {
@@ -33,10 +40,155 @@ function CampCells({ cell }: { cell?: DailyCell }) {
   );
 }
 
+/** Дневной мини-грид одного партнёра: его компании-колонки + собственный Total за день. */
+function PartnerSection({
+  group,
+  rows,
+  creator,
+  collapsed,
+  onToggle,
+}: {
+  group: PartnerGroup;
+  rows: DailyRow[];
+  creator?: string;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const { dayRows, foot, summary } = useMemo(() => {
+    const campaigns = group.campaigns;
+    let prevSubs: number | null = null;
+    const dayRows = rows.map((row) => {
+      let clicks = 0, clicksHas = false, subs = 0, payout = 0;
+      for (const c of campaigns) {
+        const cell = row.cells[String(c.link_id)];
+        if (!cell) continue;
+        if (cell.clicks != null) { clicks += cell.clicks; clicksHas = true; }
+        subs += cell.subs;
+        payout += cell.payout;
+      }
+      const totalClicks = clicksHas ? clicks : null;
+      const cr = totalClicks != null && totalClicks > 0 ? subs / totalClicks : null;
+      const subs_delta = prevSubs == null ? null : subs - prevSubs;
+      prevSubs = subs;
+      return { date: row.date, cells: row.cells, total: { clicks: totalClicks, subs, cr, payout, subs_delta } };
+    });
+
+    const perCamp = new Map<number, { clicks: number; clicksHas: boolean; subs: number; payout: number }>();
+    for (const c of campaigns) perCamp.set(c.link_id, { clicks: 0, clicksHas: false, subs: 0, payout: 0 });
+    let gC = 0, gCH = false, gS = 0, gP = 0;
+    for (const r of dayRows) {
+      for (const c of campaigns) {
+        const cell = r.cells[String(c.link_id)];
+        if (!cell) continue;
+        const a = perCamp.get(c.link_id)!;
+        if (cell.clicks != null) { a.clicks += cell.clicks; a.clicksHas = true; }
+        a.subs += cell.subs;
+        a.payout += cell.payout;
+      }
+      if (r.total.clicks != null) { gC += r.total.clicks; gCH = true; }
+      gS += r.total.subs;
+      gP += r.total.payout;
+    }
+    return { dayRows, foot: { perCamp, grand: { clicks: gCH ? gC : null, subs: gS, payout: gP } }, summary: { clicks: gCH ? gC : null, subs: gS, payout: gP } };
+  }, [group, rows]);
+
+  const summaryText =
+    `${group.campaigns.length} комп · ${summary.subs} фанов · ${moneyFmt(summary.payout)}` +
+    (summary.clicks != null ? ` · ${intFmt(summary.clicks)} кликов` : "");
+
+  return (
+    <div className={`daily-partner-section${collapsed ? " collapsed" : ""}`}>
+      <button className="daily-partner-head" onClick={onToggle}>
+        <span className="daily-collapse">{collapsed ? "▸" : "▾"}</span>
+        <span className="daily-partner-name">{group.name}</span>
+        <span className="daily-partner-summary">{summaryText}</span>
+      </button>
+
+      {!collapsed && (
+        <div className="daily-scroll">
+          <table className="data daily-table">
+            <thead>
+              <tr>
+                <th className="daily-sticky" rowSpan={2}>Дата</th>
+                <th className="num daily-total-grp daily-bd" colSpan={5}>Total за день</th>
+                {group.campaigns.map((c) => (
+                  <th key={c.link_id} className="num daily-camp-grp daily-bd" colSpan={4}>
+                    {c.campaign_code}
+                    <span className="daily-cpf">
+                      CPF ${c.cpf.toFixed(2)}
+                      {!creator && <> · {c.creator.replace("Nekoletta ", "")}</>}
+                    </span>
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                <th className="num daily-bd">Клики</th>
+                <th className="num">Фаны</th>
+                <th className="num">CR</th>
+                <th className="num">Сумма</th>
+                <th className="num">Δ<Hint text="Изменение дневного объёма фанов к предыдущему дню (разница со вчера)." /></th>
+                {group.campaigns.map((c) => (
+                  <Fragment key={c.link_id}>
+                    <th className="num daily-bd">Клики</th>
+                    <th className="num">Фаны</th>
+                    <th className="num">CR</th>
+                    <th className="num">Сумма</th>
+                  </Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dayRows.map((row) => (
+                <tr key={row.date}>
+                  <td className="daily-sticky">{dayLabel(row.date)}</td>
+                  <td className="num daily-total-cell daily-bd">{intFmt(row.total.clicks)}</td>
+                  <td className="num daily-total-cell strong">{intFmt(row.total.subs)}</td>
+                  <td className="num daily-total-cell">{pctFmt(row.total.cr)}</td>
+                  <td className="num daily-total-cell">{moneyFmt(row.total.payout)}</td>
+                  <td className={`num daily-total-cell ${deltaClass(row.total.subs_delta)}`}>
+                    {deltaFmt(row.total.subs_delta)}
+                  </td>
+                  {group.campaigns.map((c) => (
+                    <CampCells key={c.link_id} cell={row.cells[String(c.link_id)]} />
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="daily-foot">
+                <td className="daily-sticky">Σ период</td>
+                <td className="num daily-bd">{intFmt(foot.grand.clicks)}</td>
+                <td className="num strong">{intFmt(foot.grand.subs)}</td>
+                <td className="num">{foot.grand.clicks ? pctFmt(foot.grand.subs / foot.grand.clicks) : "—"}</td>
+                <td className="num">{moneyFmt(foot.grand.payout)}</td>
+                <td className="num">—</td>
+                {group.campaigns.map((c) => {
+                  const agg = foot.perCamp.get(c.link_id)!;
+                  const clicks = agg.clicksHas ? agg.clicks : null;
+                  return (
+                    <Fragment key={c.link_id}>
+                      <td className="num daily-bd">{intFmt(clicks)}</td>
+                      <td className="num strong">{intFmt(agg.subs)}</td>
+                      <td className="num">{clicks ? pctFmt(agg.subs / clicks) : "—"}</td>
+                      <td className="num">{moneyFmt(agg.payout)}</td>
+                    </Fragment>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DailyTracking() {
   const [params] = useSearchParams();
   const creator = params.get("creator") || undefined;
   const [report, setReport] = useState<DailyReport | null>(null);
+  const [partners, setPartners] = useState<PartnerRow[]>([]);
+  const [partnerId, setPartnerId] = useState<number | "">("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -44,17 +196,24 @@ export default function DailyTracking() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    api.partners().then((rows) =>
+      setPartners([...rows].sort((a, b) => a.display_name.localeCompare(b.display_name))),
+    ).catch(console.error);
+  }, []);
 
   const load = () => {
     setLoading(true);
     api
-      .dailyTracking({ creator, from: from || undefined, to: to || undefined, all: showAll })
+      .dailyTracking({ creator, from: from || undefined, to: to || undefined, all: showAll, partner: partnerId || undefined })
       .then((r) => { setReport(r); setErr(false); })
       .catch((e) => { setMsg(`Ошибка загрузки: ${e}`); setErr(true); })
       .finally(() => setLoading(false));
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [creator, from, to, showAll]);
+  useEffect(() => { load(); }, [creator, from, to, showAll, partnerId]);
 
   const doCapture = async () => {
     setCapturing(true);
@@ -77,30 +236,35 @@ export default function DailyTracking() {
     }
   };
 
-  /* Итоги за весь период (footer-строка): сумма по компаниям + grand total. */
-  const footer = useMemo(() => {
-    if (!report) return null;
-    const perCamp = new Map<number, { clicks: number; clicksHas: boolean; subs: number; payout: number }>();
-    for (const c of report.campaigns) perCamp.set(c.link_id, { clicks: 0, clicksHas: false, subs: 0, payout: 0 });
-    let gClicks = 0, gClicksHas = false, gSubs = 0, gPayout = 0;
-    for (const row of report.rows) {
-      for (const c of report.campaigns) {
-        const cell = row.cells[String(c.link_id)];
-        if (!cell) continue;
-        const agg = perCamp.get(c.link_id)!;
-        if (cell.clicks != null) { agg.clicks += cell.clicks; agg.clicksHas = true; }
-        agg.subs += cell.subs;
-        agg.payout += cell.payout;
+  /* Группы партнёров (кампании из бэка уже отсортированы по партнёру). */
+  const groups = useMemo<PartnerGroup[]>(() => {
+    if (!report) return [];
+    const map = new Map<string, PartnerGroup>();
+    const order: string[] = [];
+    for (const c of report.campaigns) {
+      const key = String(c.partner_id ?? "none");
+      if (!map.has(key)) {
+        map.set(key, { key, partnerId: c.partner_id, name: c.partner_name ?? "— без партнёра", campaigns: [] });
+        order.push(key);
       }
-      if (row.total.clicks != null) { gClicks += row.total.clicks; gClicksHas = true; }
-      gSubs += row.total.subs;
-      gPayout += row.total.payout;
+      map.get(key)!.campaigns.push(c);
     }
-    return {
-      perCamp,
-      grand: { clicks: gClicksHas ? gClicks : null, subs: gSubs, payout: gPayout },
-    };
+    return order.map((k) => map.get(k)!);
   }, [report]);
+
+  const toggle = (key: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+  const allCollapsed = report ? groups.length > 0 && groups.every((g) => collapsed.has(g.key)) : false;
+  const toggleAll = () => {
+    if (allCollapsed) setCollapsed(new Set());
+    else setCollapsed(new Set(groups.map((g) => g.key)));
+  };
 
   return (
     <section className="dashboard-section">
@@ -108,11 +272,16 @@ export default function DailyTracking() {
         <div>
           <h2>Дневной трекинг</h2>
           <p>
-            Авто-аналог ручной таблицы: клики + фаны по каждой компании за день, тотал за день и дельта.
-            Снимок счётчика кликов делается ночью в 23:55 по Киеву; фаны считаются по реальным датам подписки.
+            Авто-аналог ручной таблицы: по каждому партнёру — его компании, клики + фаны за день, Total за день
+            и дельта со вчера. Снимок счётчика кликов — ночью в 23:55 по Киеву; фаны — по реальным датам подписки.
           </p>
         </div>
         <div className="section-actions">
+          {groups.length > 0 && (
+            <button className="btn ghost" onClick={toggleAll}>
+              {allCollapsed ? "Развернуть все" : "Свернуть все"}
+            </button>
+          )}
           <button className="btn" onClick={doCapture} disabled={capturing}>
             {capturing ? "Снимаю…" : "Снять снимок сейчас"}
           </button>
@@ -133,10 +302,23 @@ export default function DailyTracking() {
         onChange={(f, t) => { setFrom(f); setTo(t); }}
         label="Период"
         labelHint="Дни считаются по таймзоне Europe/Kyiv. По умолчанию — последние 30 дней."
-        rightHint={report ? `${report.campaigns.length} компаний · ${report.rows.length} дней` : undefined}
+        rightHint={report ? `${groups.length} партнёров · ${report.campaigns.length} компаний · ${report.rows.length} дней` : undefined}
       />
 
       <div className="toolbar" style={{ marginTop: 8 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <select
+            className="input"
+            value={partnerId}
+            onChange={(e) => setPartnerId(e.target.value ? Number(e.target.value) : "")}
+          >
+            <option value="">Все партнёры</option>
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>{p.display_name}</option>
+            ))}
+          </select>
+          <Hint text="Оставить только одного партнёра — его секцию (лист как в ручной таблице)." />
+        </span>
         <label className="muted" style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 13, cursor: "pointer" }}>
           <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
           Показывать компании без активности
@@ -151,85 +333,22 @@ export default function DailyTracking() {
 
       {!report || loading ? (
         <TableSkeleton rows={8} cols={10} />
-      ) : report.campaigns.length === 0 ? (
+      ) : groups.length === 0 ? (
         <div className="empty" style={{ padding: 32, textAlign: "center", color: "var(--muted)" }}>
           Нет активности за выбранный период.
         </div>
       ) : (
-        <div className="daily-scroll">
-          <table className="data daily-table">
-            <thead>
-              <tr>
-                <th className="daily-sticky" rowSpan={2}>Дата</th>
-                <th className="num daily-total-grp daily-bd" colSpan={5}>Total за день</th>
-                {report.campaigns.map((c) => (
-                  <th key={c.link_id} className="num daily-camp-grp daily-bd" colSpan={4}>
-                    {c.campaign_code}
-                    <span className="daily-cpf">
-                      CPF ${c.cpf.toFixed(2)}
-                      {!creator && <> · {c.creator.replace("Nekoletta ", "")}</>}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                <th className="num daily-bd">Клики</th>
-                <th className="num">Фаны</th>
-                <th className="num">CR</th>
-                <th className="num">Сумма</th>
-                <th className="num">Δ<Hint text="Изменение дневного объёма фанов к предыдущему дню." /></th>
-                {report.campaigns.map((c) => (
-                  <Fragment key={c.link_id}>
-                    <th className="num daily-bd">Клики</th>
-                    <th className="num">Фаны</th>
-                    <th className="num">CR</th>
-                    <th className="num">Сумма</th>
-                  </Fragment>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.rows.map((row) => (
-                <tr key={row.date}>
-                  <td className="daily-sticky">{dayLabel(row.date)}</td>
-                  <td className="num daily-total-cell daily-bd">{intFmt(row.total.clicks)}</td>
-                  <td className="num daily-total-cell strong">{intFmt(row.total.subs)}</td>
-                  <td className="num daily-total-cell">{pctFmt(row.total.cr)}</td>
-                  <td className="num daily-total-cell">{moneyFmt(row.total.payout)}</td>
-                  <td className={`num daily-total-cell ${deltaClass(row.total.subs_delta)}`}>
-                    {deltaFmt(row.total.subs_delta)}
-                  </td>
-                  {report.campaigns.map((c) => (
-                    <CampCells key={c.link_id} cell={row.cells[String(c.link_id)]} />
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="daily-foot">
-                <td className="daily-sticky">Σ период</td>
-                <td className="num daily-bd">{intFmt(footer?.grand.clicks ?? null)}</td>
-                <td className="num strong">{intFmt(footer?.grand.subs ?? null)}</td>
-                <td className="num">
-                  {footer && footer.grand.clicks ? pctFmt(footer.grand.subs / footer.grand.clicks) : "—"}
-                </td>
-                <td className="num">{moneyFmt(footer?.grand.payout ?? null)}</td>
-                <td className="num">—</td>
-                {report.campaigns.map((c) => {
-                  const agg = footer?.perCamp.get(c.link_id);
-                  const clicks = agg?.clicksHas ? agg.clicks : null;
-                  return (
-                    <Fragment key={c.link_id}>
-                      <td className="num daily-bd">{intFmt(clicks)}</td>
-                      <td className="num strong">{intFmt(agg?.subs ?? null)}</td>
-                      <td className="num">{clicks && agg ? pctFmt(agg.subs / clicks) : "—"}</td>
-                      <td className="num">{moneyFmt(agg?.payout ?? null)}</td>
-                    </Fragment>
-                  );
-                })}
-              </tr>
-            </tfoot>
-          </table>
+        <div className="daily-sections">
+          {groups.map((g) => (
+            <PartnerSection
+              key={g.key}
+              group={g}
+              rows={report.rows}
+              creator={creator}
+              collapsed={collapsed.has(g.key)}
+              onToggle={() => toggle(g.key)}
+            />
+          ))}
         </div>
       )}
     </section>

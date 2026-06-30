@@ -21,6 +21,8 @@ export interface DailyCampaign {
   campaign_code: string;
   creator: string;
   cpf: number;
+  partner_id: number | null;
+  partner_name: string | null;
 }
 
 export interface DailyCell {
@@ -60,6 +62,8 @@ interface BuildOpts {
   creator: string | null;
   from: string;
   to: string;
+  /** фильтр по партнёру (partners.id); null = все партнёры */
+  partner?: number | null;
   includeEmpty?: boolean;
 }
 
@@ -76,21 +80,27 @@ function naturalCmp(a: string, b: string): number {
 export function buildDailyReport(opts: BuildOpts): DailyReport {
   const db = getDb();
   const { creator, from, to } = opts;
+  const partner = opts.partner ?? null;
   const days = dayRange(from, to);
 
-  /* === компании (ссылки) + их CPF === */
+  /* === компании (ссылки) + их CPF + партнёр-владелец === */
   const linkRows = db
     .prepare(
-      `SELECT l.id AS link_id, l.campaign_code, l.creator, l.cpf_free, l.cpf_paid
+      `SELECT l.id AS link_id, l.campaign_code, l.creator, l.cpf_free, l.cpf_paid,
+              l.partner_id, p.display_name AS partner_name
        FROM links l
-       WHERE (@creator IS NULL OR l.creator = @creator)`,
+       LEFT JOIN partners p ON p.id = l.partner_id
+       WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@partner IS NULL OR l.partner_id = @partner)`,
     )
-    .all({ creator: creator ?? null }) as Array<{
+    .all({ creator: creator ?? null, partner }) as Array<{
       link_id: number;
       campaign_code: string;
       creator: string;
       cpf_free: number | null;
       cpf_paid: number | null;
+      partner_id: number | null;
+      partner_name: string | null;
     }>;
 
   const campaignMap = new Map<number, DailyCampaign>();
@@ -100,6 +110,8 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       campaign_code: r.campaign_code,
       creator: r.creator,
       cpf: pickCpf(r.creator, r.cpf_free, r.cpf_paid),
+      partner_id: r.partner_id,
+      partner_name: r.partner_name,
     });
   }
 
@@ -109,9 +121,10 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       `SELECT ls.link_id, ls.om_subscribed_at
        FROM link_subscribers ls JOIN links l ON l.id = ls.link_id
        WHERE ls.om_subscribed_at IS NOT NULL
-         AND (@creator IS NULL OR l.creator = @creator)`,
+         AND (@creator IS NULL OR l.creator = @creator)
+         AND (@partner IS NULL OR l.partner_id = @partner)`,
     )
-    .all({ creator: creator ?? null }) as Array<{ link_id: number; om_subscribed_at: string }>;
+    .all({ creator: creator ?? null, partner }) as Array<{ link_id: number; om_subscribed_at: string }>;
 
   const subsByLinkDay = new Map<number, Map<string, number>>();
   for (const s of subRows) {
@@ -131,9 +144,10 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       `SELECT dc.link_id, dc.day, dc.clicks_cumulative
        FROM daily_link_clicks dc JOIN links l ON l.id = dc.link_id
        WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@partner IS NULL OR l.partner_id = @partner)
        ORDER BY dc.link_id, dc.day`,
     )
-    .all({ creator: creator ?? null }) as Array<{
+    .all({ creator: creator ?? null, partner }) as Array<{
       link_id: number;
       day: string;
       clicks_cumulative: number;
@@ -190,9 +204,14 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     }
   }
 
+  /* Группируем кампании по партнёру: сперва партнёр (натурально), внутри — код. */
   const campaigns = [...campaignMap.values()]
     .filter((c) => activeLinks.has(c.link_id))
-    .sort((a, b) => naturalCmp(a.campaign_code, b.campaign_code));
+    .sort((a, b) => {
+      const byPartner = naturalCmp(a.partner_name ?? "~", b.partner_name ?? "~");
+      if (byPartner !== 0) return byPartner;
+      return naturalCmp(a.campaign_code, b.campaign_code);
+    });
 
   /* === строки по дням === */
   const rows: DailyRow[] = [];

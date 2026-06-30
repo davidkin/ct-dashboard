@@ -324,6 +324,8 @@ export interface DailyCampaign {
   campaign_code: string;
   creator: string;
   cpf: number;
+  partner_id: number | null;
+  partner_name: string | null;
 }
 export interface DailyCell {
   clicks: number | null; // null = нет baseline (до первого ночного снэпшота)
@@ -435,12 +437,13 @@ export const api = {
     const r = await fetch("/api/finance/sync", { method: "POST" });
     return r.json();
   },
-  dailyTracking: (opts: { creator?: string; from?: string; to?: string; all?: boolean } = {}) => {
+  dailyTracking: (opts: { creator?: string; from?: string; to?: string; all?: boolean; partner?: number } = {}) => {
     const u = new URL("/api/daily-tracking", window.location.origin);
     if (opts.creator) u.searchParams.set("creator", opts.creator);
     if (opts.from) u.searchParams.set("from", opts.from);
     if (opts.to) u.searchParams.set("to", opts.to);
     if (opts.all) u.searchParams.set("all", "1");
+    if (opts.partner) u.searchParams.set("partner", String(opts.partner));
     return get<DailyReport>(u.pathname + u.search);
   },
   dailyCapture: async (): Promise<{ data?: DailyCaptureResult; error?: string }> => {
