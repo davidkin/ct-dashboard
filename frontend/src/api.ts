@@ -318,6 +318,42 @@ export interface SyncStatus {
   of_api_configured: boolean;
 }
 
+/* === Daily tracking (аналог ручной таблицы партнёра) === */
+export interface DailyCampaign {
+  link_id: number;
+  campaign_code: string;
+  creator: string;
+  cpf: number;
+}
+export interface DailyCell {
+  clicks: number | null; // null = нет baseline (до первого ночного снэпшота)
+  subs: number;
+  cr: number | null;
+  payout: number;
+}
+export interface DailyRow {
+  date: string;
+  total: { clicks: number | null; subs: number; cr: number | null; payout: number; subs_delta: number | null };
+  cells: Record<string, DailyCell>; // ключ = String(link_id)
+}
+export interface DailyReport {
+  creator: string | null;
+  from: string;
+  to: string;
+  tz: string;
+  campaigns: DailyCampaign[];
+  rows: DailyRow[];
+  clicks_available_from: string | null;
+}
+export interface DailyCaptureResult {
+  day: string;
+  links_captured: number;
+  links_unmatched: number;
+  om_synced: boolean;
+  duration_ms: number;
+  errors: string[];
+}
+
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -397,6 +433,18 @@ export const api = {
   },
   forceFinanceSync: async () => {
     const r = await fetch("/api/finance/sync", { method: "POST" });
+    return r.json();
+  },
+  dailyTracking: (opts: { creator?: string; from?: string; to?: string; all?: boolean } = {}) => {
+    const u = new URL("/api/daily-tracking", window.location.origin);
+    if (opts.creator) u.searchParams.set("creator", opts.creator);
+    if (opts.from) u.searchParams.set("from", opts.from);
+    if (opts.to) u.searchParams.set("to", opts.to);
+    if (opts.all) u.searchParams.set("all", "1");
+    return get<DailyReport>(u.pathname + u.search);
+  },
+  dailyCapture: async (): Promise<{ data?: DailyCaptureResult; error?: string }> => {
+    const r = await fetch("/api/daily-tracking/capture", { method: "POST" });
     return r.json();
   },
   updatePartner: async (id: number, patch: PartnerPatch): Promise<Partner> => {

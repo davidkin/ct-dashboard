@@ -54,6 +54,24 @@ function migrate(db: Database.Database): void {
   if (subsCols.length > 0 && !subsCols.some((c) => c.name === "om_subscribed_at")) {
     db.exec("ALTER TABLE link_subscribers ADD COLUMN om_subscribed_at TEXT");
   }
+  /* Индекс для дневного трекинга — бакетим сабы по реальной дате подписки. */
+  db.exec("CREATE INDEX IF NOT EXISTS idx_link_subs_om ON link_subscribers(om_subscribed_at)");
+
+  /* daily_link_clicks — ночной снэпшот накопительного счётчика кликов по каждой
+     компании. Единственное, что джоб реально пишет: OnlyMonster отдаёт клики
+     только текущим счётчиком без истории, поэтому day-over-day дельту считаем
+     отсюда. Сабы/пейауты деривируются из реальных дат (om_subscribed_at). */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS daily_link_clicks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,                 /* YYYY-MM-DD в TRACKING_TZ */
+      clicks_cumulative INTEGER NOT NULL,
+      captured_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(link_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_clicks_link_day ON daily_link_clicks(link_id, day);
+  `);
 
   /* OnlyMonster transactions/chargebacks — реальная выручка с fan.id + датами. */
   db.exec(`

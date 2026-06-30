@@ -935,3 +935,55 @@ code {
   padding: 2px 8px; border-radius: 999px; font-size: 11px;
   background: rgba(255,82,82,0.15); color: var(--bad);
 }
+
+/* ===== HEADER NAV ===== */
+.app-nav { display: flex; gap: 4px; margin-right: auto; margin-left: 24px; }
+.app-nav-link {
+  padding: 6px 12px; border-radius: var(--radius-sm, 8px);
+  color: var(--muted); font-size: 14px; font-weight: 500;
+  text-decoration: none; transition: color 0.15s, background 0.15s;
+}
+.app-nav-link:hover { color: var(--text); background: var(--hover-bg); }
+.app-nav-link.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* ===== DAILY TRACKING GRID ===== */
+.daily-scroll {
+  overflow: auto; max-height: 74vh;
+  border: 1px solid var(--border); border-radius: var(--radius, 12px);
+}
+table.data.daily-table { margin: 0; border: none; border-radius: 0; min-width: 100%; }
+.daily-table th, .daily-table td {
+  padding: 7px 10px; white-space: nowrap; font-size: 13px;
+}
+/* sticky-шапка (внутри прокручиваемого контейнера) */
+.daily-table thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-elevated); }
+.daily-table thead tr:nth-child(2) th { top: 44px; } /* высота первой строки шапки (имя + CPF) */
+/* группирующие заголовки блоков */
+.daily-table .daily-total-grp, .daily-table .daily-camp-grp {
+  text-align: center; text-transform: none; letter-spacing: 0;
+  font-size: 12px; font-weight: 600; color: var(--text);
+}
+.daily-table .daily-total-grp { color: var(--accent); }
+.daily-cpf { display: block; font-size: 10px; font-weight: 400; color: var(--muted); text-transform: none; letter-spacing: 0; }
+/* липкая первая колонка (Дата) */
+.daily-table .daily-sticky {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg-elevated); text-align: left; font-weight: 600;
+  border-right: 2px solid var(--border);
+}
+.daily-table thead .daily-sticky { z-index: 3; }
+.daily-table tbody tr:hover .daily-sticky { background: var(--hover-bg); }
+/* вертикальные разделители блоков */
+.daily-table .daily-bd { border-left: 2px solid var(--border); }
+/* подсветка блока Total */
+.daily-table .daily-total-cell { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.daily-table td.strong { font-weight: 700; }
+.daily-table .daily-zero { color: var(--muted); opacity: 0.45; }
+.daily-table td.delta-up { color: var(--good); font-weight: 600; }
+.daily-table td.delta-down { color: var(--bad); font-weight: 600; }
+/* итоговая строка за период */
+.daily-table tfoot .daily-foot td {
+  position: sticky; bottom: 0; z-index: 1;
+  background: var(--bg-elevated); border-top: 2px solid var(--border); font-weight: 600;
+}
+.daily-table tfoot .daily-foot .daily-sticky { z-index: 2; }

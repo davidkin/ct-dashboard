@@ -12,7 +12,9 @@ import { registerPartnerRoutes } from "./routes/partners";
 import { registerSyncRoutes } from "./routes/sync";
 import { registerTrendsRoutes } from "./routes/trends";
 import { registerWebhookRoutes } from "./routes/webhooks";
+import { registerDailyRoutes } from "./routes/daily";
 import { startScheduler } from "./of/scheduler";
+import { startDailyCapture } from "./daily/scheduler";
 
 async function main() {
   const app = Fastify({ logger: true });
@@ -37,12 +39,14 @@ async function main() {
   await registerWebhookRoutes(app);
   await registerAttributionRoutes(app);
   await registerFanRoutes(app);
+  await registerDailyRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
   await app.listen({ port, host: "0.0.0.0" });
   app.log.info(`Couture Dashboard backend on :${port}`);
 
   startScheduler();
+  startDailyCapture();
 }
 
 main().catch((err) => {
