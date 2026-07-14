@@ -324,6 +324,7 @@ export interface DailyCampaign {
   campaign_code: string;
   creator: string;
   cpf: number;
+  revshare: number | null;
   partner_id: number | null;
   partner_name: string | null;
 }
@@ -437,13 +438,15 @@ export const api = {
     const r = await fetch("/api/finance/sync", { method: "POST" });
     return r.json();
   },
-  dailyTracking: (opts: { creator?: string; from?: string; to?: string; all?: boolean; partner?: number } = {}) => {
+  dailyTracking: (opts: { creator?: string; from?: string; to?: string; all?: boolean; partner?: number; sheetOnly?: boolean; source?: "combined" } = {}) => {
     const u = new URL("/api/daily-tracking", window.location.origin);
     if (opts.creator) u.searchParams.set("creator", opts.creator);
     if (opts.from) u.searchParams.set("from", opts.from);
     if (opts.to) u.searchParams.set("to", opts.to);
     if (opts.all) u.searchParams.set("all", "1");
     if (opts.partner) u.searchParams.set("partner", String(opts.partner));
+    if (opts.sheetOnly) u.searchParams.set("sheet_only", "1");
+    if (opts.source) u.searchParams.set("source", opts.source);
     return get<DailyReport>(u.pathname + u.search);
   },
   dailyCapture: async (): Promise<{ data?: DailyCaptureResult; error?: string }> => {

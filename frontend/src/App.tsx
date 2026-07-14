@@ -23,6 +23,9 @@ export default function App() {
         </Link>
         <nav className="app-nav">
           <NavLink to="/" end className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
+            Таблица
+          </NavLink>
+          <NavLink to="/dashboard" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
             Дашборд
           </NavLink>
           <NavLink to="/daily" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>

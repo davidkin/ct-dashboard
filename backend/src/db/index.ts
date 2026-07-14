@@ -67,11 +67,17 @@ function migrate(db: Database.Database): void {
       link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
       day TEXT NOT NULL,                 /* YYYY-MM-DD в TRACKING_TZ */
       clicks_cumulative INTEGER NOT NULL,
+      fans_cumulative INTEGER,           /* cum «ФАНЫ ВСЕ» по ссылке на день (OM subscribers) */
       captured_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(link_id, day)
     );
     CREATE INDEX IF NOT EXISTS idx_daily_clicks_link_day ON daily_link_clicks(link_id, day);
   `);
+  /* fans_cumulative — для уже существующих БД (колонки могло не быть) */
+  const dlcCols = db.prepare("PRAGMA table_info(daily_link_clicks)").all() as Array<{ name: string }>;
+  if (dlcCols.length > 0 && !dlcCols.some((c) => c.name === "fans_cumulative")) {
+    db.exec("ALTER TABLE daily_link_clicks ADD COLUMN fans_cumulative INTEGER");
+  }
 
   /* daily_sheet_stats — точный снимок per-(link, day) из ручной таблицы Traffic
      Tracking (клики + фаны как ввёл партнёр). В отчёте перебивает OM-derived,

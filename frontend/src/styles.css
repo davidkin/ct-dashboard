@@ -1005,3 +1005,76 @@ table.data.daily-table { margin: 0; border: none; border-radius: 0; min-width: 1
   background: var(--bg-elevated); border-top: 2px solid var(--border); font-weight: 600;
 }
 .daily-table tfoot .daily-foot .daily-sticky { z-index: 2; }
+
+/* ===================================================================== */
+/* ===== TRAFFIC SHEET — точная копия Google Sheets (всегда светлый) ==== */
+/* ===================================================================== */
+.gs-doc {
+  background: #ffffff; color: #000000;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  border: 1px solid #d9d9d9; border-radius: 8px;
+  padding: 16px 18px 20px; margin-top: 4px;
+}
+
+/* controls */
+.gs-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.gs-select {
+  font-family: Arial, sans-serif; font-size: 13px; color: #202124;
+  background: #fff; border: 1px solid #c4c7c5; border-radius: 4px; padding: 5px 8px; height: 30px;
+}
+.gs-select:hover { border-color: #8a8f94; }
+.gs-ctl-label { font-size: 12px; color: #5f6368; }
+
+/* top: title + notes */
+.gs-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.gs-sheet-title { font-size: 15px; font-weight: 700; color: #202124; }
+.gs-sheet-sub { font-size: 12px; color: #5f6368; margin-top: 2px; }
+.gs-notes { border: 1px solid #d9d9d9; border-radius: 2px; min-width: 240px; font-size: 13px; }
+.gs-notes-hdr { background: #efefef; font-weight: 700; text-align: center; padding: 5px 10px; border-bottom: 1px solid #d9d9d9; }
+.gs-notes-row { display: flex; justify-content: space-between; gap: 20px; padding: 5px 10px; border-bottom: 1px solid #eee; }
+.gs-notes-row span { color: #333; }
+.gs-notes-row b { color: #000; }
+.gs-notes-comment { color: #999; }
+.gs-notes-comment i { color: #999; font-style: normal; }
+
+/* chart */
+.gs-chart-card { border: 1px solid #d9d9d9; border-radius: 2px; padding: 12px 12px 6px; margin-bottom: 16px; background: #fff; }
+.gs-chart-title { font-size: 14px; font-weight: 700; color: #202124; text-align: center; margin-bottom: 8px; }
+
+/* tabs (как вкладки листа) */
+.gs-tabs { display: flex; gap: 0; border-bottom: 1px solid #d9d9d9; margin-bottom: 0; }
+.gs-tab {
+  font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #5f6368;
+  background: #f1f3f4; border: 1px solid #d9d9d9; border-bottom: none;
+  border-radius: 6px 6px 0 0; padding: 6px 18px; margin-right: 3px; cursor: pointer;
+}
+.gs-tab.active { background: #fff; color: #188038; border-top: 2px solid #188038; }
+
+/* table — вид Google Sheets */
+.gs-scroll { overflow: auto; max-height: 72vh; border: 1px solid #d9d9d9; border-top: none; }
+table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; background: #fff; }
+.gs-table th, .gs-table td { border: 1px solid #d9d9d9; padding: 3px 8px; white-space: nowrap; height: 22px; }
+.gs-table th { background: #efefef; font-weight: 700; text-align: center; color: #000; position: sticky; top: 0; z-index: 1; }
+.gs-table thead tr:nth-child(2) th { top: 25px; }
+.gs-table .gs-grp { background: #efefef; }
+.gs-table .gs-sub { font-weight: 700; }
+.gs-table .gs-num { text-align: right; font-variant-numeric: tabular-nums; }
+.gs-table .gs-date { text-align: center; }
+.gs-table .gs-b { font-weight: 700; }
+/* заморозка первой колонки (Дата) */
+.gs-table .gs-freeze { position: sticky; left: 0; z-index: 2; background: #efefef; border-right: 2px solid #c9c9c9; }
+.gs-table tbody .gs-freeze { background: #fff; }
+.gs-table thead .gs-freeze { z-index: 3; }
+.gs-table tbody tr:hover td { background: #f5faff; }
+.gs-table tbody tr:hover .gs-freeze { background: #eef5ff; }
+/* строка Total (footer) — накопительные суммы */
+.gs-table tfoot .gs-total-row td { position: sticky; bottom: 0; z-index: 1; background: #efefef; font-weight: 700; border-top: 2px solid #b7b7b7; }
+.gs-table tfoot .gs-total-row .gs-freeze { z-index: 2; background: #efefef; }
+
+/* накопительный Total за период (бар над таблицей) */
+.gs-grand { display: inline-flex; align-items: stretch; border: 1px solid #d9d9d9; border-radius: 4px; overflow: hidden; margin-bottom: 14px; }
+.gs-grand-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 24px; background: #f8f9fa; }
+.gs-grand-label { font-size: 11px; color: #5f6368; }
+.gs-grand-val { font-size: 22px; font-weight: 700; color: #1a73e8; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.gs-grand-val.gs-grand-fans { color: #d93025; }
+.gs-grand-sep { width: 1px; background: #d9d9d9; }

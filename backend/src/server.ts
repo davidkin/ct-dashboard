@@ -42,7 +42,9 @@ async function main() {
   await registerDailyRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
-  await app.listen({ port, host: "0.0.0.0" });
+  /* В проде за nginx ставь HOST=127.0.0.1 — тогда 3001 не торчит наружу. */
+  const host = process.env.HOST || "0.0.0.0";
+  await app.listen({ port, host });
   app.log.info(`Couture Dashboard backend on :${port}`);
 
   startScheduler();

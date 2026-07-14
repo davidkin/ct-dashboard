@@ -11,7 +11,7 @@ export async function registerDailyRoutes(app: FastifyInstance): Promise<void> {
    * from/to — YYYY-MM-DD в TRACKING_TZ. По умолчанию последние 30 дней.
    * all=1 — показывать и компании без активности в периоде.
    */
-  app.get<{ Querystring: { creator?: string; from?: string; to?: string; all?: string; partner?: string } }>(
+  app.get<{ Querystring: { creator?: string; from?: string; to?: string; all?: string; partner?: string; sheet_only?: string; source?: string } }>(
     "/api/daily-tracking",
     async (req) => {
       const to = req.query.to || todayLocal();
@@ -23,6 +23,8 @@ export async function registerDailyRoutes(app: FastifyInstance): Promise<void> {
         to,
         partner: Number.isFinite(partnerNum) ? partnerNum : null,
         includeEmpty: req.query.all === "1",
+        sheetOnly: req.query.sheet_only === "1",
+        source: req.query.source === "combined" ? "combined" : undefined,
       });
       return { data: report };
     },

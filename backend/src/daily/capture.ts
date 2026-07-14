@@ -56,10 +56,11 @@ export async function captureDailyClicks(
   ).map((r) => r.creator);
 
   const upsert = db.prepare(`
-    INSERT INTO daily_link_clicks (link_id, day, clicks_cumulative, captured_at)
-    VALUES (@link_id, @day, @clicks, datetime('now'))
+    INSERT INTO daily_link_clicks (link_id, day, clicks_cumulative, fans_cumulative, captured_at)
+    VALUES (@link_id, @day, @clicks, @fans, datetime('now'))
     ON CONFLICT(link_id, day) DO UPDATE SET
       clicks_cumulative = excluded.clicks_cumulative,
+      fans_cumulative   = excluded.fans_cumulative,
       captured_at       = datetime('now')
   `);
 
@@ -80,7 +81,7 @@ export async function captureDailyClicks(
             unmatched++;
             continue;
           }
-          upsert.run({ link_id: internalId, day, clicks: l.clicks ?? 0 });
+          upsert.run({ link_id: internalId, day, clicks: l.clicks ?? 0, fans: l.subscribers ?? 0 });
           captured++;
         }
       });

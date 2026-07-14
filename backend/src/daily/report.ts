@@ -21,6 +21,7 @@ export interface DailyCampaign {
   campaign_code: string;
   creator: string;
   cpf: number;
+  revshare: number | null;
   partner_id: number | null;
   partner_name: string | null;
 }
@@ -65,6 +66,10 @@ interface BuildOpts {
   /** фильтр по партнёру (partners.id); null = все партнёры */
   partner?: number | null;
   includeEmpty?: boolean;
+  /** только точный слепок таблицы (daily_sheet_stats), без OM/OF fallback */
+  sheetOnly?: boolean;
+  /** "combined" — авто-снимок (дельта cum) где есть, иначе импорт листа, иначе пусто */
+  source?: "combined";
 }
 
 function pickCpf(creator: string, cpfFree: number | null, cpfPaid: number | null): number {
@@ -87,7 +92,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
   const linkRows = db
     .prepare(
       `SELECT l.id AS link_id, l.campaign_code, l.creator, l.cpf_free, l.cpf_paid,
-              l.partner_id, p.display_name AS partner_name
+              l.revshare_pct, l.partner_id, p.display_name AS partner_name
        FROM links l
        LEFT JOIN partners p ON p.id = l.partner_id
        WHERE (@creator IS NULL OR l.creator = @creator)
@@ -99,6 +104,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       creator: string;
       cpf_free: number | null;
       cpf_paid: number | null;
+      revshare_pct: number | null;
       partner_id: number | null;
       partner_name: string | null;
     }>;
@@ -110,6 +116,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       campaign_code: r.campaign_code,
       creator: r.creator,
       cpf: pickCpf(r.creator, r.cpf_free, r.cpf_paid),
+      revshare: r.revshare_pct,
       partner_id: r.partner_id,
       partner_name: r.partner_name,
     });
@@ -138,10 +145,10 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     m.set(day, (m.get(day) ?? 0) + 1);
   }
 
-  /* === клики: дельты из накопительного счётчика === */
+  /* === авто-снимок: дельты кликов И фанов из накопительного счётчика (Raw-слой) === */
   const clickRows = db
     .prepare(
-      `SELECT dc.link_id, dc.day, dc.clicks_cumulative
+      `SELECT dc.link_id, dc.day, dc.clicks_cumulative, dc.fans_cumulative
        FROM daily_link_clicks dc JOIN links l ON l.id = dc.link_id
        WHERE (@creator IS NULL OR l.creator = @creator)
          AND (@partner IS NULL OR l.partner_id = @partner)
@@ -151,31 +158,39 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       link_id: number;
       day: string;
       clicks_cumulative: number;
+      fans_cumulative: number | null;
     }>;
 
-  const cumulByLink = new Map<number, Array<{ day: string; cumul: number }>>();
+  const cumulByLink = new Map<number, Array<{ day: string; clicks: number; fans: number }>>();
   for (const c of clickRows) {
     let arr = cumulByLink.get(c.link_id);
     if (!arr) {
       arr = [];
       cumulByLink.set(c.link_id, arr);
     }
-    arr.push({ day: c.day, cumul: c.clicks_cumulative });
+    arr.push({ day: c.day, clicks: c.clicks_cumulative, fans: c.fans_cumulative ?? 0 });
   }
 
+  /* дельта кликов (для старого клик-режима) */
   const deltaByLinkDay = new Map<number, Map<string, number | null>>();
+  /* дельта снимка целиком {clicks, fans} — только дни с baseline и неотрицательной дельтой */
+  const snapshotDeltaByLinkDay = new Map<number, Map<string, { clicks: number; fans: number }>>();
   let earliestCaptureDay: string | null = null;
   for (const [linkId, arr] of cumulByLink) {
     const m = new Map<string, number | null>();
+    const snap = new Map<string, { clicks: number; fans: number }>();
     for (let i = 0; i < arr.length; i++) {
       if (i === 0) {
         m.set(arr[i].day, null); // первый снэпшот — нет baseline
       } else {
-        const d = arr[i].cumul - arr[i - 1].cumul;
-        m.set(arr[i].day, d >= 0 ? d : null); // сброс счётчика → неизвестно
+        const dc = arr[i].clicks - arr[i - 1].clicks;
+        const df = arr[i].fans - arr[i - 1].fans;
+        m.set(arr[i].day, dc >= 0 ? dc : null); // сброс счётчика → неизвестно
+        if (dc >= 0) snap.set(arr[i].day, { clicks: dc, fans: Math.max(0, df) });
       }
     }
     deltaByLinkDay.set(linkId, m);
+    snapshotDeltaByLinkDay.set(linkId, snap);
     const first = arr[0]?.day;
     if (first && (!earliestCaptureDay || first < earliestCaptureDay)) earliestCaptureDay = first;
   }
@@ -266,7 +281,24 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       const sheet = sheetByLinkDay.get(camp.link_id)?.get(date);
       let subs: number;
       let clicks: number | null;
-      if (covered && inSheetSpan(date)) {
+      if (opts.source === "combined") {
+        /* авто-снимок (дельта cum) где есть → иначе импорт листа → иначе пусто */
+        const snap = snapshotDeltaByLinkDay.get(camp.link_id)?.get(date);
+        if (snap) {
+          clicks = snap.clicks;
+          subs = snap.fans;
+        } else if (sheet) {
+          clicks = sheet.clicks;
+          subs = sheet.fans;
+        } else {
+          clicks = null;
+          subs = 0;
+        }
+      } else if (opts.sheetOnly) {
+        /* точный слепок: только таблица, без OM/OF. Нет строки → пусто (клики null, фаны 0). */
+        subs = sheet ? sheet.fans : 0;
+        clicks = sheet ? sheet.clicks : null;
+      } else if (covered && inSheetSpan(date)) {
         /* покрыта таблицей и день в её диапазоне → только таблица (0 где нет строки) */
         subs = sheet ? sheet.fans : 0;
         clicks = sheet ? sheet.clicks : 0;

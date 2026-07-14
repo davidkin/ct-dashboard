@@ -2,7 +2,7 @@
  * Ночной планировщик дневного снэпшота.
  *
  * Раз в минуту проверяет локальное время (TRACKING_TZ). Когда оно достигает
- * DAILY_CAPTURE_AT (по умолчанию 23:55) и за сегодня снэпшот ещё не делался —
+ * DAILY_CAPTURE_AT (по умолчанию 23:59) и за сегодня снэпшот ещё не делался —
  * запускает captureDailyClicks({ runSync:true }).
  *
  * Подход «проверяем каждую минуту» вместо точного setTimeout — намеренно:
@@ -13,7 +13,7 @@ import { localHHMM, todayLocal, TRACKING_TZ } from "../lib/tz";
 
 let timer: NodeJS.Timeout | null = null;
 let lastCaptureDay: string | null = null;
-const CAPTURE_AT = process.env.DAILY_CAPTURE_AT || "23:55";
+const CAPTURE_AT = process.env.DAILY_CAPTURE_AT || "23:59";
 
 export function startDailyCapture(): void {
   if (timer) return;
