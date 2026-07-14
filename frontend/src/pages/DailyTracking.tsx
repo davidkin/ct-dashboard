@@ -186,7 +186,7 @@ export default function DailyTracking() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState(false);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set()); // дефолт — все секции свёрнуты
 
   useEffect(() => {
     api.partners().then((rows) =>
@@ -263,17 +263,17 @@ export default function DailyTracking() {
   }, [report]);
 
   const toggle = (key: string) => {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
   };
-  const allCollapsed = report ? groups.length > 0 && groups.every((g) => collapsed.has(g.key)) : false;
+  const allExpanded = groups.length > 0 && groups.every((g) => expanded.has(g.key));
   const toggleAll = () => {
-    if (allCollapsed) setCollapsed(new Set());
-    else setCollapsed(new Set(groups.map((g) => g.key)));
+    if (allExpanded) setExpanded(new Set());
+    else setExpanded(new Set(groups.map((g) => g.key)));
   };
 
   return (
@@ -289,7 +289,7 @@ export default function DailyTracking() {
         <div className="section-actions">
           {groups.length > 0 && (
             <button className="btn ghost" onClick={toggleAll}>
-              {allCollapsed ? "Развернуть все" : "Свернуть все"}
+              {allExpanded ? "Свернуть все" : "Развернуть все"}
             </button>
           )}
           <button className="btn ghost" onClick={doImport} disabled={importing} title="Точный снимок ручной таблицы Traffic Tracking (клики + фаны)">
@@ -358,7 +358,7 @@ export default function DailyTracking() {
               group={g}
               rows={report.rows}
               creator={creator}
-              collapsed={collapsed.has(g.key)}
+              collapsed={!expanded.has(g.key)}
               onToggle={() => toggle(g.key)}
             />
           ))}
