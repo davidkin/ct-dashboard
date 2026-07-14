@@ -13,6 +13,7 @@ import { registerSyncRoutes } from "./routes/sync";
 import { registerTrendsRoutes } from "./routes/trends";
 import { registerWebhookRoutes } from "./routes/webhooks";
 import { registerDailyRoutes } from "./routes/daily";
+import { registerExportRoutes } from "./routes/export";
 import { startScheduler } from "./of/scheduler";
 import { startDailyCapture } from "./daily/scheduler";
 
@@ -40,6 +41,7 @@ async function main() {
   await registerAttributionRoutes(app);
   await registerFanRoutes(app);
   await registerDailyRoutes(app);
+  await registerExportRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
   /* В проде за nginx ставь HOST=127.0.0.1 — тогда 3001 не торчит наружу. */
@@ -64,6 +66,8 @@ function registerBasicAuth(app: FastifyInstance): void {
     /* Webhook должен оставаться публичным — OF API нужен прямой доступ.
        Подпись проверяется отдельно через WEBHOOK_SECRET. */
     if (req.url.startsWith("/api/webhooks/of")) return;
+    /* Read-only выгрузка — защищена своим EXPORT_TOKEN (?key=...), не Basic-auth. */
+    if (req.url.startsWith("/api/export")) return;
 
     const header = req.headers.authorization;
     const expected = `Basic ${Buffer.from(`admin:${password}`).toString("base64")}`;
