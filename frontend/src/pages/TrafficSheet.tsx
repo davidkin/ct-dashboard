@@ -1,8 +1,46 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { api, Creator, DailyReport, PartnerRow } from "../api";
+import { DailyReport, DailySnapshotInfo, fetchExportReport, isExportConfigured } from "../api";
+
+/* Партнёры для дропдауна (id → лейбл), по промпту. Меняется только partner в fetch;
+   контракт /export и рендер таблицы неизменны. Креатор пока фиксируем Nekoletta Free
+   (Free/Velora-скоуп); список креаторов статичный — листы партнёров за Basic-auth не тянем. */
+const PARTNERS: Array<{ id: number; label: string }> = [
+  { id: 6,   label: "Adult Angels (@adultangels)" },
+  { id: 43,  label: "TraffZone" },
+  { id: 37,  label: "@nosenkko" },
+  { id: 29,  label: "@awe2me" },
+  { id: 286, label: "@rprstsw88 (Roma)" },
+  { id: 273, label: "@magosym (Maga)" },
+  { id: 306, label: "@vetalmg (Vitaliy)" },
+  { id: 299, label: "@diamlan (Dima)" },
+  { id: 296, label: "@postoffice4 (Sasha Post Office)" },
+  { id: 26,  label: "@chyrtyyy (Gleb)" },
+  { id: 38,  label: "@kantniy (Ruslan)" },
+  { id: 307, label: "@pullupinmyx6 (Sasha)" },
+  { id: 33,  label: "@Skivly (Konstantin)" },
+  { id: 5,   label: "@innawork83 (Inna)" },
+  { id: 270, label: "@sahssssss" },
+  { id: 268, label: "@Celestrix001" },
+  { id: 267, label: "@ZernoTag" },
+  { id: 3,   label: "@ElmoSaniBoi (Elmar)" },
+];
+/* Free/Paid линки лежат в ОДНОЙ таблице. Тир-фильтр (серверный, через &tier=):
+   Все = объединённый набор, Free / Paid = только этот срез (бэк сам пересчитывает Total). */
+type Tier = "" | "free" | "paid";
+const TIER_OPTIONS: Array<{ v: Tier; label: string }> = [
+  { v: "", label: "Все" },
+  { v: "free", label: "Free" },
+  { v: "paid", label: "Paid" },
+];
+
+/* Начальный партнёр: из ?partner= в URL (чтобы refresh сохранял выбор), иначе первый. */
+function initialPartnerId(): number {
+  const q = Number(new URLSearchParams(window.location.search).get("partner"));
+  return PARTNERS.some((p) => p.id === q) ? q : PARTNERS[0].id;
+}
 
 /* ── форматтеры под вид Google Sheets ── */
 const intFmt = (n: number | null): string => (n == null ? "" : n.toLocaleString("en-US"));
@@ -14,45 +52,42 @@ const dmy = (d: string): string =>
 type SheetTab = "total" | "raw";
 
 export default function TrafficSheet() {
-  const [partners, setPartners] = useState<PartnerRow[]>([]);
-  const [creators, setCreators] = useState<Creator[]>([]);
-  const [partnerId, setPartnerId] = useState<number | "">("");
-  const [creator, setCreator] = useState<string>("Nekoletta Free");
+  const [partnerId, setPartnerId] = useState<number>(initialPartnerId);
+  const [tier, setTier] = useState<Tier>(""); // "" = объединённый Free+Paid
   const [from, setFrom] = useState("2026-06-01");
   const [to, setTo] = useState("");
   const [report, setReport] = useState<DailyReport | null>(null);
   const [tab, setTab] = useState<SheetTab>("total");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  /* партнёры + креаторы; дефолт — Adult Angels */
+  /* Держим выбранного партнёра в ?partner= — refresh сохраняет выбор. */
   useEffect(() => {
-    api.partners().then((rows) => {
-      const sorted = [...rows].sort((a, b) => a.display_name.localeCompare(b.display_name));
-      setPartners(sorted);
-      const aa = sorted.find((p) => p.display_name === "Adult Angels");
-      if (aa) setPartnerId(aa.id);
-    }).catch(console.error);
-    api.creators().then(setCreators).catch(console.error);
-  }, []);
+    const url = new URL(window.location.href);
+    url.searchParams.set("partner", String(partnerId));
+    window.history.replaceState(null, "", url.toString());
+  }, [partnerId]);
 
-  useEffect(() => {
-    if (partnerId === "") return;
+  /* Данные тянем напрямую с задеплоенного /export (read-only, токен в query). */
+  const load = useCallback(() => {
+    if (!isExportConfigured()) {
+      setError("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+      return;
+    }
     setLoading(true);
-    api.dailyTracking({ partner: partnerId, creator, from: from || undefined, to: to || undefined, all: true, source: "combined" })
+    setError(null);
+    fetchExportReport({ partner: partnerId, tier: tier || undefined, from: from || undefined, to: to || undefined, all: true, source: "combined" })
       .then(setReport)
-      .catch(console.error)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [partnerId, creator, from, to]);
+  }, [partnerId, tier, from, to]);
+
+  useEffect(() => { load(); }, [load]);
 
   const campaigns = report?.campaigns ?? [];
   const rows = report?.rows ?? [];
-
-  /* Накопительный Total за весь период (клики + фаны) — как в листе */
-  const grand = useMemo(() => {
-    let clicks = 0, fans = 0;
-    for (const r of rows) { clicks += r.total.clicks ?? 0; fans += r.total.subs ?? 0; }
-    return { clicks, fans };
-  }, [rows]);
+  const summary = report?.summary;
+  const snapshot = report?.snapshot;
 
   /* Notes & Conditions — CPF / Revshare берём с кампаний партнёра */
   const cpf = campaigns[0]?.cpf ?? null;
@@ -64,48 +99,48 @@ export default function TrafficSheet() {
     [rows],
   );
 
-  const creatorOptions = useMemo(() => {
-    const names = new Set<string>(["Nekoletta Free", "Nekoletta Vip"]);
-    creators.forEach((c) => names.add(c.name));
-    return [...names];
-  }, [creators]);
+  const partnerLabel = PARTNERS.find((p) => p.id === partnerId)?.label ?? "";
+  const partnerName = report?.campaigns[0]?.partner_name ?? partnerLabel;
 
   return (
     <div className="gs-doc">
       {/* ── Панель управления ── */}
       <div className="gs-controls">
-        <select className="gs-select" value={partnerId} onChange={(e) => setPartnerId(e.target.value ? Number(e.target.value) : "")}>
-          <option value="">— партнёр —</option>
-          {partners.map((p) => <option key={p.id} value={p.id}>{p.display_name}</option>)}
+        <select className="gs-select" value={partnerId} onChange={(e) => setPartnerId(Number(e.target.value))}>
+          {PARTNERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
-        <select className="gs-select" value={creator} onChange={(e) => setCreator(e.target.value)}>
-          {creatorOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <div className="gs-seg" role="group" aria-label="Tier">
+          {TIER_OPTIONS.map((t) => (
+            <button
+              key={t.v || "all"}
+              className={`gs-seg-btn${tier === t.v ? " active" : ""}`}
+              onClick={() => setTier(t.v)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
         <span className="gs-ctl-label">с</span>
         <input className="gs-select" type="date" value={from} onChange={(e) => setFrom(e.target.value)} max={to || undefined} />
         <span className="gs-ctl-label">по</span>
         <input className="gs-select" type="date" value={to} onChange={(e) => setTo(e.target.value)} min={from || undefined} />
-        {loading && <span className="gs-ctl-label">загрузка…</span>}
+        <button className="gs-tab" onClick={load} disabled={loading}>{loading ? "загрузка…" : "⟳ Обновить"}</button>
+        {error && <span className="gs-ctl-label" style={{ color: "#c00" }}>Ошибка: {error}</span>}
       </div>
 
-      {/* ── Накопительный Total за весь период ── */}
-      <div className="gs-grand">
-        <div className="gs-grand-item">
-          <span className="gs-grand-label">Клики за залив</span>
-          <span className="gs-grand-val">{grand.clicks.toLocaleString("en-US")}</span>
-        </div>
-        <div className="gs-grand-sep" />
-        <div className="gs-grand-item">
-          <span className="gs-grand-label">Фаны за залив</span>
-          <span className="gs-grand-val gs-grand-fans">{grand.fans.toLocaleString("en-US")}</span>
-        </div>
+      {/* ── Скоркарты по тирам + блок «Сегодня» ── */}
+      <div className="gs-cards">
+        <ScoreCard label="Free" accent="#4285F4" data={summary?.free} />
+        <ScoreCard label="Paid" accent="#EA4335" data={summary?.paid} />
+        <ScoreCard label="Всего" accent="#111" data={summary?.all} />
+        {snapshot && <TodayBlock key={snapshot.next_capture_at} snap={snapshot} onExpire={load} />}
       </div>
 
       {/* ── Шапка: заголовок таблицы + Notes & Conditions ── */}
       <div className="gs-top">
         <div className="gs-title-block">
           <div className="gs-sheet-title">
-            [{creator.includes("Vip") ? "PAID" : "FREE"}_{partnerId ? partners.find((p) => p.id === partnerId)?.display_name : ""}]_traffic_tracking
+            [{tier ? (tier === "paid" ? "PAID_" : "FREE_") : ""}{partnerName}]_traffic_tracking
           </div>
           <div className="gs-sheet-sub">{campaigns.length} компаний · {rows.length} дней</div>
         </div>
@@ -144,6 +179,67 @@ export default function TrafficSheet() {
       ) : (
         <RawTable campaigns={campaigns} rows={rows} />
       )}
+    </div>
+  );
+}
+
+/* ═══════════ Скоркарты по тирам (из summary) ═══════════ */
+function ScoreCard({ label, accent, data }: { label: string; accent: string; data?: { clicks: number; fans: number } }) {
+  const clicks = data?.clicks ?? 0;
+  const fans = data?.fans ?? 0;
+  return (
+    <div className="gs-card">
+      <div className="gs-card-label" style={{ color: accent }}>{label}</div>
+      <div className="gs-card-nums">
+        <div><b>{clicks.toLocaleString("en-US")}</b> <span>кликов</span></div>
+        <div><b>{fans.toLocaleString("en-US")}</b> <span>фанов</span></div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════ Блок «Сегодня» + живой отсчёт до следующего снепшота ═══════════ */
+function TodayBlock({ snap, onExpire }: { snap: DailySnapshotInfo; onExpire: () => void }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const remaining = new Date(snap.next_capture_at).getTime() - nowMs;
+
+  /* Отсчёт дошёл до 0 → джоб пишет в capture_time; ждём ~90с и рефетчим,
+     чтобы last_snapshot прокатился на новый день. */
+  useEffect(() => {
+    if (remaining <= 0 && !firedRef.current) {
+      firedRef.current = true;
+      const t = setTimeout(onExpire, 90_000);
+      return () => clearTimeout(t);
+    }
+  }, [remaining, onExpire]);
+
+  const hhmmss = (ms: number): string => {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
+  };
+
+  return (
+    <div className="gs-today">
+      <div className="gs-today-hdr">
+        Сегодня: {snap.today} <span className="gs-today-tz">({snap.tz})</span>
+      </div>
+      <div className="gs-today-row">
+        За {snap.last_snapshot_day ?? "—"}:{" "}
+        <b>{snap.last_snapshot.clicks.toLocaleString("en-US")}</b> кликов /{" "}
+        <b>{snap.last_snapshot.fans.toLocaleString("en-US")}</b> фанов
+      </div>
+      <div className="gs-today-row">
+        Следующий снепшот через <b className="gs-today-cd">{remaining > 0 ? hhmmss(remaining) : "00:00:00"}</b>
+        <span className="gs-today-tz"> (в {snap.capture_time} {snap.tz})</span>
+      </div>
     </div>
   );
 }

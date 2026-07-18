@@ -1078,3 +1078,28 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .gs-grand-val { font-size: 22px; font-weight: 700; color: #1a73e8; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .gs-grand-val.gs-grand-fans { color: #d93025; }
 .gs-grand-sep { width: 1px; background: #d9d9d9; }
+
+/* сегмент-контрол тира (Все / Free / Paid) */
+.gs-seg { display: inline-flex; border: 1px solid #c4c7c5; border-radius: 4px; overflow: hidden; height: 30px; }
+.gs-seg-btn {
+  font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #5f6368;
+  background: #fff; border: none; border-left: 1px solid #e0e0e0; padding: 0 14px; cursor: pointer;
+}
+.gs-seg-btn:first-child { border-left: none; }
+.gs-seg-btn:hover { background: #f1f3f4; }
+.gs-seg-btn.active { background: #1a73e8; color: #fff; }
+
+/* скоркарты по тирам + блок «сегодня» */
+.gs-cards { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; margin-bottom: 14px; }
+.gs-card { border: 1px solid #d9d9d9; border-radius: 6px; padding: 8px 18px; background: #f8f9fa; min-width: 150px; }
+.gs-card-label { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.gs-card-nums { display: flex; flex-direction: column; gap: 1px; font-size: 13px; color: #202124; }
+.gs-card-nums b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.gs-card-nums span { color: #5f6368; font-size: 11px; }
+
+.gs-today { border: 1px solid #d9d9d9; border-radius: 6px; padding: 8px 18px; background: #fff; min-width: 300px; margin-left: auto; }
+.gs-today-hdr { font-size: 13px; font-weight: 700; color: #202124; margin-bottom: 4px; }
+.gs-today-row { font-size: 12.5px; color: #333; line-height: 1.7; }
+.gs-today-row b { color: #000; font-variant-numeric: tabular-nums; }
+.gs-today-tz { color: #5f6368; font-weight: 400; }
+.gs-today-cd { color: #1a73e8; font-size: 14px; letter-spacing: 0.5px; }

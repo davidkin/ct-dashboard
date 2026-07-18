@@ -323,10 +323,24 @@ export interface DailyCampaign {
   link_id: number;
   campaign_code: string;
   creator: string;
+  tier: "free" | "paid";
   cpf: number;
   revshare: number | null;
   partner_id: number | null;
   partner_name: string | null;
+}
+export interface DailyTierTotals {
+  free: { clicks: number; fans: number };
+  paid: { clicks: number; fans: number };
+  all: { clicks: number; fans: number };
+}
+export interface DailySnapshotInfo {
+  tz: string;
+  today: string;
+  capture_time: string;        // "23:59"
+  next_capture_at: string;     // ISO UTC
+  last_snapshot_day: string | null;
+  last_snapshot: { clicks: number; fans: number };
 }
 export interface DailyCell {
   clicks: number | null; // null = нет baseline (до первого ночного снэпшота)
@@ -347,6 +361,8 @@ export interface DailyReport {
   campaigns: DailyCampaign[];
   rows: DailyRow[];
   clicks_available_from: string | null;
+  summary?: DailyTierTotals;      // period totals by tier
+  snapshot?: DailySnapshotInfo;   // "today" block
 }
 export interface DailyCaptureResult {
   day: string;
@@ -362,6 +378,43 @@ async function get<T>(url: string): Promise<T> {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const json = await res.json();
   return json.data as T;
+}
+
+/* === Прямой read-only фетч с задеплоенного бэкенда (VPS) через /export ===
+   Токен в query (?key=), CORS открыт → работает из браузера без прокси и Basic-auth.
+   Конфиг в .env.local: VITE_API_BASE + VITE_EXPORT_TOKEN. */
+const EXPORT_BASE = import.meta.env.VITE_API_BASE as string | undefined;
+const EXPORT_TOKEN = import.meta.env.VITE_EXPORT_TOKEN as string | undefined;
+
+export function isExportConfigured(): boolean {
+  return !!(EXPORT_BASE && EXPORT_TOKEN);
+}
+
+export async function fetchExportReport(opts: {
+  partner?: number;
+  creator?: string;
+  tier?: "free" | "paid";
+  from?: string;
+  to?: string;
+  all?: boolean;
+  source?: "combined";
+}): Promise<DailyReport> {
+  if (!EXPORT_BASE || !EXPORT_TOKEN) {
+    throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+  }
+  const u = new URL(`${EXPORT_BASE.replace(/\/$/, "")}/export`);
+  u.searchParams.set("key", EXPORT_TOKEN);
+  if (opts.partner) u.searchParams.set("partner", String(opts.partner));
+  if (opts.creator) u.searchParams.set("creator", opts.creator);
+  if (opts.tier) u.searchParams.set("tier", opts.tier);
+  if (opts.from) u.searchParams.set("from", opts.from);
+  if (opts.to) u.searchParams.set("to", opts.to);
+  if (opts.all) u.searchParams.set("all", "1");
+  if (opts.source) u.searchParams.set("source", opts.source);
+  const res = await fetch(u.toString());
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.data as DailyReport;
 }
 
 function withCreator(url: string, creator?: string): string {
