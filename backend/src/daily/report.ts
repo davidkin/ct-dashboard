@@ -14,16 +14,24 @@
  */
 import { getDb } from "../db/index";
 import { getCreatorType } from "../config/creators";
-import { localDay, dayRange, TRACKING_TZ } from "../lib/tz";
+import { localDay, dayRange, TRACKING_TZ, todayLocal, nextCaptureAt } from "../lib/tz";
 
 export interface DailyCampaign {
   link_id: number;
   campaign_code: string;
   creator: string;
+  /** free | paid — по коду (camp_paid_* = paid). Для фильтра/скоркардов на фронте. */
+  tier: "free" | "paid";
   cpf: number;
   revshare: number | null;
   partner_id: number | null;
   partner_name: string | null;
+}
+
+/** Итог по клики+фаны (для скоркардов и снапшот-блока). */
+export interface TierTotals {
+  clicks: number;
+  fans: number;
 }
 
 export interface DailyCell {
@@ -57,6 +65,21 @@ export interface DailyReport {
   rows: DailyRow[];
   /** с какого дня доступна дневная разбивка кликов (первый ночной снэпшот) */
   clicks_available_from: string | null;
+  /** тоталы клики+фаны за период, разбитые по типу (для скоркардов вне таблицы) */
+  summary: { free: TierTotals; paid: TierTotals; all: TierTotals };
+  /** блок «сегодня»: последний снепшот + таймер до следующего */
+  snapshot: {
+    tz: string;
+    today: string;
+    /** локальное время ночного джоба, напр. "23:59" */
+    capture_time: string;
+    /** ISO (UTC) следующего снепшота — фронт считает обратный отсчёт */
+    next_capture_at: string;
+    /** день последнего снятого снепшота (обычно вчера) */
+    last_snapshot_day: string | null;
+    /** тотал за день последнего снепшота */
+    last_snapshot: TierTotals;
+  };
 }
 
 interface BuildOpts {
@@ -70,6 +93,8 @@ interface BuildOpts {
   sheetOnly?: boolean;
   /** "combined" — авто-снимок (дельта cum) где есть, иначе импорт листа, иначе пусто */
   source?: "combined";
+  /** фильтр по типу кампаний: free | paid | undefined(все) */
+  tier?: "free" | "paid";
 }
 
 function pickCpf(creator: string, cpfFree: number | null, cpfPaid: number | null): number {
@@ -111,10 +136,13 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
 
   const campaignMap = new Map<number, DailyCampaign>();
   for (const r of linkRows) {
+    const tier: "free" | "paid" = r.campaign_code.startsWith("camp_paid") ? "paid" : "free";
+    if (opts.tier && tier !== opts.tier) continue; // фильтр free/paid
     campaignMap.set(r.link_id, {
       link_id: r.link_id,
       campaign_code: r.campaign_code,
       creator: r.creator,
+      tier,
       cpf: pickCpf(r.creator, r.cpf_free, r.cpf_paid),
       revshare: r.revshare_pct,
       partner_id: r.partner_id,
@@ -161,32 +189,37 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       fans_cumulative: number | null;
     }>;
 
-  const cumulByLink = new Map<number, Array<{ day: string; clicks: number; fans: number }>>();
+  const cumulByLink = new Map<number, Array<{ day: string; clicks: number; fans: number | null }>>();
   for (const c of clickRows) {
     let arr = cumulByLink.get(c.link_id);
     if (!arr) {
       arr = [];
       cumulByLink.set(c.link_id, arr);
     }
-    arr.push({ day: c.day, clicks: c.clicks_cumulative, fans: c.fans_cumulative ?? 0 });
+    arr.push({ day: c.day, clicks: c.clicks_cumulative, fans: c.fans_cumulative });
   }
 
   /* дельта кликов (для старого клик-режима) */
   const deltaByLinkDay = new Map<number, Map<string, number | null>>();
-  /* дельта снимка целиком {clicks, fans} — только дни с baseline и неотрицательной дельтой */
-  const snapshotDeltaByLinkDay = new Map<number, Map<string, { clicks: number; fans: number }>>();
+  /* дельта снимка целиком {clicks, fans} — только дни с baseline и неотрицательной дельтой.
+     fans = null означает «нет baseline по фанам» (старые снимки не писали fans_cumulative) —
+     нельзя выдавать накопленный итог за один день. */
+  const snapshotDeltaByLinkDay = new Map<number, Map<string, { clicks: number; fans: number | null }>>();
   let earliestCaptureDay: string | null = null;
   for (const [linkId, arr] of cumulByLink) {
     const m = new Map<string, number | null>();
-    const snap = new Map<string, { clicks: number; fans: number }>();
+    const snap = new Map<string, { clicks: number; fans: number | null }>();
     for (let i = 0; i < arr.length; i++) {
       if (i === 0) {
         m.set(arr[i].day, null); // первый снэпшот — нет baseline
       } else {
         const dc = arr[i].clicks - arr[i - 1].clicks;
-        const df = arr[i].fans - arr[i - 1].fans;
+        const curF = arr[i].fans;
+        const prevF = arr[i - 1].fans;
+        // дельта фанов только если ОБА baseline реальные (не NULL); иначе неизвестно
+        const df = curF != null && prevF != null ? curF - prevF : null;
         m.set(arr[i].day, dc >= 0 ? dc : null); // сброс счётчика → неизвестно
-        if (dc >= 0) snap.set(arr[i].day, { clicks: dc, fans: Math.max(0, df) });
+        if (dc >= 0) snap.set(arr[i].day, { clicks: dc, fans: df != null && df >= 0 ? df : null });
       }
     }
     deltaByLinkDay.set(linkId, m);
@@ -219,6 +252,27 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     m.set(s.day, { clicks: s.clicks, fans: s.fans });
     if (!earliestSheetDay || s.day < earliestSheetDay) earliestSheetDay = s.day;
     if (!latestSheetDay || s.day > latestSheetDay) latestSheetDay = s.day;
+  }
+
+  /* === замороженные подневные OM-значения (клики+фаны ЗА ДЕНЬ, посчитаны при записи) ===
+     Читаем как есть, без пересчёта. Дополняют сид на дни ПОСЛЕ его конца. */
+  const omDailyByLinkDay = new Map<number, Map<string, { clicks: number; fans: number }>>();
+  for (const s of db
+    .prepare(
+      `SELECT do2.link_id, do2.day, do2.clicks, do2.fans
+       FROM daily_om_stats do2 JOIN links l ON l.id = do2.link_id
+       WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@partner IS NULL OR l.partner_id = @partner)`,
+    )
+    .all({ creator: creator ?? null, partner }) as Array<{
+      link_id: number;
+      day: string;
+      clicks: number;
+      fans: number;
+    }>) {
+    let m = omDailyByLinkDay.get(s.link_id);
+    if (!m) { m = new Map(); omDailyByLinkDay.set(s.link_id, m); }
+    m.set(s.day, { clicks: s.clicks, fans: s.fans });
   }
   /* День внутри диапазона таблицы → для покрытых компаний берём ТОЛЬКО таблицу
      (0 где нет строки), чтобы дневные тоталы совпадали с таблицей точь-в-точь. */
@@ -269,6 +323,12 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
   /* === строки по дням === */
   const rows: DailyRow[] = [];
   let prevTotalSubs: number | null = null;
+  /* тоталы за период по типу (для скоркардов вне таблицы) */
+  const sum = {
+    free: { clicks: 0, fans: 0 },
+    paid: { clicks: 0, fans: 0 },
+    all: { clicks: 0, fans: 0 },
+  };
   for (const date of days) {
     const cells: Record<string, DailyCell> = {};
     let tClicks = 0;
@@ -282,14 +342,16 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       let subs: number;
       let clicks: number | null;
       if (opts.source === "combined") {
-        /* авто-снимок (дельта cum) где есть → иначе импорт листа → иначе пусто */
-        const snap = snapshotDeltaByLinkDay.get(camp.link_id)?.get(date);
-        if (snap) {
-          clicks = snap.clicks;
-          subs = snap.fans;
-        } else if (sheet) {
+        /* Чистая модель: читаем ЗАМОРОЖЕННЫЕ подневные значения, без дельт на чтении.
+           Сид (ручная таблица) — истина на своём диапазоне; дальше — подневные OM-значения,
+           посчитанные и замороженные при ночной записи. Ничего не пересчитываем. */
+        const omDaily = omDailyByLinkDay.get(camp.link_id)?.get(date);
+        if (sheet) {
           clicks = sheet.clicks;
           subs = sheet.fans;
+        } else if (omDaily) {
+          clicks = omDaily.clicks;
+          subs = omDaily.fans;
         } else {
           clicks = null;
           subs = 0;
@@ -317,6 +379,12 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       }
       tSubs += subs;
       tPayout += payout;
+      /* накопление per-tier тоталов за период */
+      const bucket = sum[camp.tier];
+      bucket.clicks += clicks ?? 0;
+      bucket.fans += subs;
+      sum.all.clicks += clicks ?? 0;
+      sum.all.fans += subs;
     }
 
     const totalClicks = tClicksHas ? tClicks : null;
@@ -330,6 +398,19 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     prevTotalSubs = tSubs;
   }
 
+  /* последний снятый снепшот = последний день с данными (обычно вчера) */
+  let lastSnapshotDay: string | null = null;
+  let lastSnapshot: TierTotals = { clicks: 0, fans: 0 };
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const t = rows[i].total;
+    if (t.clicks != null || t.subs > 0) {
+      lastSnapshotDay = rows[i].date;
+      lastSnapshot = { clicks: t.clicks ?? 0, fans: t.subs };
+      break;
+    }
+  }
+  const captureTime = process.env.DAILY_CAPTURE_AT || "23:59";
+
   return {
     creator: creator ?? null,
     from,
@@ -340,5 +421,14 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     clicks_available_from: [earliestSheetDay, earliestCaptureDay]
       .filter((d): d is string => !!d)
       .sort()[0] ?? null,
+    summary: sum,
+    snapshot: {
+      tz: TRACKING_TZ,
+      today: todayLocal(),
+      capture_time: captureTime,
+      next_capture_at: nextCaptureAt(captureTime),
+      last_snapshot_day: lastSnapshotDay,
+      last_snapshot: lastSnapshot,
+    },
   };
 }

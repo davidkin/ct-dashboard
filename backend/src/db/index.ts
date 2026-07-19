@@ -95,6 +95,25 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_daily_sheet_link_day ON daily_sheet_stats(link_id, day);
   `);
 
+  /* daily_om_stats — ЗАМОРОЖЕННОЕ подневное значение (клики + фаны ЗА ДЕНЬ),
+     посчитанное один раз при ночной вытяжке из OM (сегодня_накопит − вчера_накопит)
+     и больше не пересчитываемое. Тот же принцип что ручное заполнение таблицы:
+     дописываем строку за сегодня, старые дни не трогаем. Читается напрямую
+     (сумма), без дельт на чтении. daily_link_clicks остаётся как техническое
+     состояние (накопит.счётчик) только чтобы посчитать дельту при записи. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS daily_om_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+      day TEXT NOT NULL,                 /* YYYY-MM-DD в TRACKING_TZ */
+      clicks INTEGER NOT NULL DEFAULT 0,
+      fans INTEGER NOT NULL DEFAULT 0,
+      captured_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(link_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS idx_daily_om_link_day ON daily_om_stats(link_id, day);
+  `);
+
   /* OnlyMonster transactions/chargebacks — реальная выручка с fan.id + датами. */
   db.exec(`
     CREATE TABLE IF NOT EXISTS om_transactions (

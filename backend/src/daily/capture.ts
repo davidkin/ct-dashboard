@@ -13,7 +13,7 @@ import { getDb } from "../db/index";
 import { getOMAccountForCreator } from "../config/creators";
 import { listTrackingLinks } from "../om/client";
 import { syncOMAllCreators } from "../om/sync";
-import { todayLocal } from "../lib/tz";
+import { todayLocal, addDays } from "../lib/tz";
 
 export interface DailyCaptureResult {
   day: string;
@@ -29,7 +29,9 @@ export async function captureDailyClicks(
 ): Promise<DailyCaptureResult> {
   const db = getDb();
   const started = Date.now();
-  const day = todayLocal();
+  /* Джоб в 13:30 финализирует ПРЕДЫДУЩИЙ день — как ручной ввод в таблицу
+     (партнёр в 13:30 вписывает данные за вчера). Поэтому метим снепшот вчерашним днём. */
+  const day = addDays(todayLocal(), -1);
   const errors: string[] = [];
   let omSynced = false;
 
@@ -90,6 +92,63 @@ export async function captureDailyClicks(
       errors.push(`${creator}: ${msg(err)}`);
     }
   }
+
+  /* === Заморозка подневного значения за сегодня ===
+     Тот же принцип что ручное заполнение таблицы: считаем «за день» = сегодня_накопит
+     − вчера_накопит ОДИН раз при записи и кладём в daily_om_stats. Старые дни не трогаем.
+     Читается потом напрямую (сумма), без дельт на чтении. */
+  const prevCumStmt = db.prepare(
+    `SELECT day, clicks_cumulative AS c, fans_cumulative AS f FROM daily_link_clicks
+     WHERE link_id = ? AND day < ? ORDER BY day DESC LIMIT 1`,
+  );
+  const seedLastStmt = db.prepare(`SELECT MAX(day) AS d FROM daily_sheet_stats WHERE link_id = ?`);
+  /* накопительный итог сида на его последний день = сумма подневных значений
+     (сид хранит дневные дельты, их сумма = кумулятив на конец сида). Служит
+     baseline-ом для первого OM-дня после сида, чтобы «за день» посчиталось реально. */
+  const seedSumStmt = db.prepare(
+    `SELECT COALESCE(SUM(clicks),0) AS c, COALESCE(SUM(fans),0) AS f FROM daily_sheet_stats WHERE link_id = ?`,
+  );
+  const upsertDaily = db.prepare(`
+    INSERT INTO daily_om_stats (link_id, day, clicks, fans, captured_at)
+    VALUES (@link_id, @day, @clicks, @fans, datetime('now'))
+    ON CONFLICT(link_id, day) DO UPDATE SET
+      clicks = excluded.clicks, fans = excluded.fans, captured_at = datetime('now')
+  `);
+  const todayRows = db
+    .prepare(
+      `SELECT link_id, clicks_cumulative AS c, fans_cumulative AS f FROM daily_link_clicks WHERE day = ?`,
+    )
+    .all(day) as Array<{ link_id: number; c: number; f: number | null }>;
+  const freeze = db.transaction(() => {
+    for (const t of todayRows) {
+      const prev = prevCumStmt.get(t.link_id, day) as
+        | { day: string; c: number; f: number | null }
+        | undefined;
+      const seedLast = (seedLastStmt.get(t.link_id) as { d: string | null } | undefined)?.d ?? null;
+      let dClicks = 0;
+      let dFans = 0;
+      /* baseline для «за день»:
+         — если есть предыдущий OM-снимок уже в OM-режиме (после конца сида) → дельта к нему (16.07+);
+         — иначе, если есть сид → baseline = накопит.итог сида (первый OM-день после сида, напр. 15.07);
+         — иначе, если есть предыдущий OM-снимок (партнёр без сида) → дельта к нему;
+         — иначе → 0 (совсем нет базы). */
+      let base: { c: number; f: number | null } | null = null;
+      if (prev && (!seedLast || prev.day > seedLast)) {
+        base = { c: prev.c, f: prev.f };
+      } else if (seedLast) {
+        const ss = seedSumStmt.get(t.link_id) as { c: number; f: number } | undefined;
+        if (ss) base = { c: ss.c, f: ss.f };
+      } else if (prev) {
+        base = { c: prev.c, f: prev.f };
+      }
+      if (base) {
+        dClicks = Math.max(0, t.c - base.c);
+        dFans = t.f != null && base.f != null ? Math.max(0, t.f - base.f) : 0;
+      }
+      upsertDaily.run({ link_id: t.link_id, day, clicks: dClicks, fans: dFans });
+    }
+  });
+  freeze();
 
   return {
     day,

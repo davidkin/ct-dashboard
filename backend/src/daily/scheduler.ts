@@ -9,7 +9,7 @@
  * иммунен к переходам на летнее/зимнее время, не нужно считать смещение TZ.
  */
 import { captureDailyClicks } from "./capture";
-import { localHHMM, todayLocal, TRACKING_TZ } from "../lib/tz";
+import { localHHMM, todayLocal, addDays, TRACKING_TZ } from "../lib/tz";
 
 let timer: NodeJS.Timeout | null = null;
 let lastCaptureDay: string | null = null;
@@ -29,7 +29,7 @@ export function startDailyCapture(): void {
       /* Окно 23:55–23:59: срабатывает один раз за день (guard по lastCaptureDay). */
       if (now >= CAPTURE_AT && lastCaptureDay !== today) {
         lastCaptureDay = today;
-        console.log(`[daily] capturing clicks for ${today} (${TRACKING_TZ}) at ${now}`);
+        console.log(`[daily] capturing clicks for ${addDays(today, -1)} (finalized at ${now} ${TRACKING_TZ})`);
         const res = await captureDailyClicks({ runSync: true });
         console.log(
           `[daily] captured ${res.links_captured} links, unmatched=${res.links_unmatched}, ` +

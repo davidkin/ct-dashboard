@@ -17,6 +17,8 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       all?: string;
       partner?: string;
       source?: string;
+      sheet_only?: string;
+      tier?: string;
     };
   }>("/api/export", async (req, reply) => {
     const token = process.env.EXPORT_TOKEN;
@@ -38,7 +40,9 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       to,
       partner: Number.isFinite(partnerNum) ? partnerNum : null,
       includeEmpty: req.query.all === "1",
+      sheetOnly: req.query.sheet_only === "1",
       source: req.query.source === "combined" ? "combined" : undefined,
+      tier: req.query.tier === "free" || req.query.tier === "paid" ? req.query.tier : undefined,
     });
     return { data: report };
   });

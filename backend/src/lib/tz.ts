@@ -45,6 +45,44 @@ export function addDays(day: string, delta: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
+/** Смещение зоны от UTC в мс для момента (положительное = зона впереди UTC). */
+function tzOffsetMs(date: Date, tz: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const p = dtf.formatToParts(date).reduce<Record<string, string>>((a, x) => {
+    a[x.type] = x.value;
+    return a;
+  }, {});
+  const asUTC = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour === "24" ? "0" : p.hour),
+    Number(p.minute),
+    Number(p.second),
+  );
+  return asUTC - date.getTime();
+}
+
+/** ISO (UTC) следующего наступления времени HH:mm в TRACKING_TZ (для таймера до снепшота). */
+export function nextCaptureAt(captureTime: string): string {
+  const [hh, mm] = captureTime.split(":").map(Number);
+  const today = todayLocal();
+  const targetDay = localHHMM() < captureTime ? today : addDays(today, 1);
+  const [y, m, d] = targetDay.split("-").map(Number);
+  const wallUTC = Date.UTC(y, m - 1, d, hh, mm, 0);
+  const off = tzOffsetMs(new Date(wallUTC), TRACKING_TZ);
+  return new Date(wallUTC - off).toISOString();
+}
+
 /** Список дней [from..to] включительно (YYYY-MM-DD). */
 export function dayRange(from: string, to: string): string[] {
   const out: string[] = [];

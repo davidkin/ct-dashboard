@@ -25,12 +25,6 @@ export default function App() {
           <NavLink to="/" end className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
             Таблица
           </NavLink>
-          <NavLink to="/dashboard" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
-            Дашборд
-          </NavLink>
-          <NavLink to="/daily" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
-            Дневной трекинг
-          </NavLink>
         </nav>
         <div className="app-header-actions">
           <div className="status">

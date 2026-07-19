@@ -6,8 +6,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 # ↓ поменяй под своего пользователя и путь клонирования
-User=deploy
-WorkingDirectory=/home/deploy/couture-dashboard/backend
+User=openclaw
+WorkingDirectory=/home/openclaw/ct-dashboard/backend
 ExecStart=/usr/bin/env node dist/server.js
 Restart=always
 RestartSec=5
