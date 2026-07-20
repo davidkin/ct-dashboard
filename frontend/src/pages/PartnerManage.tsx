@@ -20,7 +20,7 @@ const emptyRow = (): LinkRow => ({
 
 const SOURCES = ["Instagram", "Facebook", "TikTok", "Telegram", "Other"];
 
-export default function PartnerManage() {
+export default function PartnerManage({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"auto" | "manual">("auto");
   const [display_name, setName] = useState("");
   const [telegram, setTelegram] = useState("");
@@ -81,19 +81,28 @@ export default function PartnerManage() {
     }
   }
 
+  const shell = (inner: React.ReactNode) => (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal pm-wrap" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose} title="закрыть">✕</button>
+        {inner}
+      </div>
+    </div>
+  );
+
   if (!isAdminConfigured()) {
-    return (
-      <div className="pm-wrap">
+    return shell(
+      <>
         <h2>Новый партнёр</h2>
         <p className="muted">
           Не заданы админ-креды (VITE_ADMIN_USER / VITE_ADMIN_PASS) в .env.local — запись недоступна.
         </p>
-      </div>
+      </>,
     );
   }
 
-  return (
-    <div className="pm-wrap">
+  return shell(
+    <>
       <h2>Новый партнёр</h2>
 
       <div className="pm-mode">
@@ -173,6 +182,6 @@ export default function PartnerManage() {
 
       {result && <p className="pm-ok">{result}</p>}
       {error && <p className="pm-err">Ошибка: {error}</p>}
-    </div>
+    </>,
   );
 }
