@@ -79,6 +79,29 @@ function migrate(db: Database.Database): void {
       `UPDATE partners SET cpf_paid = (SELECT l.cpf_paid FROM links l WHERE l.partner_id = partners.id AND l.cpf_paid IS NOT NULL LIMIT 1) WHERE cpf_paid IS NULL`,
     );
   }
+  /* note — свободная заметка на партнёра (значок «!» в аналитике: серый пустой, акцент если есть текст). */
+  if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "note")) {
+    db.exec("ALTER TABLE partners ADD COLUMN note TEXT");
+  }
+  /* archived — 0/1. Архивный партнёр исключён из таблицы «Все партнёры» и KPI-счётчика, но не удалён. */
+  if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "archived")) {
+    db.exec("ALTER TABLE partners ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
+  }
+
+  /* payout_status — статус выплаты партнёру за конкретную неделю (Пн–Вс).
+     week_start = YYYY-MM-DD понедельника. status: 'pending' | 'done'.
+     Выплаты по понедельникам за прошлую неделю; в аналитике бейдж Готов/Ожидает. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS payout_status (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      partner_id INTEGER NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+      week_start TEXT NOT NULL,          /* YYYY-MM-DD, понедельник недели */
+      status TEXT NOT NULL DEFAULT 'pending',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(partner_id, week_start)
+    );
+    CREATE INDEX IF NOT EXISTS idx_payout_status_partner ON payout_status(partner_id, week_start);
+  `);
 
   /* daily_link_clicks — ночной снэпшот накопительного счётчика кликов по каждой
      компании. Единственное, что джоб реально пишет: OnlyMonster отдаёт клики

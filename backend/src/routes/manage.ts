@@ -8,6 +8,7 @@ import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
 import { listTrackingLinks } from "../om/client";
 import { getOMAccountForCreator } from "../config/creators";
+import { lastCompletedWeekStart } from "../lib/tz";
 
 interface NewLink {
   campaign_code: string;
@@ -210,6 +211,31 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
           .prepare("SELECT id, partner_id, campaign_code, cpf_free, cpf_paid, source, revshare_pct FROM links WHERE id = ?")
           .get(id),
       };
+    },
+  );
+
+  /**
+   * PUT /api/payout-status — статус выплаты партнёру за неделю (Готов/Ожидает).
+   * Body: { partner_id, status: "done"|"pending", week_start? }.
+   * По умолчанию week_start = понедельник прошлой завершённой недели (за неё платят).
+   */
+  app.put<{ Body: { partner_id?: number; status?: string; week_start?: string } }>(
+    "/api/payout-status",
+    async (req, reply) => {
+      const partnerId = Number(req.body?.partner_id);
+      const status = req.body?.status === "done" ? "done" : "pending";
+      const weekStart = req.body?.week_start || lastCompletedWeekStart();
+      if (!Number.isFinite(partnerId)) {
+        reply.code(400);
+        return { error: "partner_id required" };
+      }
+      db.prepare(
+        `INSERT INTO payout_status (partner_id, week_start, status, updated_at)
+         VALUES (?, ?, ?, datetime('now'))
+         ON CONFLICT(partner_id, week_start)
+         DO UPDATE SET status = excluded.status, updated_at = datetime('now')`,
+      ).run(partnerId, weekStart, status);
+      return { data: { partner_id: partnerId, week_start: weekStart, status } };
     },
   );
 }

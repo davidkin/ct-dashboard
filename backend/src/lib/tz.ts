@@ -83,6 +83,20 @@ export function nextCaptureAt(captureTime: string): string {
   return new Date(wallUTC - off).toISOString();
 }
 
+/** Понедельник недели, в которую попадает day (YYYY-MM-DD → YYYY-MM-DD). */
+export function weekStartMonday(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dow = dt.getUTCDay(); // 0=Вс..6=Сб
+  const delta = dow === 0 ? -6 : 1 - dow; // к понедельнику
+  return addDays(day, delta);
+}
+
+/** Понедельник ПОСЛЕДНЕЙ завершённой недели (Пн–Вс) относительно сегодня — за неё платят. */
+export function lastCompletedWeekStart(): string {
+  return addDays(weekStartMonday(todayLocal()), -7);
+}
+
 /** Список дней [from..to] включительно (YYYY-MM-DD). */
 export function dayRange(from: string, to: string): string[] {
   const out: string[] = [];

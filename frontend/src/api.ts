@@ -417,6 +417,50 @@ export async function fetchExportReport(opts: {
   return json.data as DailyReport;
 }
 
+/* === Общая аналитика (главный экран) — read-only через export-токен === */
+export interface AnalyticsPartner {
+  partner_id: number;
+  display_name: string;
+  telegram: string | null;
+  type: string | null;
+  source: string | null;
+  note: string | null;
+  archived: boolean;
+  clicks: number;
+  fans: number;
+  cr: number | null;
+  revenue: number;
+  payout: number;
+  trend: number | null;
+  payout_status: "pending" | "done";
+}
+export interface AnalyticsReport {
+  from: string;
+  to: string;
+  tz: string;
+  week_start: string;
+  kpi: { partners: number; clicks: number; fans: number; revenue: number; payout: number };
+  daily: Array<{ day: string; clicks: number; fans: number }>;
+  tiers: { free: { clicks: number; fans: number }; paid: { clicks: number; fans: number } };
+  sources: Array<{ label: string; clicks: number; fans: number }>;
+  partners: AnalyticsPartner[];
+}
+
+export async function fetchAnalytics(opts: { from?: string; to?: string; tier?: "free" | "paid" }): Promise<AnalyticsReport> {
+  if (!EXPORT_BASE || !EXPORT_TOKEN) {
+    throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+  }
+  const u = new URL(`${EXPORT_BASE.replace(/\/$/, "")}/export/analytics`);
+  u.searchParams.set("key", EXPORT_TOKEN);
+  if (opts.from) u.searchParams.set("from", opts.from);
+  if (opts.to) u.searchParams.set("to", opts.to);
+  if (opts.tier) u.searchParams.set("tier", opts.tier);
+  const res = await fetch(u.toString());
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.data as AnalyticsReport;
+}
+
 /* === Write-операции (создание/правка партнёра) — Basic-auth админа ===
    Хост тот же (EXPORT_BASE). Креды в .env.local: VITE_ADMIN_USER + VITE_ADMIN_PASS. */
 const ADMIN_USER = import.meta.env.VITE_ADMIN_USER as string | undefined;
@@ -505,6 +549,22 @@ export async function patchPartner(id: number, body: Record<string, unknown>): P
     method: "PATCH",
     headers: adminHeaders(),
     body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
+/** Статус выплаты партнёру за неделю (Готов/Ожидает). week_start опционально (по умолч. прошлая неделя). */
+export async function setPayoutStatus(
+  partner_id: number,
+  status: "done" | "pending",
+  week_start?: string,
+): Promise<{ partner_id: number; week_start: string; status: string }> {
+  const res = await fetch(manageUrl("/payout-status"), {
+    method: "PUT",
+    headers: adminHeaders(),
+    body: JSON.stringify({ partner_id, status, week_start }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);

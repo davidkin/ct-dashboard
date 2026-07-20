@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { buildDailyReport } from "../daily/report";
+import { buildAnalytics } from "../daily/analytics";
 import { todayLocal, addDays } from "../lib/tz";
 
 /**
@@ -46,4 +47,24 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     });
     return { data: report };
   });
+
+  /* Общая аналитика по всем партнёрам за период (главный экран). Тот же токен. */
+  app.get<{ Querystring: { key?: string; from?: string; to?: string; tier?: string } }>(
+    "/api/export/analytics",
+    async (req, reply) => {
+      const token = process.env.EXPORT_TOKEN;
+      if (!token) {
+        reply.code(503);
+        return { error: "EXPORT_TOKEN not configured" };
+      }
+      if (!req.query.key || req.query.key !== token) {
+        reply.code(401);
+        return { error: "invalid or missing key" };
+      }
+      const to = req.query.to || todayLocal();
+      const from = req.query.from || addDays(to, -29);
+      const tier = req.query.tier === "free" || req.query.tier === "paid" ? req.query.tier : undefined;
+      return { data: buildAnalytics(from, to, tier) };
+    },
+  );
 }
