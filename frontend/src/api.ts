@@ -417,6 +417,79 @@ export async function fetchExportReport(opts: {
   return json.data as DailyReport;
 }
 
+/* === Write-операции (создание/правка партнёра) — Basic-auth админа ===
+   Хост тот же (EXPORT_BASE). Креды в .env.local: VITE_ADMIN_USER + VITE_ADMIN_PASS. */
+const ADMIN_USER = import.meta.env.VITE_ADMIN_USER as string | undefined;
+const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASS as string | undefined;
+
+export function isAdminConfigured(): boolean {
+  return !!(EXPORT_BASE && ADMIN_USER && ADMIN_PASS);
+}
+function adminHeaders(): Record<string, string> {
+  if (!ADMIN_USER || !ADMIN_PASS) throw new Error("VITE_ADMIN_USER / VITE_ADMIN_PASS не заданы в .env.local");
+  return { Authorization: "Basic " + btoa(`${ADMIN_USER}:${ADMIN_PASS}`), "Content-Type": "application/json" };
+}
+function manageUrl(path: string): string {
+  if (!EXPORT_BASE) throw new Error("VITE_API_BASE не задан");
+  return `${EXPORT_BASE.replace(/\/$/, "")}${path}`;
+}
+
+export interface NewPartnerLink {
+  campaign_code: string;
+  tier: "free" | "paid";
+  cpf_free?: number | null;
+  cpf_paid?: number | null;
+  source?: string | null;
+  of_url?: string | null;
+}
+
+export async function createPartner(body: {
+  partner: {
+    display_name: string;
+    telegram?: string;
+    source?: string;
+    wallet?: string;
+    network?: string;
+    monthly_fee?: number | null;
+  };
+  links: NewPartnerLink[];
+  mode: "auto" | "manual";
+}): Promise<{ partner_id: number; links_created: number; unmatched_om: string[]; mode: string }> {
+  const res = await fetch(manageUrl("/partners"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status} ${res.statusText}`);
+  return json.data;
+}
+
+export async function patchLink(
+  id: number,
+  body: { cpf_free?: number | null; cpf_paid?: number | null; source?: string | null; revshare_pct?: number | null },
+): Promise<unknown> {
+  const res = await fetch(manageUrl(`/links/${id}`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
+export async function patchPartner(id: number, body: Record<string, unknown>): Promise<unknown> {
+  const res = await fetch(manageUrl(`/partners/${id}`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
 function withCreator(url: string, creator?: string): string {
   if (!creator) return url;
   const sep = url.includes("?") ? "&" : "?";

@@ -57,6 +57,15 @@ function migrate(db: Database.Database): void {
   /* Индекс для дневного трекинга — бакетим сабы по реальной дате подписки. */
   db.exec("CREATE INDEX IF NOT EXISTS idx_link_subs_om ON link_subscribers(om_subscribed_at)");
 
+  /* partners: кошелёк + сеть для выплат (задаются при создании/редактировании партнёра). */
+  const partnersCols = db.prepare("PRAGMA table_info(partners)").all() as Array<{ name: string }>;
+  if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "wallet")) {
+    db.exec("ALTER TABLE partners ADD COLUMN wallet TEXT");
+  }
+  if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "network")) {
+    db.exec("ALTER TABLE partners ADD COLUMN network TEXT");
+  }
+
   /* daily_link_clicks — ночной снэпшот накопительного счётчика кликов по каждой
      компании. Единственное, что джоб реально пишет: OnlyMonster отдаёт клики
      только текущим счётчиком без истории, поэтому day-over-day дельту считаем

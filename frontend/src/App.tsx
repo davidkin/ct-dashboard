@@ -25,6 +25,9 @@ export default function App() {
           <NavLink to="/" end className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
             Таблица
           </NavLink>
+          <NavLink to="/manage" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
+            Новый партнёр
+          </NavLink>
         </nav>
         <div className="app-header-actions">
           <div className="status">
