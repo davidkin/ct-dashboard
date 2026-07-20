@@ -519,7 +519,6 @@ function withCreator(url: string, creator?: string): string {
 
 export const api = {
   health: () => fetch("/api/health").then((r) => r.json() as Promise<HealthResponse>),
-  creators: () => get<Creator[]>("/api/creators"),
   creator: (slug: string) => get<CreatorDetail>(`/api/creators/${slug}`),
   trends: async (days = 7, creator?: string, range?: TrendRange): Promise<TrendsResponse> => {
     const url = new URL("/api/trends", window.location.origin);
@@ -535,21 +534,8 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status}`);
     return res.json();
   },
-  partners: (creator?: string, from?: string, to?: string) => {
-    let url = withCreator("/api/partners", creator);
-    if (from && to) {
-      const sep = url.includes("?") ? "&" : "?";
-      url = `${url}${sep}from=${from}&to=${to}`;
-    }
-    return get<PartnerRow[]>(url);
-  },
   partner: (id: number, creator?: string) =>
     get<{ partner: Partner; links: Link[] }>(withCreator(`/api/partners/${id}`, creator)),
-  syncStatus: () => get<SyncStatus>("/api/sync/status"),
-  forceSync: async () => {
-    const res = await fetch("/api/sync", { method: "POST" });
-    return res.json();
-  },
   linkSubscribers: async (linkId: number, refresh = false): Promise<{ data: LinkSubscriber[]; source: string }> => {
     const r = await fetch(`/api/links/${linkId}/subscribers${refresh ? "?refresh=1" : ""}`);
     if (!r.ok) throw new Error((await r.json()).error || `${r.status}`);
@@ -558,50 +544,6 @@ export const api = {
   linkSpenders: async (linkId: number, refresh = false): Promise<{ data: LinkSpender[]; source: string }> => {
     const r = await fetch(`/api/links/${linkId}/spenders${refresh ? "?refresh=1" : ""}`);
     if (!r.ok) throw new Error((await r.json()).error || `${r.status}`);
-    return r.json();
-  },
-  chargebacks: (days = 30) => get<Chargeback[]>(`/api/chargebacks?days=${days}`),
-  transactions: (days = 30) => get<Transaction[]>(`/api/transactions?days=${days}`),
-  payouts: () => get<Payout[]>("/api/payouts"),
-  webhookEvents: (limit = 50) => get<WebhookEvent[]>(`/api/webhooks/events?limit=${limit}`),
-  attributionPartners: (from?: string, to?: string) => {
-    const q = from && to ? `?from=${from}&to=${to}` : "";
-    return get<AttributionPartner[]>(`/api/attribution/partners${q}`);
-  },
-  attributionOverview: () => get<AttributionOverview>("/api/attribution/overview"),
-  attributionPartnerLinks: (partnerId: number, from?: string, to?: string) => {
-    const q = from && to ? `?from=${from}&to=${to}` : "";
-    return get<AttributionLink[]>(`/api/attribution/partners/${partnerId}/links${q}`);
-  },
-  syncFans: async () => {
-    const r = await fetch("/api/sync/fans", { method: "POST" });
-    return r.json();
-  },
-  pullAllSubscribers: async (force = false) => {
-    const r = await fetch(`/api/sync/all-subscribers${force ? "?force=1" : ""}`, { method: "POST" });
-    return r.json();
-  },
-  forceFinanceSync: async () => {
-    const r = await fetch("/api/finance/sync", { method: "POST" });
-    return r.json();
-  },
-  dailyTracking: (opts: { creator?: string; from?: string; to?: string; all?: boolean; partner?: number; sheetOnly?: boolean; source?: "combined" } = {}) => {
-    const u = new URL("/api/daily-tracking", window.location.origin);
-    if (opts.creator) u.searchParams.set("creator", opts.creator);
-    if (opts.from) u.searchParams.set("from", opts.from);
-    if (opts.to) u.searchParams.set("to", opts.to);
-    if (opts.all) u.searchParams.set("all", "1");
-    if (opts.partner) u.searchParams.set("partner", String(opts.partner));
-    if (opts.sheetOnly) u.searchParams.set("sheet_only", "1");
-    if (opts.source) u.searchParams.set("source", opts.source);
-    return get<DailyReport>(u.pathname + u.search);
-  },
-  dailyCapture: async (): Promise<{ data?: DailyCaptureResult; error?: string }> => {
-    const r = await fetch("/api/daily-tracking/capture", { method: "POST" });
-    return r.json();
-  },
-  dailyImportSheet: async (): Promise<{ data?: unknown; error?: string }> => {
-    const r = await fetch("/api/daily-tracking/import-sheet", { method: "POST" });
     return r.json();
   },
   updatePartner: async (id: number, patch: PartnerPatch): Promise<Partner> => {

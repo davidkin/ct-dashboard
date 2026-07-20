@@ -203,31 +203,20 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
     arr.push({ day: c.day, clicks: c.clicks_cumulative, fans: c.fans_cumulative });
   }
 
-  /* дельта кликов (для старого клик-режима) */
+  /* дельта кликов (для дней вне диапазона листа — OM-derived clicks) */
   const deltaByLinkDay = new Map<number, Map<string, number | null>>();
-  /* дельта снимка целиком {clicks, fans} — только дни с baseline и неотрицательной дельтой.
-     fans = null означает «нет baseline по фанам» (старые снимки не писали fans_cumulative) —
-     нельзя выдавать накопленный итог за один день. */
-  const snapshotDeltaByLinkDay = new Map<number, Map<string, { clicks: number; fans: number | null }>>();
   let earliestCaptureDay: string | null = null;
   for (const [linkId, arr] of cumulByLink) {
     const m = new Map<string, number | null>();
-    const snap = new Map<string, { clicks: number; fans: number | null }>();
     for (let i = 0; i < arr.length; i++) {
       if (i === 0) {
         m.set(arr[i].day, null); // первый снэпшот — нет baseline
       } else {
         const dc = arr[i].clicks - arr[i - 1].clicks;
-        const curF = arr[i].fans;
-        const prevF = arr[i - 1].fans;
-        // дельта фанов только если ОБА baseline реальные (не NULL); иначе неизвестно
-        const df = curF != null && prevF != null ? curF - prevF : null;
         m.set(arr[i].day, dc >= 0 ? dc : null); // сброс счётчика → неизвестно
-        if (dc >= 0) snap.set(arr[i].day, { clicks: dc, fans: df != null && df >= 0 ? df : null });
       }
     }
     deltaByLinkDay.set(linkId, m);
-    snapshotDeltaByLinkDay.set(linkId, snap);
     const first = arr[0]?.day;
     if (first && (!earliestCaptureDay || first < earliestCaptureDay)) earliestCaptureDay = first;
   }
