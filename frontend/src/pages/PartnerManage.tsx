@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPartner, fetchOmLinks, isAdminConfigured, NewPartnerLink, OmLink } from "../api";
+import { Hint } from "../components/Hint";
 
 /* Фаза A: создание партнёра. Линки пока создаются на стороне OM, поэтому кампании
    ВЫБИРАЕМ из списка OM (селект с поиском), а не вводим руками. tier выводим из кода/аккаунта.
@@ -124,9 +125,9 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
           <label>Source
             <select value={source} onChange={(e) => setSource(e.target.value)}>{SOURCES.map((s) => <option key={s}>{s}</option>)}</select>
           </label>
-          <label>Free CPF<input type="number" step="0.1" value={cpfFree} onChange={(e) => setCpfFree(e.target.value)} placeholder="1.5" /></label>
-          <label>Paid CPF<input type="number" step="0.1" value={cpfPaid} onChange={(e) => setCpfPaid(e.target.value)} placeholder="3.0" /></label>
-          <label>Monthly fee<input type="number" value={monthly_fee} onChange={(e) => setFee(e.target.value)} placeholder="0" /></label>
+          <label>Free CPF <Hint text="Оплата за 1 фана с FREE-трафика (fan amount)" /><input type="number" step="0.1" value={cpfFree} onChange={(e) => setCpfFree(e.target.value)} placeholder="1.5" /></label>
+          <label>Paid CPF <Hint text="Оплата за 1 фана с PAID-трафика (fan amount)" /><input type="number" step="0.1" value={cpfPaid} onChange={(e) => setCpfPaid(e.target.value)} placeholder="3.0" /></label>
+          <label>Monthly fee <Hint text="Фикс-выплата партнёру в месяц (fix payment / ретейнер) — отдельно и НЕ за фанов. За фанов платится через CPF." /><input type="number" value={monthly_fee} onChange={(e) => setFee(e.target.value)} placeholder="0" /></label>
           <label>Кошелёк<input value={wallet} onChange={(e) => setWallet(e.target.value)} placeholder="0x… / адрес" /></label>
           <label>Сеть
             <select value={network} onChange={(e) => setNetwork(e.target.value)}>{NETWORKS.map((n) => <option key={n}>{n}</option>)}</select>
