@@ -32,6 +32,53 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
   const db = getDb();
 
   /**
+   * GET /api/om/tracking-links — все tracking-линки из OM (оба аккаунта Free+Vip)
+   * для селекта при создании партнёра. Помечаем уже привязанные к партнёру.
+   */
+  app.get("/api/om/tracking-links", async (_req, reply) => {
+    const accts = [
+      { id: process.env.ONLYMONSTER_ACCOUNT_FREE, tier: "free" as const },
+      { id: process.env.ONLYMONSTER_ACCOUNT_VIP, tier: "paid" as const },
+    ].filter((a): a is { id: string; tier: "free" | "paid" } => !!a.id);
+
+    const assigned = new Map<number, string>();
+    for (const r of db
+      .prepare(
+        `SELECT l.of_tracking_link_id AS tid, p.display_name AS name
+         FROM links l JOIN partners p ON p.id = l.partner_id
+         WHERE l.of_tracking_link_id IS NOT NULL`,
+      )
+      .all() as Array<{ tid: number; name: string }>) {
+      assigned.set(Number(r.tid), r.name);
+    }
+
+    const out: Array<Record<string, unknown>> = [];
+    const errors: string[] = [];
+    for (const a of accts) {
+      try {
+        const links = await listTrackingLinks(a.id);
+        for (const l of links) {
+          const tier = l.name.startsWith("camp_paid") ? "paid" : a.tier;
+          out.push({
+            id: Number(l.id),
+            code: l.name,
+            url: l.url,
+            subscribers: l.subscribers,
+            clicks: l.clicks,
+            is_active: l.is_active,
+            tier,
+            assigned_to: assigned.get(Number(l.id)) ?? null,
+          });
+        }
+      } catch (e) {
+        errors.push(`${a.tier}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    out.sort((x, y) => String(x.code).localeCompare(String(y.code), undefined, { numeric: true }));
+    return { data: out, errors };
+  });
+
+  /**
    * POST /api/partners — создать партнёра + его линки.
    * Body: { partner: {display_name, glossary_name?, telegram?, source?, wallet?, network?, monthly_fee?, notes?},
    *         links: NewLink[], mode: "auto"|"manual" }

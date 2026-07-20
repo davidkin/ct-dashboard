@@ -1137,3 +1137,18 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .pm-section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space); margin: var(--space) 0; }
 .pm-section h3 { margin: 0 0 var(--space-sm); font-size: 14px; color: var(--text); }
 .pm-actions { display: flex; justify-content: flex-end; margin-top: var(--space); }
+
+/* --- OM-пикер линков (создание партнёра) --- */
+.pm-links-head { display: flex; justify-content: space-between; align-items: baseline; }
+.pm-search { width: 100%; margin: var(--space-sm) 0; }
+.pm-picker { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.pm-pick-row { display: flex; align-items: center; gap: var(--space-sm); padding: 7px 10px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.pm-pick-row:last-child { border-bottom: none; }
+.pm-pick-row:hover { background: var(--hover-bg); }
+.pm-pick-row.sel { background: rgba(0,175,240,0.08); }
+.pm-pick-code { font-weight: 600; min-width: 130px; }
+.pm-pick-stats { margin-left: auto; }
+.pm-tier { font-size: 11px; padding: 1px 7px; border-radius: 10px; }
+.pm-tier-free { background: rgba(0,175,240,0.15); color: var(--accent); }
+.pm-tier-paid { background: rgba(255,179,0,0.18); color: var(--warn); }
+.pm-assigned { font-size: 11px; color: var(--warn); }

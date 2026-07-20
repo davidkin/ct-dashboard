@@ -441,6 +441,25 @@ export interface NewPartnerLink {
   cpf_paid?: number | null;
   source?: string | null;
   of_url?: string | null;
+  of_tracking_link_id?: number | null;
+}
+
+export interface OmLink {
+  id: number;
+  code: string;
+  url: string;
+  subscribers: number;
+  clicks: number;
+  is_active: boolean;
+  tier: "free" | "paid";
+  assigned_to: string | null;
+}
+
+export async function fetchOmLinks(): Promise<OmLink[]> {
+  const res = await fetch(manageUrl("/om/tracking-links"), { headers: adminHeaders() });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as OmLink[];
 }
 
 export async function createPartner(body: {

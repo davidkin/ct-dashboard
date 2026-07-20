@@ -1,13 +1,9 @@
-import React, { useState } from "react";
-import { createPartner, isAdminConfigured, NewPartnerLink } from "../api";
+import React, { useEffect, useMemo, useState } from "react";
+import { createPartner, fetchOmLinks, isAdminConfigured, NewPartnerLink, OmLink } from "../api";
 
-/* Фаза A: создание партнёра — ручное ведение (как глоссарий). CPF — свойство ПАРТНЁРА
-   (Free CPF + Paid CPF), не линка. tracking-id дорезолвится из OM по коду. «Таблицу» не трогает. */
-
-type LinkRow = Pick<NewPartnerLink, "campaign_code" | "tier" | "source" | "of_url"> & { _id: number };
-
-let rowSeq = 1;
-const emptyRow = (): LinkRow => ({ _id: rowSeq++, campaign_code: "", tier: "free", source: "", of_url: "" });
+/* Фаза A: создание партнёра. Линки пока создаются на стороне OM, поэтому кампании
+   ВЫБИРАЕМ из списка OM (селект с поиском), а не вводим руками. tier выводим из кода/аккаунта.
+   CPF — свойство ПАРТНЁРА. «Таблицу» не трогает. */
 
 const SOURCES = ["Instagram", "Facebook", "TikTok", "Telegram", "Other"];
 const NETWORKS = ["BEP-20", "ERC-20", "TRC-20"];
@@ -21,30 +17,58 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
   const [monthly_fee, setFee] = useState("");
   const [cpfFree, setCpfFree] = useState("");
   const [cpfPaid, setCpfPaid] = useState("");
-  const [rows, setRows] = useState<LinkRow[]>([emptyRow()]);
+
+  const [omLinks, setOmLinks] = useState<OmLink[]>([]);
+  const [loadingLinks, setLoadingLinks] = useState(true);
+  const [linksErr, setLinksErr] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const setRow = (id: number, patch: Partial<LinkRow>) =>
-    setRows((rs) => rs.map((r) => (r._id === id ? { ...r, ...patch } : r)));
-  const addRow = () => setRows((rs) => [...rs, emptyRow()]);
-  const delRow = (id: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r._id !== id) : rs));
+  useEffect(() => {
+    if (!isAdminConfigured()) {
+      setLoadingLinks(false);
+      return;
+    }
+    fetchOmLinks()
+      .then((links) => setOmLinks(links))
+      .catch((e) => setLinksErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoadingLinks(false));
+  }, []);
+
   const num = (s: string) => (s.trim() === "" ? null : Number(s));
+  const toggle = (id: number) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return omLinks;
+    return omLinks.filter(
+      (l) => l.code.toLowerCase().includes(q) || (l.assigned_to ?? "").toLowerCase().includes(q),
+    );
+  }, [omLinks, search]);
 
   async function submit() {
     setError(null);
     setResult(null);
     if (!display_name.trim()) return setError("Укажи имя/хэндл партнёра");
-    const links: NewPartnerLink[] = rows
-      .filter((r) => r.campaign_code.trim())
-      .map((r) => ({
-        campaign_code: r.campaign_code.trim(),
-        tier: r.tier,
-        source: r.source || source || null,
-        of_url: r.of_url?.trim() || null,
+    const links: NewPartnerLink[] = omLinks
+      .filter((l) => selected.has(l.id))
+      .map((l) => ({
+        campaign_code: l.code,
+        tier: l.tier,
+        of_tracking_link_id: l.id,
+        of_url: l.url,
+        source: source || null,
       }));
-    if (!links.length) return setError("Добавь хотя бы одну кампанию (campaign_code)");
+    if (!links.length) return setError("Выбери хотя бы одну кампанию из OM");
     setBusy(true);
     try {
       const res = await createPartner({
@@ -59,11 +83,10 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
           cpf_paid: num(cpfPaid),
         },
         links,
-        mode: "auto", // tracking-id из OM по коду; линковку партнёр↔коды ведём вручную
+        mode: "manual", // id уже есть из пикера — резолвить из OM не нужно
       });
-      const warn = res.unmatched_om?.length ? ` ⚠️ не нашлись в OM: ${res.unmatched_om.join(", ")}` : "";
-      setResult(`Партнёр создан (id ${res.partner_id}), линков: ${res.links_created}.${warn}`);
-      setRows([emptyRow()]);
+      setResult(`Партнёр создан (id ${res.partner_id}), линков: ${res.links_created}.`);
+      setSelected(new Set());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -112,35 +135,27 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
       </section>
 
       <section className="pm-section">
-        <h3>Кампании (линки)</h3>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Коды ведём вручную (как в глоссарии). tracking-id подтянется из OM по campaign_code; CPF берётся с партнёра по tier.
-        </p>
-        <table className="pm-links">
-          <thead>
-            <tr><th>campaign_code*</th><th>tier</th><th>source</th><th>OF-ссылка (опц.)</th><th></th></tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r._id}>
-                <td><input value={r.campaign_code} onChange={(e) => setRow(r._id, { campaign_code: e.target.value })} placeholder="camp_123 / camp_paid_45" /></td>
-                <td>
-                  <select value={r.tier} onChange={(e) => setRow(r._id, { tier: e.target.value as "free" | "paid" })}>
-                    <option value="free">free</option><option value="paid">paid</option>
-                  </select>
-                </td>
-                <td>
-                  <select value={r.source ?? ""} onChange={(e) => setRow(r._id, { source: e.target.value })}>
-                    <option value="">(как у партнёра)</option>{SOURCES.map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </td>
-                <td><input value={r.of_url ?? ""} onChange={(e) => setRow(r._id, { of_url: e.target.value })} placeholder="https://onlyfans.com/… (если нет в OM)" /></td>
-                <td><button type="button" onClick={() => delRow(r._id)} title="удалить">✕</button></td>
-              </tr>
+        <div className="pm-links-head">
+          <h3>Кампании из OM</h3>
+          <span className="muted">выбрано: {selected.size}</span>
+        </div>
+        <input className="pm-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="поиск по коду…" />
+        {loadingLinks && <p className="muted">Загружаю линки из OM…</p>}
+        {linksErr && <p className="pm-err">OM: {linksErr}</p>}
+        {!loadingLinks && !linksErr && (
+          <div className="pm-picker">
+            {filtered.map((l) => (
+              <label key={l.id} className={`pm-pick-row${selected.has(l.id) ? " sel" : ""}`}>
+                <input type="checkbox" checked={selected.has(l.id)} onChange={() => toggle(l.id)} />
+                <span className="pm-pick-code">{l.code}</span>
+                <span className={`pm-tier pm-tier-${l.tier}`}>{l.tier}</span>
+                <span className="muted pm-pick-stats">{l.clicks} кл · {l.subscribers} фан</span>
+                {l.assigned_to && <span className="pm-assigned">уже у: {l.assigned_to}</span>}
+              </label>
             ))}
-          </tbody>
-        </table>
-        <button type="button" className="pm-add" onClick={addRow}>+ кампания</button>
+            {!filtered.length && <p className="muted">Ничего не найдено.</p>}
+          </div>
+        )}
       </section>
 
       <div className="pm-actions">
