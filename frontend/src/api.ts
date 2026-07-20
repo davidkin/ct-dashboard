@@ -1,3 +1,32 @@
+export interface PartnerLinkSummary {
+  partner_id: number;
+  creator: string;
+  id: number;
+  campaign_code: string;
+  of_url: string;
+  of_created_at: string | null;
+  cpf_free: number | null;
+  cpf_paid: number | null;
+  revshare_pct: number | null;
+  clicks_count: number;
+  subscribers_count: number;
+  spenders_count: number;
+  revenue_total: number;
+  payout_total: number;
+}
+
+export interface PartnerCreatorBreakdown {
+  partner_id: number;
+  creator: string;
+  links_count: number;
+  clicks_total: number | null;
+  subs_total: number | null;
+  spenders_total: number | null;
+  revenue_total: number | null;
+  payout_total: number | null;
+  links: PartnerLinkSummary[];
+}
+
 export interface PartnerRow {
   id: number;
   display_name: string;
@@ -14,6 +43,8 @@ export interface PartnerRow {
   revenue_total: number | null;
   payout_total: number | null;
   last_synced_at: string | null;
+  by_creator: PartnerCreatorBreakdown[];
+  sparkline: Array<{ day: string; clicks: number }>;
 }
 
 export interface Link {
@@ -64,6 +95,9 @@ export interface Creator {
   last_synced_at: string | null;
   account_id: string | null;
   configured: boolean;
+  avatar: string | null;
+  header: string | null;
+  of_username: string | null;
 }
 
 export interface PartnerTrend {
@@ -148,8 +182,9 @@ export interface LinkSubscriber {
   link_id: number;
   of_fan_id: string;
   username: string | null;
-  subscribed_at: string | null;
+  subscribed_at: string | null;     // OF: subscribedByExpireDate — когда подписка ИСТЕКАЕТ
   is_active: number;
+  first_seen_at: string | null;      // когда МЫ впервые увидели → прокси-дата подписки
   fetched_at: string;
 }
 
@@ -160,6 +195,7 @@ export interface LinkSpender {
   username: string | null;
   revenue_total: number;
   calculated_at: string | null;
+  first_seen_at: string | null;
   fetched_at: string;
 }
 
@@ -217,10 +253,124 @@ export interface WebhookEvent {
   error: string | null;
 }
 
+/* === Attribution (Игорь) === */
+export interface AttributionPartner {
+  partner_id: number;
+  display_name: string;
+  first_touch_fans: number;
+  repeat_touch_fans: number;
+  overlap_fans: number;
+  cpf_eligible_fans: number;
+  cpf_component: number;
+  revshare_component: number;
+  payout_total: number;
+  free_to_vip_conversions: number;
+  gross_vip_revenue_from_free_fans: number;
+  agency_recoup_rate: number | null;
+}
+
+export interface AttributionLink {
+  link_id: number;
+  campaign_code: string;
+  of_url: string;
+  creator: string | null;
+  partner_id: number | null;
+  gross_subscribers: number;
+  unique_fans: number;
+  first_touch_fans: number;
+  repeat_overlap_fans: number;
+  spenders: number;
+  revenue: number;
+  attributed_purchases: number;
+  payout_breakdown: {
+    link_id: number;
+    cpf_component: number;
+    revshare_component: number;
+    payout_total: number;
+    cpf_eligible_fans?: number;
+  } | null;
+}
+
+export interface AttributionOverview {
+  total_unique_fans: number;
+  total_first_touch_fans: number;
+  total_repeat_touch_fans: number;
+  multi_touch_fans: number;
+  overlap_fans: number;
+  overlap_rate: number;
+  free_fans: number;
+  vip_fans: number;
+  free_to_vip_conversions: number;
+  free_to_vip_conversion_rate: number;
+  avg_time_to_vip_hours: number | null;
+  median_time_to_vip_hours: number | null;
+  gross_vip_revenue_from_free_fans: number;
+  free_cpf_cost: number;
+  agency_recoup_rate: number | null;
+  total_cpf_component: number;
+  total_revshare_component: number;
+  total_payout: number;
+}
+
 export interface SyncStatus {
   recent: unknown[];
   links_with_metrics: number;
   of_api_configured: boolean;
+}
+
+/* === Daily tracking (аналог ручной таблицы партнёра) === */
+export interface DailyCampaign {
+  link_id: number;
+  campaign_code: string;
+  creator: string;
+  tier: "free" | "paid";
+  cpf: number;
+  revshare: number | null;
+  partner_id: number | null;
+  partner_name: string | null;
+}
+export interface DailyTierTotals {
+  free: { clicks: number; fans: number };
+  paid: { clicks: number; fans: number };
+  all: { clicks: number; fans: number };
+}
+export interface DailySnapshotInfo {
+  tz: string;
+  today: string;
+  capture_time: string;        // "23:59"
+  next_capture_at: string;     // ISO UTC
+  last_snapshot_day: string | null;
+  last_snapshot: { clicks: number; fans: number };
+}
+export interface DailyCell {
+  clicks: number | null; // null = нет baseline (до первого ночного снэпшота)
+  subs: number;
+  cr: number | null;
+  payout: number;
+}
+export interface DailyRow {
+  date: string;
+  total: { clicks: number | null; subs: number; cr: number | null; payout: number; subs_delta: number | null };
+  cells: Record<string, DailyCell>; // ключ = String(link_id)
+}
+export interface DailyReport {
+  creator: string | null;
+  from: string;
+  to: string;
+  tz: string;
+  campaigns: DailyCampaign[];
+  rows: DailyRow[];
+  clicks_available_from: string | null;
+  summary?: DailyTierTotals;      // period totals by tier
+  snapshot?: DailySnapshotInfo;   // "today" block
+}
+export interface DailyCaptureResult {
+  day: string;
+  links_captured: number;
+  links_unmatched: number;
+  om_synced: boolean;
+  duration_ms: number;
+  errors: string[];
 }
 
 async function get<T>(url: string): Promise<T> {
@@ -228,6 +378,137 @@ async function get<T>(url: string): Promise<T> {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const json = await res.json();
   return json.data as T;
+}
+
+/* === Прямой read-only фетч с задеплоенного бэкенда (VPS) через /export ===
+   Токен в query (?key=), CORS открыт → работает из браузера без прокси и Basic-auth.
+   Конфиг в .env.local: VITE_API_BASE + VITE_EXPORT_TOKEN. */
+const EXPORT_BASE = import.meta.env.VITE_API_BASE as string | undefined;
+const EXPORT_TOKEN = import.meta.env.VITE_EXPORT_TOKEN as string | undefined;
+
+export function isExportConfigured(): boolean {
+  return !!(EXPORT_BASE && EXPORT_TOKEN);
+}
+
+export async function fetchExportReport(opts: {
+  partner?: number;
+  creator?: string;
+  tier?: "free" | "paid";
+  from?: string;
+  to?: string;
+  all?: boolean;
+  source?: "combined";
+}): Promise<DailyReport> {
+  if (!EXPORT_BASE || !EXPORT_TOKEN) {
+    throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+  }
+  const u = new URL(`${EXPORT_BASE.replace(/\/$/, "")}/export`);
+  u.searchParams.set("key", EXPORT_TOKEN);
+  if (opts.partner) u.searchParams.set("partner", String(opts.partner));
+  if (opts.creator) u.searchParams.set("creator", opts.creator);
+  if (opts.tier) u.searchParams.set("tier", opts.tier);
+  if (opts.from) u.searchParams.set("from", opts.from);
+  if (opts.to) u.searchParams.set("to", opts.to);
+  if (opts.all) u.searchParams.set("all", "1");
+  if (opts.source) u.searchParams.set("source", opts.source);
+  const res = await fetch(u.toString());
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.data as DailyReport;
+}
+
+/* === Write-операции (создание/правка партнёра) — Basic-auth админа ===
+   Хост тот же (EXPORT_BASE). Креды в .env.local: VITE_ADMIN_USER + VITE_ADMIN_PASS. */
+const ADMIN_USER = import.meta.env.VITE_ADMIN_USER as string | undefined;
+const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASS as string | undefined;
+
+export function isAdminConfigured(): boolean {
+  return !!(EXPORT_BASE && ADMIN_USER && ADMIN_PASS);
+}
+function adminHeaders(): Record<string, string> {
+  if (!ADMIN_USER || !ADMIN_PASS) throw new Error("VITE_ADMIN_USER / VITE_ADMIN_PASS не заданы в .env.local");
+  return { Authorization: "Basic " + btoa(`${ADMIN_USER}:${ADMIN_PASS}`), "Content-Type": "application/json" };
+}
+function manageUrl(path: string): string {
+  if (!EXPORT_BASE) throw new Error("VITE_API_BASE не задан");
+  return `${EXPORT_BASE.replace(/\/$/, "")}${path}`;
+}
+
+export interface NewPartnerLink {
+  campaign_code: string;
+  tier: "free" | "paid";
+  cpf_free?: number | null;
+  cpf_paid?: number | null;
+  source?: string | null;
+  of_url?: string | null;
+  of_tracking_link_id?: number | null;
+}
+
+export interface OmLink {
+  id: number;
+  code: string;
+  url: string;
+  subscribers: number;
+  clicks: number;
+  is_active: boolean;
+  tier: "free" | "paid";
+  assigned_to: string | null;
+}
+
+export async function fetchOmLinks(): Promise<OmLink[]> {
+  const res = await fetch(manageUrl("/om/tracking-links"), { headers: adminHeaders() });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as OmLink[];
+}
+
+export async function createPartner(body: {
+  partner: {
+    display_name: string;
+    telegram?: string;
+    source?: string;
+    wallet?: string;
+    network?: string;
+    monthly_fee?: number | null;
+    cpf_free?: number | null;
+    cpf_paid?: number | null;
+  };
+  links: NewPartnerLink[];
+  mode: "auto" | "manual";
+}): Promise<{ partner_id: number; links_created: number; unmatched_om: string[]; mode: string }> {
+  const res = await fetch(manageUrl("/partners"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status} ${res.statusText}`);
+  return json.data;
+}
+
+export async function patchLink(
+  id: number,
+  body: { cpf_free?: number | null; cpf_paid?: number | null; source?: string | null; revshare_pct?: number | null },
+): Promise<unknown> {
+  const res = await fetch(manageUrl(`/links/${id}`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
+export async function patchPartner(id: number, body: Record<string, unknown>): Promise<unknown> {
+  const res = await fetch(manageUrl(`/partners/${id}`), {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
 }
 
 function withCreator(url: string, creator?: string): string {
@@ -254,7 +535,14 @@ export const api = {
     if (!res.ok) throw new Error(`${res.status}`);
     return res.json();
   },
-  partners: (creator?: string) => get<PartnerRow[]>(withCreator("/api/partners", creator)),
+  partners: (creator?: string, from?: string, to?: string) => {
+    let url = withCreator("/api/partners", creator);
+    if (from && to) {
+      const sep = url.includes("?") ? "&" : "?";
+      url = `${url}${sep}from=${from}&to=${to}`;
+    }
+    return get<PartnerRow[]>(url);
+  },
   partner: (id: number, creator?: string) =>
     get<{ partner: Partner; links: Link[] }>(withCreator(`/api/partners/${id}`, creator)),
   syncStatus: () => get<SyncStatus>("/api/sync/status"),
@@ -276,8 +564,44 @@ export const api = {
   transactions: (days = 30) => get<Transaction[]>(`/api/transactions?days=${days}`),
   payouts: () => get<Payout[]>("/api/payouts"),
   webhookEvents: (limit = 50) => get<WebhookEvent[]>(`/api/webhooks/events?limit=${limit}`),
+  attributionPartners: (from?: string, to?: string) => {
+    const q = from && to ? `?from=${from}&to=${to}` : "";
+    return get<AttributionPartner[]>(`/api/attribution/partners${q}`);
+  },
+  attributionOverview: () => get<AttributionOverview>("/api/attribution/overview"),
+  attributionPartnerLinks: (partnerId: number, from?: string, to?: string) => {
+    const q = from && to ? `?from=${from}&to=${to}` : "";
+    return get<AttributionLink[]>(`/api/attribution/partners/${partnerId}/links${q}`);
+  },
+  syncFans: async () => {
+    const r = await fetch("/api/sync/fans", { method: "POST" });
+    return r.json();
+  },
+  pullAllSubscribers: async (force = false) => {
+    const r = await fetch(`/api/sync/all-subscribers${force ? "?force=1" : ""}`, { method: "POST" });
+    return r.json();
+  },
   forceFinanceSync: async () => {
     const r = await fetch("/api/finance/sync", { method: "POST" });
+    return r.json();
+  },
+  dailyTracking: (opts: { creator?: string; from?: string; to?: string; all?: boolean; partner?: number; sheetOnly?: boolean; source?: "combined" } = {}) => {
+    const u = new URL("/api/daily-tracking", window.location.origin);
+    if (opts.creator) u.searchParams.set("creator", opts.creator);
+    if (opts.from) u.searchParams.set("from", opts.from);
+    if (opts.to) u.searchParams.set("to", opts.to);
+    if (opts.all) u.searchParams.set("all", "1");
+    if (opts.partner) u.searchParams.set("partner", String(opts.partner));
+    if (opts.sheetOnly) u.searchParams.set("sheet_only", "1");
+    if (opts.source) u.searchParams.set("source", opts.source);
+    return get<DailyReport>(u.pathname + u.search);
+  },
+  dailyCapture: async (): Promise<{ data?: DailyCaptureResult; error?: string }> => {
+    const r = await fetch("/api/daily-tracking/capture", { method: "POST" });
+    return r.json();
+  },
+  dailyImportSheet: async (): Promise<{ data?: unknown; error?: string }> => {
+    const r = await fetch("/api/daily-tracking/import-sheet", { method: "POST" });
     return r.json();
   },
   updatePartner: async (id: number, patch: PartnerPatch): Promise<Partner> => {

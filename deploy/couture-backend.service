@@ -1,0 +1,19 @@
+[Unit]
+Description=Couture Dashboard backend — traffic tracking + nightly snapshot automation
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# ↓ поменяй под своего пользователя и путь клонирования
+User=openclaw
+WorkingDirectory=/home/openclaw/ct-dashboard/backend
+ExecStart=/usr/bin/env node dist/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+# .env (секреты, HOST, TRACKING_TZ, DAILY_CAPTURE_AT) грузится dotenv-ом из WorkingDirectory.
+# Логи → journald: journalctl -u couture-backend -f
+
+[Install]
+WantedBy=multi-user.target

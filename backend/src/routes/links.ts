@@ -28,7 +28,7 @@ export async function registerLinksRoutes(app: FastifyInstance): Promise<void> {
 
       if (!refresh) {
         const cached = db
-          .prepare(`SELECT * FROM link_subscribers WHERE link_id = ? AND fetched_at >= datetime('now', '-60 minutes')`)
+          .prepare(`SELECT * FROM link_subscribers WHERE link_id = ? AND fetched_at >= datetime('now', '-60 minutes') ORDER BY first_seen_at DESC`)
           .all(id);
         if (cached.length > 0) return { data: cached, source: "cache" };
       }
@@ -36,12 +36,13 @@ export async function registerLinksRoutes(app: FastifyInstance): Promise<void> {
       try {
         const fresh = await listTrackingLinkSubscribers(link.of_account_id, link.of_tracking_link_id, 100, 0);
         const stmt = db.prepare(`
-          INSERT INTO link_subscribers (link_id, of_fan_id, username, subscribed_at, is_active, fetched_at)
-          VALUES (?, ?, ?, ?, ?, datetime('now'))
+          INSERT INTO link_subscribers (link_id, of_fan_id, username, subscribed_at, is_active, first_seen_at, fetched_at)
+          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
           ON CONFLICT(link_id, of_fan_id) DO UPDATE SET
             username      = excluded.username,
             subscribed_at = excluded.subscribed_at,
             is_active     = excluded.is_active,
+            /* first_seen_at НЕ трогаем — оригинальная дата подписки сохраняется */
             fetched_at    = datetime('now')
         `);
         const safeFresh = Array.isArray(fresh) ? fresh : [];
@@ -57,7 +58,9 @@ export async function registerLinksRoutes(app: FastifyInstance): Promise<void> {
           }
         });
         tx();
-        const rows = db.prepare(`SELECT * FROM link_subscribers WHERE link_id = ?`).all(id);
+        const rows = db
+          .prepare(`SELECT * FROM link_subscribers WHERE link_id = ? ORDER BY first_seen_at DESC`)
+          .all(id);
         return { data: rows, source: "fresh", count: safeFresh.length };
       } catch (err) {
         reply.code(502);
@@ -92,12 +95,13 @@ export async function registerLinksRoutes(app: FastifyInstance): Promise<void> {
       try {
         const fresh = await listTrackingLinkSpenders(link.of_account_id, link.of_tracking_link_id, 100, 0, minSpend);
         const stmt = db.prepare(`
-          INSERT INTO link_spenders (link_id, of_fan_id, username, revenue_total, calculated_at, fetched_at)
-          VALUES (?, ?, ?, ?, ?, datetime('now'))
+          INSERT INTO link_spenders (link_id, of_fan_id, username, revenue_total, calculated_at, first_seen_at, fetched_at)
+          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
           ON CONFLICT(link_id, of_fan_id) DO UPDATE SET
             username       = excluded.username,
             revenue_total  = excluded.revenue_total,
             calculated_at  = excluded.calculated_at,
+            /* first_seen_at не трогаем — это дата первого платежа */
             fetched_at     = datetime('now')
         `);
         const safeFresh = Array.isArray(fresh) ? fresh : [];

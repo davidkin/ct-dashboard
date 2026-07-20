@@ -171,6 +171,7 @@ table.data th {
 }
 table.data tr:last-child td { border-bottom: none; }
 table.data tr:hover td { background: var(--hover-bg); }
+table.data th.num,
 table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.data td.muted, .muted { color: var(--muted); }
 
@@ -186,6 +187,148 @@ table.clickable-rows td.row-open {
 }
 table.clickable-rows tbody tr:hover td.row-open {
   background: var(--accent); color: white;
+}
+
+/* ===== HIERARCHICAL PARTNERS TABLE ===== */
+table.partners-table tbody tr.partner-row { cursor: pointer; }
+table.partners-table tbody tr.partner-row td { padding: 14px 16px; }
+table.partners-table tbody tr.partner-row:hover td { background: var(--hover-bg); }
+
+table.partners-table td.expand-cell {
+  width: 32px; text-align: center; padding: 0;
+  cursor: pointer; user-select: none;
+}
+table.partners-table .expand-arrow {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  color: var(--muted); font-size: 10px;
+  transition: transform 0.15s, background 0.15s, color 0.15s;
+}
+table.partners-table .expand-arrow.open {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+table.partners-table td.expand-cell:hover .expand-arrow {
+  background: var(--panel-hi); color: var(--accent);
+}
+
+/* Партнёр-блок: иконка + имя/телега */
+.partner-cell {
+  display: flex; align-items: center; gap: 12px;
+}
+.partner-cell.child { padding-left: 20px; }
+.partner-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--panel-hi); border: 1px solid var(--border);
+  font-size: 13px; flex-shrink: 0;
+}
+.partner-name-block { display: flex; flex-direction: column; min-width: 0; }
+.partner-name {
+  font-weight: 600; font-size: 14px; color: var(--text);
+  letter-spacing: 0; line-height: 1.3;
+}
+table.partners-table tr.partner-row:hover .partner-name { color: var(--accent); }
+.partner-telegram {
+  font-size: 11px; color: var(--muted); text-decoration: none;
+  margin-top: 1px;
+}
+.partner-telegram:hover { color: var(--accent); text-decoration: none; }
+.creator-name { font-size: 13px; color: var(--muted); font-style: italic; }
+
+/* Большие цифры в колонках */
+table.partners-table td.num.big {
+  font-size: 15px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+table.partners-table td.num.big.accent { color: var(--accent); }
+
+/* Child rows — приглушённый фон, чуть меньше */
+table.partners-table tr.partner-child-row td {
+  background: var(--bg);
+  padding: 9px 16px;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px solid var(--border);
+}
+table.partners-table tr.partner-child-row td.num.big { font-size: 13px; font-weight: 500; }
+table.partners-table tr.partner-child-row .creator-name { color: var(--text); font-style: normal; font-weight: 500; }
+
+.creator-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  object-fit: cover; flex-shrink: 0;
+  border: 1px solid var(--border); background: var(--bg);
+}
+
+/* ===== PAYOUT SYSTEM TABS ===== */
+.payout-tabs {
+  display: flex; gap: 0; margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.payout-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 18px;
+  background: transparent; border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 14px; font-weight: 500; color: var(--muted);
+  cursor: pointer; font-family: inherit;
+  transition: all 0.15s;
+  margin-bottom: -1px;
+}
+.payout-tab:hover { color: var(--text); background: var(--hover-bg); }
+.payout-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.payout-tab-note {
+  font-size: 11px; font-weight: 400; color: var(--muted);
+  text-transform: lowercase; letter-spacing: 0;
+}
+.badge-exp {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  background: rgba(255,179,0,0.2); color: var(--warn);
+  padding: 1px 6px; border-radius: 4px;
+}
+
+.period-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; margin-bottom: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+.period-row .input { max-width: 150px; }
+.period-presets { display: flex; gap: 6px; }
+.period-presets .chip { padding: 3px 10px; font-size: 12px; }
+
+/* Creator row — cursor pointer на expand */
+table.partners-table tr.creator-row td.expand-cell { cursor: pointer; }
+
+/* LEVEL 3: Link row — ещё глубже отступ, мельче типографика */
+table.partners-table tr.link-row td {
+  background: var(--bg-elevated);
+  padding: 7px 16px;
+  border-top: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+table.partners-table tr.link-row td.num { font-weight: 500; font-size: 12px; }
+table.partners-table tr.link-row td.num.accent { color: var(--accent); }
+.partner-cell.link { padding-left: 40px; }
+.link-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  background: transparent; font-size: 11px; flex-shrink: 0;
+}
+.link-name-block { display: flex; flex-direction: column; min-width: 0; }
+.link-campaign {
+  font-weight: 600; font-size: 12px;
+  color: var(--accent); text-decoration: none;
+  letter-spacing: 0; line-height: 1.2;
+}
+.link-campaign:hover { text-decoration: underline; }
+.link-url {
+  font-size: 10px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 180px;
 }
 
 .partner-link { color: var(--text); font-weight: 500; }
@@ -734,6 +877,44 @@ code {
   display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
 }
 
+/* "По дням" view — компактные чипы фанов сгруппированные по дате */
+.day-group {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-elevated); margin-bottom: 10px;
+}
+.day-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  background: var(--panel-hi);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.day-group-header .day-label {
+  font-weight: 600; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.day-group-fans {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 12px;
+}
+.fan-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--border);
+  font-size: 12px; color: var(--text); text-decoration: none;
+  transition: all 0.1s;
+}
+.fan-chip:hover {
+  background: var(--accent); color: white; border-color: var(--accent);
+  text-decoration: none;
+}
+.fan-chip .fan-spent {
+  font-size: 11px; font-weight: 600; color: var(--good);
+  padding-left: 6px; border-left: 1px solid var(--border); margin-left: 2px;
+}
+.fan-chip:hover .fan-spent {
+  color: white; border-left-color: rgba(255,255,255,0.3);
+}
+
 /* ===== ACTIVITY FEED / FINANCE WIDGETS ===== */
 .feed-list { display: flex; flex-direction: column; gap: 6px; }
 .feed-list .item {
@@ -754,3 +935,220 @@ code {
   padding: 2px 8px; border-radius: 999px; font-size: 11px;
   background: rgba(255,82,82,0.15); color: var(--bad);
 }
+
+/* ===== HEADER NAV ===== */
+.app-nav { display: flex; gap: 4px; margin-right: auto; margin-left: 24px; }
+.app-nav-link {
+  padding: 6px 12px; border-radius: var(--radius-sm, 8px);
+  color: var(--muted); font-size: 14px; font-weight: 500;
+  text-decoration: none; transition: color 0.15s, background 0.15s;
+}
+.app-nav-link:hover { color: var(--text); background: var(--hover-bg); }
+.app-nav-link.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* ===== DAILY TRACKING GRID ===== */
+/* секции партнёров (каждый партнёр = свой дневной мини-грид) */
+.daily-sections { display: flex; flex-direction: column; gap: 16px; }
+.daily-partner-section { border: 1px solid var(--border); border-radius: var(--radius, 12px); overflow: hidden; }
+.daily-partner-head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  text-align: left; cursor: pointer; color: var(--text);
+  background: var(--bg-elevated); border: none; border-bottom: 1px solid var(--border);
+  padding: 11px 16px; font-size: 14px;
+}
+.daily-partner-head:hover { background: var(--hover-bg); }
+.daily-partner-section.collapsed .daily-partner-head { border-bottom: none; }
+.daily-collapse { color: var(--muted); font-size: 12px; width: 14px; }
+.daily-partner-name { font-weight: 700; font-size: 15px; color: var(--accent); }
+.daily-partner-summary { color: var(--muted); font-size: 12px; margin-left: auto; }
+.daily-partner-section .daily-scroll { border: none; border-radius: 0; max-height: 70vh; }
+
+.daily-scroll {
+  overflow: auto; max-height: 74vh;
+  border: 1px solid var(--border); border-radius: var(--radius, 12px);
+}
+table.data.daily-table { margin: 0; border: none; border-radius: 0; min-width: 100%; }
+.daily-table th, .daily-table td {
+  padding: 7px 10px; white-space: nowrap; font-size: 13px;
+}
+/* sticky-шапка из двух ярусов (компания → метрики) */
+.daily-table thead th { position: sticky; z-index: 1; background: var(--bg-elevated); }
+.daily-table thead tr:nth-child(1) th { top: 0; }
+.daily-table thead tr:nth-child(2) th { top: 40px; } /* высота строки с именем компании + CPF */
+/* группирующие заголовки блоков */
+.daily-table .daily-total-grp, .daily-table .daily-camp-grp {
+  text-align: center; text-transform: none; letter-spacing: 0;
+  font-size: 12px; font-weight: 600; color: var(--text);
+}
+.daily-table .daily-total-grp { color: var(--accent); }
+.daily-cpf { display: block; font-size: 10px; font-weight: 400; color: var(--muted); text-transform: none; letter-spacing: 0; }
+/* липкая первая колонка (Дата) */
+.daily-table .daily-sticky {
+  position: sticky; left: 0; z-index: 2;
+  background: var(--bg-elevated); text-align: left; font-weight: 600;
+  border-right: 2px solid var(--border);
+}
+.daily-table thead .daily-sticky { z-index: 3; }
+.daily-table tbody tr:hover .daily-sticky { background: var(--hover-bg); }
+/* вертикальные разделители: толстый на стыке партнёров/Total, тонкий между компаниями */
+.daily-table .daily-bd { border-left: 2px solid var(--border); }
+.daily-table .daily-bd-camp { border-left: 1px solid var(--border); }
+/* подсветка блока Total */
+.daily-table .daily-total-cell { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.daily-table td.strong { font-weight: 700; }
+.daily-table .daily-zero { color: var(--muted); opacity: 0.45; }
+.daily-table td.delta-up { color: var(--good); font-weight: 600; }
+.daily-table td.delta-down { color: var(--bad); font-weight: 600; }
+/* итоговая строка за период */
+.daily-table tfoot .daily-foot td {
+  position: sticky; bottom: 0; z-index: 1;
+  background: var(--bg-elevated); border-top: 2px solid var(--border); font-weight: 600;
+}
+.daily-table tfoot .daily-foot .daily-sticky { z-index: 2; }
+
+/* ===================================================================== */
+/* ===== TRAFFIC SHEET — точная копия Google Sheets (всегда светлый) ==== */
+/* ===================================================================== */
+.gs-doc {
+  background: #ffffff; color: #000000;
+  font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+  border: 1px solid #d9d9d9; border-radius: 8px;
+  padding: 16px 18px 20px; margin-top: 4px;
+}
+
+/* controls */
+.gs-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.gs-select {
+  font-family: Arial, sans-serif; font-size: 13px; color: #202124;
+  background: #fff; border: 1px solid #c4c7c5; border-radius: 4px; padding: 5px 8px; height: 30px;
+}
+.gs-select:hover { border-color: #8a8f94; }
+.gs-ctl-label { font-size: 12px; color: #5f6368; }
+
+/* top: title + notes */
+.gs-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.gs-sheet-title { font-size: 15px; font-weight: 700; color: #202124; }
+.gs-sheet-sub { font-size: 12px; color: #5f6368; margin-top: 2px; }
+.gs-notes { border: 1px solid #d9d9d9; border-radius: 2px; min-width: 240px; font-size: 13px; }
+.gs-notes-hdr { background: #efefef; font-weight: 700; text-align: center; padding: 5px 10px; border-bottom: 1px solid #d9d9d9; }
+.gs-notes-row { display: flex; justify-content: space-between; gap: 20px; padding: 5px 10px; border-bottom: 1px solid #eee; }
+.gs-notes-row span { color: #333; }
+.gs-notes-row b { color: #000; }
+.gs-notes-comment { color: #999; }
+.gs-notes-comment i { color: #999; font-style: normal; }
+
+/* chart */
+.gs-chart-card { border: 1px solid #d9d9d9; border-radius: 2px; padding: 12px 12px 6px; margin-bottom: 16px; background: #fff; }
+.gs-chart-title { font-size: 14px; font-weight: 700; color: #202124; text-align: center; margin-bottom: 8px; }
+
+/* tabs (как вкладки листа) */
+.gs-tabs { display: flex; gap: 0; border-bottom: 1px solid #d9d9d9; margin-bottom: 0; }
+.gs-tab {
+  font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #5f6368;
+  background: #f1f3f4; border: 1px solid #d9d9d9; border-bottom: none;
+  border-radius: 6px 6px 0 0; padding: 6px 18px; margin-right: 3px; cursor: pointer;
+}
+.gs-tab.active { background: #fff; color: #188038; border-top: 2px solid #188038; }
+
+/* table — вид Google Sheets */
+.gs-scroll { overflow: auto; max-height: 72vh; border: 1px solid #d9d9d9; border-top: none; }
+table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; background: #fff; }
+.gs-table th, .gs-table td { border: 1px solid #d9d9d9; padding: 3px 8px; white-space: nowrap; height: 22px; }
+.gs-table th { background: #efefef; font-weight: 700; text-align: center; color: #000; position: sticky; top: 0; z-index: 1; }
+.gs-table thead tr:nth-child(2) th { top: 25px; }
+.gs-table .gs-grp { background: #efefef; }
+.gs-table .gs-sub { font-weight: 700; }
+.gs-table .gs-num { text-align: right; font-variant-numeric: tabular-nums; }
+.gs-table .gs-date { text-align: center; }
+.gs-table .gs-b { font-weight: 700; }
+/* заморозка первой колонки (Дата) */
+.gs-table .gs-freeze { position: sticky; left: 0; z-index: 2; background: #efefef; border-right: 2px solid #c9c9c9; }
+.gs-table tbody .gs-freeze { background: #fff; }
+.gs-table thead .gs-freeze { z-index: 3; }
+.gs-table tbody tr:hover td { background: #f5faff; }
+.gs-table tbody tr:hover .gs-freeze { background: #eef5ff; }
+/* строка Total (footer) — накопительные суммы */
+.gs-table tfoot .gs-total-row td { position: sticky; bottom: 0; z-index: 1; background: #efefef; font-weight: 700; border-top: 2px solid #b7b7b7; }
+.gs-table tfoot .gs-total-row .gs-freeze { z-index: 2; background: #efefef; }
+
+/* накопительный Total за период (бар над таблицей) */
+.gs-grand { display: inline-flex; align-items: stretch; border: 1px solid #d9d9d9; border-radius: 4px; overflow: hidden; margin-bottom: 14px; }
+.gs-grand-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 24px; background: #f8f9fa; }
+.gs-grand-label { font-size: 11px; color: #5f6368; }
+.gs-grand-val { font-size: 22px; font-weight: 700; color: #1a73e8; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.gs-grand-val.gs-grand-fans { color: #d93025; }
+.gs-grand-sep { width: 1px; background: #d9d9d9; }
+
+/* сегмент-контрол тира (Все / Free / Paid) */
+.gs-seg { display: inline-flex; border: 1px solid #c4c7c5; border-radius: 4px; overflow: hidden; height: 30px; }
+.gs-seg-btn {
+  font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; color: #5f6368;
+  background: #fff; border: none; border-left: 1px solid #e0e0e0; padding: 0 14px; cursor: pointer;
+}
+.gs-seg-btn:first-child { border-left: none; }
+.gs-seg-btn:hover { background: #f1f3f4; }
+.gs-seg-btn.active { background: #1a73e8; color: #fff; }
+
+/* скоркарты по тирам + блок «сегодня» */
+.gs-cards { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; margin-bottom: 14px; }
+.gs-card { border: 1px solid #d9d9d9; border-radius: 6px; padding: 8px 18px; background: #f8f9fa; min-width: 150px; }
+.gs-card-label { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.gs-card-nums { display: flex; flex-direction: column; gap: 1px; font-size: 13px; color: #202124; }
+.gs-card-nums b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.gs-card-nums span { color: #5f6368; font-size: 11px; }
+
+.gs-today { border: 1px solid #d9d9d9; border-radius: 6px; padding: 8px 18px; background: #fff; min-width: 300px; margin-left: auto; }
+.gs-today-hdr { font-size: 13px; font-weight: 700; color: #202124; margin-bottom: 4px; }
+.gs-today-row { font-size: 12.5px; color: #333; line-height: 1.7; }
+.gs-today-row b { color: #000; font-variant-numeric: tabular-nums; }
+.gs-today-tz { color: #5f6368; font-weight: 400; }
+.gs-today-cd { color: #1a73e8; font-size: 14px; letter-spacing: 0.5px; }
+
+/* --- Новый партнёр (Фаза A) — на дизайн-системе (CSS-переменные) --- */
+.pm-wrap { padding: var(--space); }
+.pm-mode { display: flex; gap: var(--space-sm); align-items: center; margin: var(--space) 0; flex-wrap: wrap; }
+.pm-mode button { padding: 6px 12px; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; }
+.pm-mode button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-sm); margin: var(--space) 0; }
+.pm-grid label { display: flex; flex-direction: column; font-size: 12px; gap: var(--space-xs); color: var(--muted); }
+.pm-grid input, .pm-grid select, .pm-links input, .pm-links select { padding: 8px 12px; height: 36px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+.pm-grid input:focus, .pm-grid select:focus, .pm-links input:focus, .pm-links select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,175,240,0.15); }
+.pm-grid input::placeholder, .pm-links input::placeholder { color: var(--muted); }
+.pm-links { width: 100%; border-collapse: collapse; margin: var(--space-sm) 0; }
+.pm-links th, .pm-links td { padding: var(--space-xs) 6px; text-align: left; font-size: 12px; color: var(--muted); }
+.pm-links input { width: 100%; }
+.pm-links td button { background: transparent; border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); cursor: pointer; padding: 4px 8px; }
+.pm-add { margin: var(--space-xs) 0 var(--space); padding: 6px 12px; border: 1px dashed var(--border); background: transparent; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; }
+.pm-submit { padding: 10px 20px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 600; }
+.pm-submit:hover { background: var(--accent-hi); }
+.pm-submit:disabled { opacity: .6; cursor: default; }
+.pm-ok { color: var(--good); margin-top: var(--space); }
+.pm-err { color: var(--bad); margin-top: var(--space); }
+
+/* --- Модалка «Добавить партнёра» (Фаза A) --- */
+.add-partner-btn { padding: 7px 14px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 600; white-space: nowrap; }
+.add-partner-btn:hover { background: var(--accent-hi); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; z-index: 1000; overflow-y: auto; }
+.modal { position: relative; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); width: 100%; max-width: 1000px; color: var(--text); }
+.modal-close { position: absolute; top: 10px; right: 12px; background: transparent; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
+.modal-close:hover { color: var(--text); }
+
+/* --- Секции модалки «Новый партнёр» --- */
+.pm-section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space); margin: var(--space) 0; }
+.pm-section h3 { margin: 0 0 var(--space-sm); font-size: 14px; color: var(--text); }
+.pm-actions { display: flex; justify-content: flex-end; margin-top: var(--space); }
+
+/* --- OM-пикер линков (создание партнёра) --- */
+.pm-links-head { display: flex; justify-content: space-between; align-items: baseline; }
+.pm-search { width: 100%; margin: var(--space-sm) 0; }
+.pm-picker { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.pm-pick-row { display: flex; align-items: center; gap: var(--space-sm); padding: 7px 10px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.pm-pick-row:last-child { border-bottom: none; }
+.pm-pick-row:hover { background: var(--hover-bg); }
+.pm-pick-row.sel { background: rgba(0,175,240,0.08); }
+.pm-pick-code { font-weight: 600; min-width: 130px; }
+.pm-pick-stats { margin-left: auto; }
+.pm-tier { font-size: 11px; padding: 1px 7px; border-radius: 10px; }
+.pm-tier-free { background: rgba(0,175,240,0.15); color: var(--accent); }
+.pm-tier-paid { background: rgba(255,179,0,0.18); color: var(--warn); }
+.pm-assigned { font-size: 11px; color: var(--warn); }

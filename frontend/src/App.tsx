@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { api } from "./api";
 import { Hint } from "./components/Hint";
 import { useTheme } from "./hooks/useTheme";
+import PartnerManage from "./pages/PartnerManage";
 
 export default function App() {
   const [theme, toggleTheme] = useTheme();
   const [ofConfigured, setOfConfigured] = useState<boolean | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
     api.health().then((h) => setOfConfigured(h.of_api_configured));
@@ -21,6 +23,11 @@ export default function App() {
             Couture Dashboard
           </h1>
         </Link>
+        <nav className="app-nav">
+          <NavLink to="/" end className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
+            Таблица
+          </NavLink>
+        </nav>
         <div className="app-header-actions">
           <div className="status">
             {ofConfigured === null && <span className="muted">…</span>}
@@ -40,6 +47,9 @@ export default function App() {
               </>
             )}
           </div>
+          <button className="add-partner-btn" type="button" onClick={() => setShowAdd(true)}>
+            Добавить партнёра +
+          </button>
           <button
             className="theme-toggle"
             onClick={toggleTheme}
@@ -52,6 +62,7 @@ export default function App() {
       <main className="app-main">
         <Outlet />
       </main>
+      {showAdd && <PartnerManage onClose={() => setShowAdd(false)} />}
     </>
   );
 }

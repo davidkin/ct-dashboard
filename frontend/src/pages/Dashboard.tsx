@@ -6,6 +6,9 @@ import { ActivityChart } from "../components/ActivityChart";
 import { CreatorSwitcher } from "../components/CreatorSwitcher";
 import { Hint } from "../components/Hint";
 import { Pagination } from "../components/Pagination";
+import { AttributionTable } from "../components/AttributionTable";
+import { PartnersTable } from "../components/PartnersTable";
+import { PeriodPicker } from "../components/PeriodPicker";
 import { StatSkeleton, TableSkeleton } from "../components/Skeleton";
 import { TopMovers } from "../components/TopMovers";
 
@@ -62,6 +65,10 @@ export default function Dashboard() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [payoutSystem, setPayoutSystem] = useState<"current" | "attribution">("current");
+  /* Shared period — синхронно работает в обоих табах */
+  const [periodFrom, setPeriodFrom] = useState("");
+  const [periodTo, setPeriodTo] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
@@ -83,11 +90,13 @@ export default function Dashboard() {
   }, [trendRange, trendDays]);
 
   const load = () => {
-    api.partners(selectedCreator).then(setPartners).catch(console.error);
+    api.partners(selectedCreator, periodFrom || undefined, periodTo || undefined)
+      .then(setPartners)
+      .catch(console.error);
     api.creators().then(setCreators).catch(console.error);
     api.trends(trendDays, selectedCreator, trendRange).then(setTrends).catch(console.error);
   };
-  useEffect(() => { load(); }, [selectedCreator, trendDays, trendRange]);
+  useEffect(() => { load(); }, [selectedCreator, trendDays, trendRange, periodFrom, periodTo]);
 
   const sources = useMemo(() => {
     if (!partners) return [];
@@ -452,64 +461,62 @@ export default function Dashboard() {
 
         <ActiveFilters filters={activeFilters} onClearAll={clearAll} />
 
-        <div className="muted" style={{ fontSize: 12, margin: "0 4px 6px 4px" }}>
-          💡 Клик по строке откроет профиль партнёра. Внутри будет разбивка по моделям (Free / Vip).
+        <PeriodPicker
+          from={periodFrom}
+          to={periodTo}
+          onChange={(f, t) => { setPeriodFrom(f); setPeriodTo(t); }}
+          label="Период"
+          labelHint="В режиме «Текущая система» — прирост clicks/subs/revenue за окно (из snapshots delta). В режиме «Новая» — first-touch фаны попавшие в окно. Логика как у Adult Angels Sheet."
+          rightHint={periodFrom && periodTo ? `Окно: ${periodFrom} — ${periodTo}` : undefined}
+        />
+
+        <div className="payout-tabs">
+          <button
+            className={`payout-tab${payoutSystem === "current" ? " active" : ""}`}
+            onClick={() => setPayoutSystem("current")}
+          >
+            📊 Текущая система <span className="payout-tab-note">snapshot estimate</span>
+          </button>
+          <button
+            className={`payout-tab${payoutSystem === "attribution" ? " active" : ""}`}
+            onClick={() => setPayoutSystem("attribution")}
+          >
+            🧬 Новая система <span className="payout-tab-note">first-touch dedup</span>
+            <span className="badge-exp" title="Экспериментальный режим">BETA</span>
+          </button>
         </div>
 
-        <table className="data clickable-rows">
-        <thead>
-          <tr>
-            <th style={{ width: 28 }}></th>
-            <SortHeader k="display_name">Партнёр</SortHeader>
-            <th>Telegram</th>
-            <SortHeader k="type" hint="External — внешний арбитражник. In-house — наша команда.">Тип</SortHeader>
-            <SortHeader k="source">Источник</SortHeader>
-            <SortHeader k="links_count" hint="Сколько трекинг-ссылок у партнёра (по обеим моделям)" num>Ссылок</SortHeader>
-            <SortHeader k="clicks_total" hint="Клики по всем ссылкам партнёра" num>Clicks</SortHeader>
-            <SortHeader k="subs_total" hint="Атрибутированные подписки" num>Subs</SortHeader>
-            <SortHeader k="spenders_total" hint="Подписчики, которые что-то покупали" num>Spenders</SortHeader>
-            <SortHeader k="revenue_total" hint="Выручка от подписчиков партнёра" num>Revenue</SortHeader>
-            <SortHeader k="payout_total" hint="Оценка выплаты партнёру по текущей формуле" num>Payout</SortHeader>
-          </tr>
-        </thead>
-        <tbody>
-          {pageData.map((p) => (
-            <tr key={p.id} onClick={() => navigate(`/partners/${p.id}${selectedCreator ? `?creator=${encodeURIComponent(selectedCreator)}` : ""}`)}>
-              <td className="row-open">
-                <span title="Открыть профиль партнёра">↗</span>
-              </td>
-              <td>
-                <span className="partner-link">{p.display_name}</span>
-              </td>
-              <td className="muted" onClick={(e) => e.stopPropagation()}>
-                {p.telegram
-                  ? <a href={`https://t.me/${p.telegram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer">{p.telegram}</a>
-                  : "—"}
-              </td>
-              <td>{p.type ? <span className={`tag ${p.type === "External" ? "ext" : "in"}`}>{p.type}</span> : <span className="muted">—</span>}</td>
-              <td>{p.source || <span className="muted">—</span>}</td>
-              <td className="num">{p.links_count}</td>
-              <td className="num">{fmt(p.clicks_total)}</td>
-              <td className="num">{fmt(p.subs_total)}</td>
-              <td className="num">{fmt(p.spenders_total)}</td>
-              <td className="num">{money(p.revenue_total)}</td>
-              <td className="num">{money(p.payout_total)}</td>
-            </tr>
-          ))}
-          {pageData.length === 0 && (
-            <tr><td colSpan={11} className="empty">Партнёры не найдены</td></tr>
-          )}
-        </tbody>
-        </table>
+        {payoutSystem === "current" && (
+          <>
+            <div className="muted" style={{ fontSize: 12, margin: "0 4px 6px 4px" }}>
+              💡 Клик по строке — открыть профиль партнёра. Клик по ▶ — раскрыть разбивку по моделям.
+            </div>
+            <PartnersTable
+              rows={pageData}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onToggleSort={toggleSort}
+              onOpenPartner={(id) => navigate(`/partners/${id}${selectedCreator ? `?creator=${encodeURIComponent(selectedCreator)}` : ""}`)}
+            />
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              totalItems={visible.length}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </>
+        )}
 
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          totalItems={visible.length}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+        {payoutSystem === "attribution" && (
+          <AttributionTable
+            oldRows={partners ?? []}
+            onOpenPartner={(id) => navigate(`/partners/${id}${selectedCreator ? `?creator=${encodeURIComponent(selectedCreator)}` : ""}`)}
+            externalFrom={periodFrom}
+            externalTo={periodTo}
+          />
+        )}
       </section>
 
       {/* Активность — В САМОМ НИЗУ под таблицей */}

@@ -1,7 +1,36 @@
 import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
 import { creatorSlug, getAccountIdForCreator } from "../config/creators";
-import { getAccount } from "../of/client";
+import { getAccount, listAccounts } from "../of/client";
+
+/**
+ * Кэш аватарок моделей: ключ = of_account_id.
+ * TTL 30 мин — аватарки меняются редко, экономим OF API.
+ */
+const profileCache = new Map<string, { avatar: string | null; header: string | null; username: string | null; expires: number }>();
+const PROFILE_TTL_MS = 30 * 60 * 1000;
+
+async function getCachedProfiles(): Promise<typeof profileCache> {
+  const now = Date.now();
+  const allExpired = [...profileCache.values()].every((v) => v.expires < now);
+  if (profileCache.size === 0 || allExpired) {
+    try {
+      const accounts = await listAccounts();
+      profileCache.clear();
+      for (const a of accounts) {
+        profileCache.set(a.id, {
+          avatar: a.onlyfans_user_data?.avatar ?? null,
+          header: a.onlyfans_user_data?.header ?? null,
+          username: a.onlyfans_username ?? null,
+          expires: now + PROFILE_TTL_MS,
+        });
+      }
+    } catch {
+      /* Если OF API не отвечает — возвращаем старый кэш */
+    }
+  }
+  return profileCache;
+}
 
 export async function registerCreatorRoutes(app: FastifyInstance): Promise<void> {
   app.get("/api/creators", async () => {
@@ -32,14 +61,20 @@ export async function registerCreatorRoutes(app: FastifyInstance): Promise<void>
         last_synced_at: string | null;
       }>;
 
+    const profiles = process.env.ONLYFANSAPI_KEY ? await getCachedProfiles() : null;
+
     return {
       data: rows.map((r) => {
         const accountId = getAccountIdForCreator(r.name);
+        const prof = accountId && profiles ? profiles.get(accountId) : null;
         return {
           ...r,
           slug: creatorSlug(r.name),
           account_id: accountId,
           configured: !!accountId,
+          avatar: prof?.avatar ?? null,
+          header: prof?.header ?? null,
+          of_username: prof?.username ?? null,
         };
       }),
     };

@@ -75,10 +75,12 @@ CREATE TABLE IF NOT EXISTS link_subscribers (
   username TEXT,
   subscribed_at TEXT,
   is_active INTEGER,
+  first_seen_at TEXT,           /* когда МЫ впервые увидели фана в OF API — наша прокси-дата подписки */
   fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(link_id, of_fan_id)
 );
 CREATE INDEX IF NOT EXISTS idx_link_subs_link ON link_subscribers(link_id);
+CREATE INDEX IF NOT EXISTS idx_link_subs_first_seen ON link_subscribers(first_seen_at);
 
 CREATE TABLE IF NOT EXISTS link_spenders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,10 +89,12 @@ CREATE TABLE IF NOT EXISTS link_spenders (
   username TEXT,
   revenue_total REAL NOT NULL DEFAULT 0,
   calculated_at TEXT,
+  first_seen_at TEXT,           /* когда МЫ впервые увидели спендера в OF API */
   fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(link_id, of_fan_id)
 );
 CREATE INDEX IF NOT EXISTS idx_link_spenders_link ON link_spenders(link_id);
+CREATE INDEX IF NOT EXISTS idx_link_spenders_first_seen ON link_spenders(first_seen_at);
 
 /* ===== Chargebacks, transactions, payouts — синкаются периодически ===== */
 CREATE TABLE IF NOT EXISTS chargebacks (
