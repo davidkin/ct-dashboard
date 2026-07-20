@@ -21,7 +21,6 @@ const emptyRow = (): LinkRow => ({
 const SOURCES = ["Instagram", "Facebook", "TikTok", "Telegram", "Other"];
 
 export default function PartnerManage({ onClose }: { onClose: () => void }) {
-  const [mode, setMode] = useState<"auto" | "manual">("auto");
   const [display_name, setName] = useState("");
   const [telegram, setTelegram] = useState("");
   const [source, setSource] = useState("Instagram");
@@ -52,7 +51,7 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
         cpf_free: r.tier === "free" ? num(r.cpf_free) : null,
         cpf_paid: r.tier === "paid" ? num(r.cpf_paid) : null,
         source: r.source || source || null,
-        of_url: mode === "manual" ? r.of_url || null : null,
+        of_url: r.of_url?.trim() || null,
       }));
     if (!links.length) return setError("Добавь хотя бы одну кампанию (campaign_code)");
     setBusy(true);
@@ -67,11 +66,11 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
           monthly_fee: monthly_fee === "" ? null : Number(monthly_fee),
         },
         links,
-        mode,
+        mode: "auto", // невидимо дорезолвливаем tracking-id из OM по коду; линковку партнёр↔коды ведём вручную
       });
       const warn =
         res.unmatched_om?.length ? ` ⚠️ не нашлись в OM: ${res.unmatched_om.join(", ")}` : "";
-      setResult(`Партнёр создан (id ${res.partner_id}), линков: ${res.links_created}, режим: ${res.mode}.${warn}`);
+      setResult(`Партнёр создан (id ${res.partner_id}), линков: ${res.links_created}.${warn}`);
       // сброс кампаний, партнёрские поля оставляем на случай второй попытки
       setRows([emptyRow()]);
     } catch (e) {
@@ -105,19 +104,10 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
     <>
       <h2>Новый партнёр</h2>
 
-      <div className="pm-mode">
-        <button className={mode === "auto" ? "active" : ""} onClick={() => setMode("auto")} type="button">
-          Авто-заполнение из OM
-        </button>
-        <button className={mode === "manual" ? "active" : ""} onClick={() => setMode("manual")} type="button">
-          Ручная
-        </button>
-        <span className="muted">
-          {mode === "auto"
-            ? "tracking-ссылки подтянутся из OM по campaign_code — остальное задай руками"
-            : "все поля вводишь сам, включая OF-ссылку"}
-        </span>
-      </div>
+      <p className="muted" style={{ margin: "8px 0 4px" }}>
+        Заводим партнёра и его кампании вручную (как в глоссарии). tracking-id подтянется из OM
+        по campaign_code автоматически; OF-ссылку можно указать вручную, если кода ещё нет в OM.
+      </p>
 
       <div className="pm-grid">
         <label>Имя / хэндл*<input value={display_name} onChange={(e) => setName(e.target.value)} placeholder="@handle или имя" /></label>
@@ -137,7 +127,7 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
         <thead>
           <tr>
             <th>campaign_code*</th><th>tier</th><th>CPF</th><th>source</th>
-            {mode === "manual" && <th>OF-ссылка</th>}<th></th>
+            <th>OF-ссылка (опц.)</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -164,9 +154,7 @@ export default function PartnerManage({ onClose }: { onClose: () => void }) {
                   {SOURCES.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </td>
-              {mode === "manual" && (
-                <td><input value={r.of_url ?? ""} onChange={(e) => setRow(r._id, { of_url: e.target.value })} placeholder="https://onlyfans.com/…" /></td>
-              )}
+              <td><input value={r.of_url ?? ""} onChange={(e) => setRow(r._id, { of_url: e.target.value })} placeholder="https://onlyfans.com/… (если нет в OM)" /></td>
               <td><button type="button" onClick={() => delRow(r._id)} title="удалить">✕</button></td>
             </tr>
           ))}
