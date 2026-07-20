@@ -65,6 +65,20 @@ function migrate(db: Database.Database): void {
   if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "network")) {
     db.exec("ALTER TABLE partners ADD COLUMN network TEXT");
   }
+  /* CPF — свойство ПАРТНЁРА (Free CPF + Paid CPF), не линка. Линк берёт CPF партнёра по tier. */
+  if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "cpf_free")) {
+    db.exec("ALTER TABLE partners ADD COLUMN cpf_free REAL");
+    /* бэкфилл из линков для существующих партнёров (значения по партнёру одинаковые). */
+    db.exec(
+      `UPDATE partners SET cpf_free = (SELECT l.cpf_free FROM links l WHERE l.partner_id = partners.id AND l.cpf_free IS NOT NULL LIMIT 1) WHERE cpf_free IS NULL`,
+    );
+  }
+  if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "cpf_paid")) {
+    db.exec("ALTER TABLE partners ADD COLUMN cpf_paid REAL");
+    db.exec(
+      `UPDATE partners SET cpf_paid = (SELECT l.cpf_paid FROM links l WHERE l.partner_id = partners.id AND l.cpf_paid IS NOT NULL LIMIT 1) WHERE cpf_paid IS NULL`,
+    );
+  }
 
   /* daily_link_clicks — ночной снэпшот накопительного счётчика кликов по каждой
      компании. Единственное, что джоб реально пишет: OnlyMonster отдаёт клики

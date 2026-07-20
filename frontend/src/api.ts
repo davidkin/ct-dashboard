@@ -451,6 +451,8 @@ export async function createPartner(body: {
     wallet?: string;
     network?: string;
     monthly_fee?: number | null;
+    cpf_free?: number | null;
+    cpf_paid?: number | null;
   };
   links: NewPartnerLink[];
   mode: "auto" | "manual";

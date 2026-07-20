@@ -76,8 +76,8 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
       }
 
       const insP = db.prepare(`
-        INSERT INTO partners (glossary_name, display_name, telegram, source, monthly_fee, notes, wallet, network)
-        VALUES (@glossary_name, @display_name, @telegram, @source, @monthly_fee, @notes, @wallet, @network)
+        INSERT INTO partners (glossary_name, display_name, telegram, source, monthly_fee, notes, wallet, network, cpf_free, cpf_paid)
+        VALUES (@glossary_name, @display_name, @telegram, @source, @monthly_fee, @notes, @wallet, @network, @cpf_free, @cpf_paid)
       `);
       const insL = db.prepare(`
         INSERT INTO links (partner_id, creator, campaign_code, of_url, cpf_free, cpf_paid, revshare_pct, source, of_tracking_link_id)
@@ -97,6 +97,8 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
               notes: partner.notes ?? null,
               wallet: partner.wallet ?? null,
               network: partner.network ?? null,
+              cpf_free: partner.cpf_free ?? null,
+              cpf_paid: partner.cpf_paid ?? null,
             }).lastInsertRowid,
           );
           for (const l of links) {

@@ -1111,7 +1111,8 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .pm-mode button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-sm); margin: var(--space) 0; }
 .pm-grid label { display: flex; flex-direction: column; font-size: 12px; gap: var(--space-xs); color: var(--muted); }
-.pm-grid input, .pm-grid select, .pm-links input, .pm-links select { padding: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: var(--radius-sm); }
+.pm-grid input, .pm-grid select, .pm-links input, .pm-links select { padding: 8px 12px; height: 36px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+.pm-grid input:focus, .pm-grid select:focus, .pm-links input:focus, .pm-links select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,175,240,0.15); }
 .pm-grid input::placeholder, .pm-links input::placeholder { color: var(--muted); }
 .pm-links { width: 100%; border-collapse: collapse; margin: var(--space-sm) 0; }
 .pm-links th, .pm-links td { padding: var(--space-xs) 6px; text-align: left; font-size: 12px; color: var(--muted); }
@@ -1131,3 +1132,8 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .modal { position: relative; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); width: 100%; max-width: 1000px; color: var(--text); }
 .modal-close { position: absolute; top: 10px; right: 12px; background: transparent; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
 .modal-close:hover { color: var(--text); }
+
+/* --- Секции модалки «Новый партнёр» --- */
+.pm-section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space); margin: var(--space) 0; }
+.pm-section h3 { margin: 0 0 var(--space-sm); font-size: 14px; color: var(--text); }
+.pm-actions { display: flex; justify-content: flex-end; margin-top: var(--space); }

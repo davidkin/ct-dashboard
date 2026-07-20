@@ -472,13 +472,15 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
       source?: string | null;
       wallet?: string | null;
       network?: string | null;
+      cpf_free?: number | null;
+      cpf_paid?: number | null;
     };
   }>("/api/partners/:id", async (req, reply) => {
     const db = getDb();
     const id = Number(req.params.id);
     const fields: string[] = [];
     const values: (string | number | null)[] = [];
-    for (const key of ["monthly_fee", "notes", "display_name", "telegram", "source", "wallet", "network"] as const) {
+    for (const key of ["monthly_fee", "notes", "display_name", "telegram", "source", "wallet", "network", "cpf_free", "cpf_paid"] as const) {
       if (req.body[key] !== undefined) {
         fields.push(`${key} = ?`);
         values.push(req.body[key] ?? null);

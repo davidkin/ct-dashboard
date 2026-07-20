@@ -117,7 +117,8 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
   const linkRows = db
     .prepare(
       `SELECT l.id AS link_id, l.campaign_code, l.creator, l.cpf_free, l.cpf_paid,
-              l.revshare_pct, l.partner_id, p.display_name AS partner_name
+              l.revshare_pct, l.partner_id, p.display_name AS partner_name,
+              p.cpf_free AS p_cpf_free, p.cpf_paid AS p_cpf_paid
        FROM links l
        LEFT JOIN partners p ON p.id = l.partner_id
        WHERE (@creator IS NULL OR l.creator = @creator)
@@ -132,18 +133,21 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       revshare_pct: number | null;
       partner_id: number | null;
       partner_name: string | null;
+      p_cpf_free: number | null;
+      p_cpf_paid: number | null;
     }>;
 
   const campaignMap = new Map<number, DailyCampaign>();
   for (const r of linkRows) {
     const tier: "free" | "paid" = r.campaign_code.startsWith("camp_paid") ? "paid" : "free";
     if (opts.tier && tier !== opts.tier) continue; // фильтр free/paid
+    /* CPF берём с ПАРТНЁРА (Free/Paid CPF), фолбэк на CPF линка (для старых данных). */
     campaignMap.set(r.link_id, {
       link_id: r.link_id,
       campaign_code: r.campaign_code,
       creator: r.creator,
       tier,
-      cpf: pickCpf(r.creator, r.cpf_free, r.cpf_paid),
+      cpf: pickCpf(r.creator, r.p_cpf_free ?? r.cpf_free, r.p_cpf_paid ?? r.cpf_paid),
       revshare: r.revshare_pct,
       partner_id: r.partner_id,
       partner_name: r.partner_name,
