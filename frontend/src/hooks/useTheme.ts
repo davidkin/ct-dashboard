@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 export type Theme = "dark" | "light";
-const STORAGE_KEY = "couture-theme";
+const STORAGE_KEY = "couture-theme-v2";
 
 function getInitial(): Theme {
   if (typeof window === "undefined") return "dark";
