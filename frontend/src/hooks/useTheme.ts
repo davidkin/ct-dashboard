@@ -7,8 +7,8 @@ function getInitial(): Theme {
   if (typeof window === "undefined") return "dark";
   const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
   if (stored === "dark" || stored === "light") return stored;
-  const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
-  return prefersLight ? "light" : "dark";
+  /* Дизайн — тёмная тема основная. По умолчанию dark, не смотрим на OS-настройку. */
+  return "dark";
 }
 
 export function useTheme(): [Theme, () => void] {
