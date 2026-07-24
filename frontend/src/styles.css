@@ -1270,6 +1270,54 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .an-table td.up { color: var(--up); }
 .an-table td.down { color: var(--down); }
 
+/* ── Дневная матрица трафика (профиль), тема-адаптивная ── */
+.dm-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.dm-seg-btn {
+  padding: 5px 14px; font-size: 13px; font-weight: 600; color: var(--muted);
+  background: transparent; border: none; cursor: pointer; transition: background .12s, color .12s;
+}
+.dm-seg-btn + .dm-seg-btn { border-left: 1px solid var(--line); }
+.dm-seg-btn.active { background: var(--accent-soft); color: var(--text); }
+.dm-scroll { overflow: auto; max-height: 72vh; border-top: 1px solid var(--line); }
+table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; color: var(--text); }
+.dm-table th, .dm-table td {
+  padding: 7px 12px; white-space: nowrap; height: 22px; border-bottom: 1px solid var(--lineSoft);
+}
+.dm-table th {
+  background: var(--surface2); font-weight: 700; text-align: center; color: var(--text);
+  position: sticky; top: 0; z-index: 1;
+}
+.dm-table thead tr:nth-child(2) th { top: 33px; font-size: 11.5px; color: var(--muted); }
+.dm-table th.num, .dm-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.dm-table .dm-grp { border-bottom: 1px solid var(--line); }
+.dm-table .dm-grp-sep, .dm-table .dm-sep { border-left: 1px solid var(--line); }
+.dm-table td.muted { color: var(--muted); }
+.dm-table td.accent { color: var(--accent); font-weight: 600; }
+.dm-table .dm-b { font-weight: 700; }
+.dm-table .dm-date { text-align: center; color: var(--muted); }
+.dm-table .dm-freeze {
+  position: sticky; left: 0; z-index: 2; background: var(--surface2);
+  border-right: 1px solid var(--line);
+}
+.dm-table tbody .dm-freeze { background: var(--surface); }
+.dm-table thead .dm-freeze { z-index: 3; }
+.dm-table tbody tr:hover td { background: var(--accent-soft); }
+.dm-table tbody tr:hover .dm-freeze { background: var(--accent-soft); }
+.dm-table tfoot .dm-total-row td {
+  position: sticky; bottom: 0; z-index: 1; background: var(--surface2);
+  font-weight: 700; border-top: 1px solid var(--line);
+}
+.dm-table tfoot .dm-total-row .dm-freeze { z-index: 2; }
+
+/* ── Аккордеон (кампании/ссылки в профиле) ── */
+.pd-acc-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 15px 20px; cursor: pointer; user-select: none;
+}
+.pd-acc-head h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.pd-acc-caret { color: var(--muted); font-size: 13px; transition: transform .15s; }
+.pd-acc-head.open .pd-acc-caret { transform: rotate(90deg); }
+
 .an-partner { display: flex; align-items: center; gap: 10px; position: relative; }
 .an-ava {
   width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;

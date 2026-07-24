@@ -245,7 +245,7 @@ function TodayBlock({ snap, onExpire }: { snap: DailySnapshotInfo; onExpire: () 
 }
 
 /* ═══════════ TOTAL ═══════════ */
-export function TotalTable({ campaigns, rows }: { campaigns: DailyReport["campaigns"]; rows: DailyReport["rows"] }) {
+function TotalTable({ campaigns, rows }: { campaigns: DailyReport["campaigns"]; rows: DailyReport["rows"] }) {
   const foot = useMemo(() => {
     const per = new Map<number, { clicks: number; fans: number; payout: number }>();
     campaigns.forEach((c) => per.set(c.link_id, { clicks: 0, fans: 0, payout: 0 }));
@@ -341,7 +341,7 @@ export function TotalTable({ campaigns, rows }: { campaigns: DailyReport["campai
 }
 
 /* ═══════════ RAW DATA ═══════════ */
-export function RawTable({ campaigns, rows }: { campaigns: DailyReport["campaigns"]; rows: DailyReport["rows"] }) {
+function RawTable({ campaigns, rows }: { campaigns: DailyReport["campaigns"]; rows: DailyReport["rows"] }) {
   return (
     <div className="gs-scroll">
       <table className="gs-table">

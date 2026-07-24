@@ -9,7 +9,7 @@ import {
   patchPartner,
   setPayoutStatus,
 } from "../api";
-import { TotalTable, RawTable } from "./TrafficSheet";
+import DailyMatrix from "../components/DailyMatrix";
 
 /* Профиль партнёра (дизайн, экран 5). Данные — через export-токен (combined),
    поэтому работает на проде. Заметка/статус/архив — write через админ-креды. */
@@ -134,7 +134,7 @@ export default function PartnerDetail() {
   }
 
   const [noteOpen, setNoteOpen] = useState(false);
-  const [sheetTab, setSheetTab] = useState<"total" | "raw">("total");
+  const [campOpen, setCampOpen] = useState(false);
 
   if (loading && !meta && !rep) return <p className="muted">Загружаю профиль…</p>;
   if (err) return <div className="alert">{err}</div>;
@@ -224,71 +224,55 @@ export default function PartnerDetail() {
       {/* daily chart */}
       {rep && <ProfileChart rows={rep.rows} />}
 
-      {/* campaigns */}
+      {/* персональная таблица трафика (день × кампания) — над кампаниями */}
+      {rep && <DailyMatrix campaigns={rep.campaigns} rows={rep.rows} />}
+
+      {/* кампании / ссылки — свёрнуты в аккордеон */}
       <div className="an-card">
-        <div className="an-card-head">
+        <div className={`pd-acc-head${campOpen ? " open" : ""}`} onClick={() => setCampOpen((s) => !s)}>
           <h3>
             Кампании <span className="faint">· {campaigns.length}</span>
           </h3>
+          <span className="pd-acc-caret">▶</span>
         </div>
-        <div className="an-table-wrap">
-          <table className="an-table">
-            <thead>
-              <tr>
-                <th>Кампания</th>
-                <th>Тир</th>
-                <th className="num">Клики</th>
-                <th className="num">Фаны</th>
-                <th className="num">Конверт</th>
-                <th className="num">Выплата</th>
-              </tr>
-            </thead>
-            <tbody>
-              {campaigns.map((c) => (
-                <tr key={c.link_id} style={{ cursor: "default" }}>
-                  <td>{c.code}</td>
-                  <td>
-                    <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
-                  </td>
-                  <td className="num">{fmt(c.clicks)}</td>
-                  <td className="num">{fmt(c.fans)}</td>
-                  <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
-                  <td className="num accent">{money(c.payout)}</td>
-                </tr>
-              ))}
-              {!campaigns.length && (
+        {campOpen && (
+          <div className="an-table-wrap">
+            <table className="an-table">
+              <thead>
                 <tr>
-                  <td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>
-                    Нет кампаний за период.
-                  </td>
+                  <th>Кампания</th>
+                  <th>Тир</th>
+                  <th className="num">Клики</th>
+                  <th className="num">Фаны</th>
+                  <th className="num">Конверт</th>
+                  <th className="num">Выплата</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* персональная таблица трафика (день × кампания), как на /traffic */}
-      {rep && (
-        <div className="an-card">
-          <div className="an-card-head">
-            <h3>Таблица трафика</h3>
-            <div className="gs-tabs">
-              <button className={`gs-tab${sheetTab === "total" ? " active" : ""}`} onClick={() => setSheetTab("total")}>
-                Total
-              </button>
-              <button className={`gs-tab${sheetTab === "raw" ? " active" : ""}`} onClick={() => setSheetTab("raw")}>
-                Raw Data
-              </button>
-            </div>
+              </thead>
+              <tbody>
+                {campaigns.map((c) => (
+                  <tr key={c.link_id} style={{ cursor: "default" }}>
+                    <td>{c.code}</td>
+                    <td>
+                      <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
+                    </td>
+                    <td className="num">{fmt(c.clicks)}</td>
+                    <td className="num">{fmt(c.fans)}</td>
+                    <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
+                    <td className="num accent">{money(c.payout)}</td>
+                  </tr>
+                ))}
+                {!campaigns.length && (
+                  <tr>
+                    <td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>
+                      Нет кампаний за период.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-          {sheetTab === "total" ? (
-            <TotalTable campaigns={rep.campaigns} rows={rep.rows} />
-          ) : (
-            <RawTable campaigns={rep.campaigns} rows={rep.rows} />
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
