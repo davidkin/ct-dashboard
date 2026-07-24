@@ -1289,35 +1289,40 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 }
 .dm-note b { color: var(--text); font-weight: 700; margin-left: 4px; }
 .dm-scroll { overflow: auto; max-height: 72vh; border-top: 1px solid var(--line); }
-table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; color: var(--text); }
-.dm-table th, .dm-table td {
-  padding: 7px 12px; white-space: nowrap; height: 22px; border-bottom: 1px solid var(--lineSoft);
-}
+table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; color: var(--text); }
+/* воздух + только горизонтальные разделители строк (без грида, как в дизайне) */
+.dm-table th, .dm-table td { padding: 11px 14px; white-space: nowrap; }
+.dm-table td { border-bottom: 1px solid var(--lineSoft); }
 .dm-table th {
-  background: var(--surface2); font-weight: 700; text-align: center; color: var(--text);
+  background: var(--surface2); font-weight: 700; text-align: right; color: var(--muted);
+  font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
   position: sticky; top: 0; z-index: 1;
 }
-.dm-table thead tr:nth-child(2) th { top: 33px; font-size: 11.5px; color: var(--muted); }
+.dm-table thead tr:first-child th { text-align: center; }
+.dm-table thead tr:nth-child(2) th { top: 41px; }
 .dm-table th.num, .dm-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.dm-table .dm-grp { border-bottom: 1px solid var(--line); }
-.dm-table .dm-grp-sep, .dm-table .dm-sep { border-left: 1px solid var(--line); }
+.dm-table .dm-grp { border-bottom: 1px solid var(--line); color: var(--text); letter-spacing: 0; text-transform: none; font-size: 12.5px; }
+/* мягкий разделитель только на СТЫКЕ групп кампаний (не по каждой ячейке) */
+.dm-table .dm-grp-sep { border-left: 1px solid var(--lineSoft); }
 .dm-table td.muted { color: var(--muted); }
 .dm-table td.accent { color: var(--accent); font-weight: 600; }
 .dm-table .dm-b { font-weight: 700; }
-.dm-table .dm-date { text-align: center; color: var(--muted); }
-.dm-table .dm-freeze {
-  position: sticky; left: 0; z-index: 2; background: var(--surface2);
-  border-right: 1px solid var(--line);
-}
-.dm-table tbody .dm-freeze { background: var(--surface); }
-.dm-table thead .dm-freeze { z-index: 3; }
+.dm-table .dm-date-col { text-align: center; }
+.dm-table td.dm-date { text-align: center; color: var(--muted); }
+
+/* ── зафиксированные слева колонки (Дата + Total) ── */
+.dm-table .dm-frz { position: sticky; z-index: 1; }
+.dm-table thead .dm-frz { z-index: 3; background: var(--surface2); }
+.dm-table tbody .dm-frz { z-index: 2; background: var(--surface); }
+.dm-table tfoot .dm-frz { z-index: 3; }
+.dm-table .dm-frz-edge { border-right: 1px solid var(--line); }
+
 .dm-table tbody tr:hover td { background: var(--accent-soft); }
-.dm-table tbody tr:hover .dm-freeze { background: var(--accent-soft); }
+.dm-table tbody tr:hover .dm-frz { background: var(--accent-soft); }
 .dm-table tfoot .dm-total-row td {
   position: sticky; bottom: 0; z-index: 1; background: var(--surface2);
   font-weight: 700; border-top: 1px solid var(--line);
 }
-.dm-table tfoot .dm-total-row .dm-freeze { z-index: 2; }
 
 /* ── Аккордеон (кампании/ссылки в профиле) ── */
 .pd-acc-head {
