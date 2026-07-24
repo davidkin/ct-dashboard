@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import { DailyReport } from "../api";
+import { DailyReport, isAdminConfigured, patchPartner } from "../api";
 
 /* Дневная матрица трафика (день × кампания) в дизайн-системе профиля (an-/dm-),
    тема-адаптивная, без Google-Sheets грида. Колонки Дата + Total зафиксированы
@@ -27,13 +27,32 @@ const TOTAL_COLS = [
 const totalLeft = (i: number) => DATE_W + TOTAL_COLS.slice(0, i).reduce((s, c) => s + c.w, 0);
 const LAST_TOTAL = TOTAL_COLS.length - 1;
 
-export default function DailyMatrix({ campaigns, rows }: { campaigns: Campaigns; rows: Rows }) {
+export default function DailyMatrix({
+  campaigns,
+  rows,
+  partnerId,
+  onChanged,
+}: {
+  campaigns: Campaigns;
+  rows: Rows;
+  partnerId: number;
+  onChanged?: () => void;
+}) {
   const [tab, setTab] = useState<"total" | "raw">("total");
 
-  /* Notes & Conditions: СPF по тирам + Revshare (из кампаний партнёра) */
+  /* Notes & Conditions: СPF по тирам + Revshare (из кампаний партнёра).
+     CPF резолвится с приоритетом партнёра → правка идёт в партнёра (patchPartner). */
   const freeCpf = campaigns.find((c) => c.tier === "free")?.cpf ?? null;
   const paidCpf = campaigns.find((c) => c.tier === "paid")?.cpf ?? null;
   const revshare = campaigns.find((c) => c.revshare != null)?.revshare ?? null;
+  const hasFree = campaigns.some((c) => c.tier === "free");
+  const hasPaid = campaigns.some((c) => c.tier === "paid");
+  const canEdit = isAdminConfigured();
+
+  async function saveCpf(field: "cpf_free" | "cpf_paid", value: number | null) {
+    await patchPartner(partnerId, { [field]: value });
+    onChanged?.();
+  }
 
   return (
     <div className="an-card">
@@ -54,15 +73,11 @@ export default function DailyMatrix({ campaigns, rows }: { campaigns: Campaigns;
       {/* Notes & Conditions */}
       <div className="dm-notes">
         <span className="dm-notes-lbl">Notes &amp; Conditions</span>
-        {freeCpf != null && (
-          <span className="dm-note">
-            СPF Free <b>{money(freeCpf)}</b>
-          </span>
+        {hasFree && (
+          <CpfNote label="СPF Free" value={freeCpf} editable={canEdit} onSave={(v) => saveCpf("cpf_free", v)} />
         )}
-        {paidCpf != null && (
-          <span className="dm-note">
-            СPF Paid <b>{money(paidCpf)}</b>
-          </span>
+        {hasPaid && (
+          <CpfNote label="СPF Paid" value={paidCpf} editable={canEdit} onSave={(v) => saveCpf("cpf_paid", v)} />
         )}
         <span className="dm-note">
           Revshare <b>{revshare != null ? pct(revshare) : "—"}</b>
@@ -79,6 +94,73 @@ export default function DailyMatrix({ campaigns, rows }: { campaigns: Campaigns;
         <RawMatrix campaigns={campaigns} rows={rows} />
       )}
     </div>
+  );
+}
+
+/* Редактируемый CPF-чип: клик (у админа) → инпут, Enter/blur сохраняет. */
+function CpfNote({
+  label,
+  value,
+  editable,
+  onSave,
+}: {
+  label: string;
+  value: number | null;
+  editable: boolean;
+  onSave: (v: number | null) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function begin() {
+    if (!editable) return;
+    setDraft(value != null ? String(value) : "");
+    setEditing(true);
+  }
+  async function commit() {
+    const trimmed = draft.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    setEditing(false);
+    if (next != null && Number.isNaN(next)) return;
+    if (next === value) return;
+    setSaving(true);
+    try {
+      await onSave(next);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <span className="dm-note dm-note-edit">
+        {label}{" "}
+        <input
+          autoFocus
+          type="number"
+          step="0.01"
+          min="0"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") setEditing(false);
+          }}
+        />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`dm-note${editable ? " dm-note-btn" : ""}${saving ? " dm-note-saving" : ""}`}
+      onClick={begin}
+      title={editable ? "Редактировать CPF" : undefined}
+    >
+      {label} <b>{value != null ? money(value) : "—"}</b>
+      {editable && <span className="dm-note-pen">✎</span>}
+    </span>
   );
 }
 

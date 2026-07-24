@@ -49,6 +49,7 @@ export default function PartnerDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [statusOv, setStatusOv] = useState<"done" | "pending" | null>(null);
   const [archOv, setArchOv] = useState<boolean | null>(null);
   const [noteOv, setNoteOv] = useState<string | null>(null);
@@ -71,7 +72,7 @@ export default function PartnerDetail() {
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [pid, from, to]);
+  }, [pid, from, to, reloadNonce]);
 
   const campaigns = useMemo<CampAgg[]>(() => {
     if (!rep) return [];
@@ -225,7 +226,14 @@ export default function PartnerDetail() {
       {rep && <ProfileChart rows={rep.rows} />}
 
       {/* персональная таблица трафика (день × кампания) — над кампаниями */}
-      {rep && <DailyMatrix campaigns={rep.campaigns} rows={rep.rows} />}
+      {rep && (
+        <DailyMatrix
+          campaigns={rep.campaigns}
+          rows={rep.rows}
+          partnerId={pid}
+          onChanged={() => setReloadNonce((n) => n + 1)}
+        />
+      )}
 
       {/* кампании / ссылки — свёрнуты в аккордеон */}
       <div className="an-card">
