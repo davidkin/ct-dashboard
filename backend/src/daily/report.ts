@@ -13,7 +13,6 @@
  * клики задним числом восстановить нельзя, сабы — можно за всю историю.
  */
 import { getDb } from "../db/index";
-import { getCreatorType } from "../config/creators";
 import { localDay, dayRange, TRACKING_TZ, todayLocal, nextCaptureAt } from "../lib/tz";
 
 export interface DailyCampaign {
@@ -97,10 +96,21 @@ interface BuildOpts {
   tier?: "free" | "paid";
 }
 
-function pickCpf(creator: string, cpfFree: number | null, cpfPaid: number | null): number {
-  const type = getCreatorType(creator);
-  if (type === "vip") return cpfPaid ?? cpfFree ?? 0;
-  return cpfFree ?? cpfPaid ?? 0;
+/* CPF выбирается по ТИРУ КАМПАНИИ (free/paid), а не по типу креатора.
+   Источник истины — глоссарий: CPF кампании лежит в cpf_free её линка
+   (для paid-рядов там одно значение, напр. 3.5), поэтому в фолбэках paid
+   доходим до link.cpf_free. Приоритет отдаём непустому (>0) значению —
+   partner.cpf_paid=0.0 это плейсхолдер, а не реальный $0. */
+function pickCpf(
+  tier: "free" | "paid",
+  pFree: number | null,
+  pPaid: number | null,
+  lFree: number | null,
+  lPaid: number | null,
+): number {
+  const pick = (...cands: (number | null)[]): number =>
+    cands.find((v) => v != null && v > 0) ?? cands.find((v) => v != null) ?? 0;
+  return tier === "paid" ? pick(pPaid, lPaid, lFree, pFree) : pick(pFree, lFree, pPaid, lPaid);
 }
 
 function naturalCmp(a: string, b: string): number {
@@ -147,7 +157,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       campaign_code: r.campaign_code,
       creator: r.creator,
       tier,
-      cpf: pickCpf(r.creator, r.p_cpf_free ?? r.cpf_free, r.p_cpf_paid ?? r.cpf_paid),
+      cpf: pickCpf(tier, r.p_cpf_free, r.p_cpf_paid, r.cpf_free, r.cpf_paid),
       revshare: r.revshare_pct,
       partner_id: r.partner_id,
       partner_name: r.partner_name,
