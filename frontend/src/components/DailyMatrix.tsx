@@ -16,6 +16,12 @@ type Rows = DailyReport["rows"];
 
 export default function DailyMatrix({ campaigns, rows }: { campaigns: Campaigns; rows: Rows }) {
   const [tab, setTab] = useState<"total" | "raw">("total");
+
+  /* Notes & Conditions: СPF по тирам + Revshare (из кампаний партнёра) */
+  const freeCpf = campaigns.find((c) => c.tier === "free")?.cpf ?? null;
+  const paidCpf = campaigns.find((c) => c.tier === "paid")?.cpf ?? null;
+  const revshare = campaigns.find((c) => c.revshare != null)?.revshare ?? null;
+
   return (
     <div className="an-card">
       <div className="an-card-head">
@@ -30,6 +36,24 @@ export default function DailyMatrix({ campaigns, rows }: { campaigns: Campaigns;
             Raw
           </button>
         </div>
+      </div>
+
+      {/* Notes & Conditions */}
+      <div className="dm-notes">
+        <span className="dm-notes-lbl">Notes &amp; Conditions</span>
+        {freeCpf != null && (
+          <span className="dm-note">
+            СPF Free <b>{money(freeCpf)}</b>
+          </span>
+        )}
+        {paidCpf != null && (
+          <span className="dm-note">
+            СPF Paid <b>{money(paidCpf)}</b>
+          </span>
+        )}
+        <span className="dm-note">
+          Revshare <b>{revshare != null ? pct(revshare) : "—"}</b>
+        </span>
       </div>
       {!rows.length ? (
         <p className="muted" style={{ padding: "0 20px 20px" }}>

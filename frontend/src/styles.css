@@ -1278,6 +1278,16 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 }
 .dm-seg-btn + .dm-seg-btn { border-left: 1px solid var(--line); }
 .dm-seg-btn.active { background: var(--accent-soft); color: var(--text); }
+.dm-notes {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 0 20px 14px;
+}
+.dm-notes-lbl { font-size: 12px; font-weight: 700; color: var(--muted); margin-right: 4px; }
+.dm-note {
+  font-size: 12.5px; color: var(--muted); padding: 4px 10px;
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 8px;
+}
+.dm-note b { color: var(--text); font-weight: 700; margin-left: 4px; }
 .dm-scroll { overflow: auto; max-height: 72vh; border-top: 1px solid var(--line); }
 table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; color: var(--text); }
 .dm-table th, .dm-table td {
