@@ -1344,7 +1344,7 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 
 /* ── Плавающий попап суммы выделенных ячеек ── */
 .dm-sum-popup {
-  position: fixed; right: 24px; bottom: 24px; z-index: 50;
+  position: fixed; left: 24px; bottom: 24px; z-index: 50;
   display: flex; align-items: center; gap: 16px;
   padding: 12px 16px; border-radius: 14px;
   background: var(--bg-elevated); border: 1px solid var(--line);
