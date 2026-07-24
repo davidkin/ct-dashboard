@@ -115,8 +115,45 @@ function useCellSelection(resetDeps: unknown[]) {
 function SumPopup({ stats, onClear }: { stats: SelStats; onClear: () => void }) {
   const fmt = (n: number) =>
     stats.money ? `$${n.toFixed(2)}` : n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+  /* Перетаскивание окна. pos=null → дефолтное место (CSS: слева-снизу).
+     Тащим за грип; крестик из drag исключён. Клампим в границы вьюпорта. */
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const grab = useRef<{ dx: number; dy: number } | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  function onGripDown(e: React.MouseEvent) {
+    const box = boxRef.current!.getBoundingClientRect();
+    grab.current = { dx: e.clientX - box.left, dy: e.clientY - box.top };
+    setPos({ left: box.left, top: box.top });
+    e.preventDefault();
+  }
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      const g = grab.current;
+      const el = boxRef.current;
+      if (!g || !el) return;
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const left = Math.min(Math.max(0, e.clientX - g.dx), window.innerWidth - w);
+      const top = Math.min(Math.max(0, e.clientY - g.dy), window.innerHeight - h);
+      setPos({ left, top });
+    };
+    const up = () => (grab.current = null);
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+    return () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+    };
+  }, []);
+
+  const style: React.CSSProperties = pos
+    ? { left: pos.left, top: pos.top, right: "auto", bottom: "auto" }
+    : {};
+
   return (
-    <div className="dm-sum-popup" role="status">
+    <div className="dm-sum-popup" role="status" ref={boxRef} style={style}>
+      <span className="dm-sum-grip" title="Перетащить" onMouseDown={onGripDown}>⠿</span>
       <div className="dm-sum-main">
         <span className="dm-sum-lbl">Сумма</span>
         <b className="dm-sum-val">{fmt(stats.sum)}</b>

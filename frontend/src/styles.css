@@ -1352,6 +1352,11 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
   animation: dmSumIn .14s ease-out;
 }
 @keyframes dmSumIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.dm-sum-grip {
+  cursor: grab; color: var(--faint); font-size: 16px; line-height: 1;
+  padding: 0 2px; user-select: none; align-self: stretch; display: flex; align-items: center;
+}
+.dm-sum-grip:active { cursor: grabbing; }
 .dm-sum-main { display: flex; flex-direction: column; line-height: 1.2; }
 .dm-sum-lbl { font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .dm-sum-val { font-size: 20px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
