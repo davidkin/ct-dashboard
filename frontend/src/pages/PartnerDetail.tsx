@@ -9,6 +9,7 @@ import {
   patchPartner,
   setPayoutStatus,
 } from "../api";
+import { TotalTable, RawTable } from "./TrafficSheet";
 
 /* Профиль партнёра (дизайн, экран 5). Данные — через export-токен (combined),
    поэтому работает на проде. Заметка/статус/архив — write через админ-креды. */
@@ -58,7 +59,7 @@ export default function PartnerDetail() {
     setErr(null);
     Promise.all([
       fetchAnalytics({ from, to }),
-      fetchExportReport({ partner: pid, from, to, source: "combined" }),
+      fetchExportReport({ partner: pid, from, to, all: true, source: "combined" }),
     ])
       .then(([an, report]) => {
         setMeta(an.partners.find((p) => p.partner_id === pid) ?? null);
@@ -133,6 +134,7 @@ export default function PartnerDetail() {
   }
 
   const [noteOpen, setNoteOpen] = useState(false);
+  const [sheetTab, setSheetTab] = useState<"total" | "raw">("total");
 
   if (loading && !meta && !rep) return <p className="muted">Загружаю профиль…</p>;
   if (err) return <div className="alert">{err}</div>;
@@ -265,6 +267,28 @@ export default function PartnerDetail() {
           </table>
         </div>
       </div>
+
+      {/* персональная таблица трафика (день × кампания), как на /traffic */}
+      {rep && (
+        <div className="an-card">
+          <div className="an-card-head">
+            <h3>Таблица трафика</h3>
+            <div className="gs-tabs">
+              <button className={`gs-tab${sheetTab === "total" ? " active" : ""}`} onClick={() => setSheetTab("total")}>
+                Total
+              </button>
+              <button className={`gs-tab${sheetTab === "raw" ? " active" : ""}`} onClick={() => setSheetTab("raw")}>
+                Raw Data
+              </button>
+            </div>
+          </div>
+          {sheetTab === "total" ? (
+            <TotalTable campaigns={rep.campaigns} rows={rep.rows} />
+          ) : (
+            <RawTable campaigns={rep.campaigns} rows={rep.rows} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
