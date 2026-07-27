@@ -1298,7 +1298,15 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
   background: var(--bg); border: 1px solid var(--accent); border-radius: 6px;
   font-variant-numeric: tabular-nums;
 }
-.dm-scroll { overflow: auto; max-height: 72vh; border-top: 1px solid var(--line); }
+.dm-scroll { overflow: auto; max-height: 72vh; border-top: 1px solid var(--line); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.dm-scroll::-webkit-scrollbar { height: 10px; width: 10px; }
+.dm-scroll::-webkit-scrollbar-track { background: transparent; }
+.dm-scroll::-webkit-scrollbar-thumb {
+  background: var(--line); border-radius: 8px;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+.dm-scroll::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: padding-box; }
+.dm-scroll::-webkit-scrollbar-corner { background: transparent; }
 table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; color: var(--text); }
 /* воздух + только горизонтальные разделители строк (без грида, как в дизайне) */
 .dm-table th, .dm-table td { padding: 11px 14px; white-space: nowrap; }
@@ -1336,12 +1344,22 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .dm-table .dm-frz-edge { border-right: 1px solid var(--line); }
 
 .dm-table tbody tr:hover td { background: var(--accent-soft); }
-.dm-table tbody tr:hover .dm-frz { background: var(--accent-soft); }
+/* frozen-ячейки: фон ДОЛЖЕН быть непрозрачным, иначе скроллящийся под ними
+   контент кампаний просвечивает и цифры накладываются. accent-soft
+   полупрозрачный → композитим его поверх непрозрачного surface. */
+.dm-table tbody tr:hover .dm-frz {
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface);
+}
 
 /* выделяемые ячейки + подсветка выбранных */
 .dm-table td[data-k] { cursor: cell; user-select: none; }
-.dm-table td.dm-sel, .dm-table tbody tr:hover td.dm-sel, .dm-table .dm-frz.dm-sel {
+.dm-table td.dm-sel, .dm-table tbody tr:hover td.dm-sel {
   background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--text);
+}
+.dm-table tbody .dm-frz.dm-sel {
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface);
   box-shadow: inset 0 0 0 1.5px var(--accent);
   color: var(--text);
 }
