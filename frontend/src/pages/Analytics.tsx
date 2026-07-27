@@ -44,6 +44,7 @@ export default function Analytics() {
   const [err, setErr] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [onlyActive, setOnlyActive] = useState(true); // дефолтный фильтр по активным
 
   /* локальные оверрайды после write, чтобы не перезапрашивать весь отчёт */
   const [statusOv, setStatusOv] = useState<Record<number, "done" | "pending">>({});
@@ -93,12 +94,19 @@ export default function Analytics() {
   const archived = all.filter((p) => archOf(p));
 
   const filtered = useMemo(() => {
+    let list = active;
+    /* дефолтный фильтр по активным (activeOf !== false — чтобы до рестарта, пока
+       бэкенд не отдаёт active, показывались все) */
+    if (onlyActive) list = list.filter((p) => activeOf(p) !== false);
     const q = query.trim().toLowerCase();
-    if (!q) return active;
-    return active.filter(
-      (p) => p.display_name.toLowerCase().includes(q) || (p.telegram ?? "").toLowerCase().includes(q),
-    );
-  }, [active, query, archOv]);
+    if (q) {
+      list = list.filter(
+        (p) => p.display_name.toLowerCase().includes(q) || (p.telegram ?? "").toLowerCase().includes(q),
+      );
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, query, archOv, activeOv, onlyActive]);
 
   /* KPI пересчитываем по активным (учёт локального архивирования) */
   const kpi = useMemo(() => {
@@ -238,16 +246,25 @@ export default function Analytics() {
           <div className="an-card">
             <div className="an-card-head">
               <h3>
-                Все партнёры <span className="faint">· {active.length}</span>
+                {onlyActive ? "Активные партнёры" : "Все партнёры"} <span className="faint">· {filtered.length}</span>
               </h3>
-              <div className="input-with-icon an-search">
-                <span className="input-icon">⌕</span>
-                <input
-                  className="input"
-                  placeholder="Поиск партнёра…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
+              <div className="an-card-head-actions">
+                <button
+                  className={`seg-btn an-active-toggle${onlyActive ? " active" : ""}`}
+                  onClick={() => setOnlyActive((v) => !v)}
+                  title="Показывать только активных партнёров"
+                >
+                  {onlyActive ? "Только активные" : "Все партнёры"}
+                </button>
+                <div className="input-with-icon an-search">
+                  <span className="input-icon">⌕</span>
+                  <input
+                    className="input"
+                    placeholder="Поиск партнёра…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
             <div className="an-table-wrap">
