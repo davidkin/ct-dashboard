@@ -476,6 +476,7 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
       cpf_paid?: number | null;
       note?: string | null;
       archived?: boolean | number | null;
+      active?: boolean | number | null;
     };
   }>("/api/partners/:id", async (req, reply) => {
     const db = getDb();
@@ -491,6 +492,10 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
     if (req.body.archived !== undefined) {
       fields.push(`archived = ?`);
       values.push(req.body.archived ? 1 : 0);
+    }
+    if (req.body.active !== undefined) {
+      fields.push(`active = ?`);
+      values.push(req.body.active ? 1 : 0);
     }
     if (fields.length === 0) {
       reply.code(400);

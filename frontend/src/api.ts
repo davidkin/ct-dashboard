@@ -426,6 +426,7 @@ export interface AnalyticsPartner {
   source: string | null;
   note: string | null;
   archived: boolean;
+  active: boolean;
   clicks: number;
   fans: number;
   cr: number | null;

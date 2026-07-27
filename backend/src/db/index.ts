@@ -88,6 +88,11 @@ function migrate(db: Database.Database): void {
     db.exec("ALTER TABLE partners ADD COLUMN archived INTEGER NOT NULL DEFAULT 0");
   }
 
+  /* active — 0/1. Статус «Активный/Не активный» (селект в таблице). Не скрывает партнёра, только метка. */
+  if (partnersCols.length > 0 && !partnersCols.some((c) => c.name === "active")) {
+    db.exec("ALTER TABLE partners ADD COLUMN active INTEGER NOT NULL DEFAULT 1");
+  }
+
   /* payout_status — статус выплаты партнёру за конкретную неделю (Пн–Вс).
      week_start = YYYY-MM-DD понедельника. status: 'pending' | 'done'.
      Выплаты по понедельникам за прошлую неделю; в аналитике бейдж Готов/Ожидает. */

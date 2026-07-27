@@ -49,6 +49,7 @@ export default function Analytics() {
   const [statusOv, setStatusOv] = useState<Record<number, "done" | "pending">>({});
   const [noteOv, setNoteOv] = useState<Record<number, string>>({});
   const [archOv, setArchOv] = useState<Record<number, boolean>>({});
+  const [activeOv, setActiveOv] = useState<Record<number, boolean>>({});
   const [noteOpen, setNoteOpen] = useState<number | null>(null);
 
   const load = () => {
@@ -65,6 +66,7 @@ export default function Analytics() {
         setStatusOv({});
         setNoteOv({});
         setArchOv({});
+        setActiveOv({});
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
@@ -74,6 +76,17 @@ export default function Analytics() {
   const statusOf = (p: AnalyticsPartner) => statusOv[p.partner_id] ?? p.payout_status;
   const noteOf = (p: AnalyticsPartner) => (p.partner_id in noteOv ? noteOv[p.partner_id] : p.note ?? "");
   const archOf = (p: AnalyticsPartner) => (p.partner_id in archOv ? archOv[p.partner_id] : p.archived);
+  const activeOf = (p: AnalyticsPartner) => (p.partner_id in activeOv ? activeOv[p.partner_id] : p.active);
+
+  async function setActive(p: AnalyticsPartner, next: boolean, e: React.ChangeEvent) {
+    e.stopPropagation();
+    setActiveOv((s) => ({ ...s, [p.partner_id]: next }));
+    try {
+      await patchPartner(p.partner_id, { active: next });
+    } catch {
+      setActiveOv((s) => ({ ...s, [p.partner_id]: !next }));
+    }
+  }
 
   const all = rep?.partners ?? [];
   const active = all.filter((p) => !archOf(p));
@@ -242,6 +255,7 @@ export default function Analytics() {
                 <thead>
                   <tr>
                     <th>Партнёр</th>
+                    <th>Активность</th>
                     <th>Тип</th>
                     <th>Источник</th>
                     <th className="num">Клики</th>
@@ -291,6 +305,17 @@ export default function Analytics() {
                           )}
                         </div>
                       </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <select
+                          className={`an-active-sel ${activeOf(p) ? "on" : "off"}`}
+                          value={activeOf(p) ? "1" : "0"}
+                          onChange={(e) => setActive(p, e.target.value === "1", e)}
+                          disabled={!isAdminConfigured()}
+                        >
+                          <option value="1">Активный</option>
+                          <option value="0">Не активный</option>
+                        </select>
+                      </td>
                       <td>{p.type ? <span className="tag">{p.type}</span> : <span className="faint">—</span>}</td>
                       <td className="muted">{p.source || "—"}</td>
                       <td className="num">{fmt(p.clicks)}</td>
@@ -324,7 +349,7 @@ export default function Analytics() {
                   ))}
                   {!filtered.length && (
                     <tr>
-                      <td colSpan={11} className="muted" style={{ textAlign: "center", padding: 24 }}>
+                      <td colSpan={12} className="muted" style={{ textAlign: "center", padding: 24 }}>
                         Нет партнёров за период.
                       </td>
                     </tr>

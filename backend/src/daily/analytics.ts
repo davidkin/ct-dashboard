@@ -20,6 +20,7 @@ export interface PartnerAnalytics {
   source: string | null;
   note: string | null;
   archived: boolean;
+  active: boolean;
   clicks: number;
   fans: number;
   cr: number | null;
@@ -79,12 +80,12 @@ export function buildAnalytics(from: string, to: string, tier?: "free" | "paid")
   const pmeta = db
     .prepare(
       `SELECT id, display_name, telegram, type, source, note,
-              COALESCE(archived,0) AS archived
+              COALESCE(archived,0) AS archived, COALESCE(active,1) AS active
        FROM partners`,
     )
     .all() as Array<{
       id: number; display_name: string; telegram: string | null; type: string | null;
-      source: string | null; note: string | null; archived: number;
+      source: string | null; note: string | null; archived: number; active: number;
     }>;
   const metaById = new Map(pmeta.map((p) => [p.id, p]));
 
@@ -134,6 +135,7 @@ export function buildAnalytics(from: string, to: string, tier?: "free" | "paid")
       source: meta.source,
       note: meta.note,
       archived: !!meta.archived,
+      active: !!meta.active,
       clicks: a.clicks,
       fans: a.fans,
       cr: a.clicks > 0 ? a.fans / a.clicks : null,
