@@ -271,6 +271,7 @@ export default function Analytics() {
               <table className="an-table">
                 <thead>
                   <tr>
+                    <th className="an-rownum-h">#</th>
                     <th>Партнёр</th>
                     <th>Активность</th>
                     <th>Тип</th>
@@ -286,8 +287,9 @@ export default function Analytics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((p) => (
+                  {filtered.map((p, i) => (
                     <tr key={p.partner_id} onClick={() => navigate(`/partners/${p.partner_id}`)}>
+                      <td className="an-rownum">{i + 1}</td>
                       <td>
                         <div className="an-partner">
                           <span className="an-ava">{initials(p.display_name)}</span>
@@ -366,7 +368,7 @@ export default function Analytics() {
                   ))}
                   {!filtered.length && (
                     <tr>
-                      <td colSpan={12} className="muted" style={{ textAlign: "center", padding: 24 }}>
+                      <td colSpan={13} className="muted" style={{ textAlign: "center", padding: 24 }}>
                         Нет партнёров за период.
                       </td>
                     </tr>
