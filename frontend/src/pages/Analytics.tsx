@@ -167,6 +167,34 @@ export default function Analytics() {
             ))}
           </div>
 
+          {/* виджеты с собственным диапазоном дней (агрегат по всем партнёрам) */}
+          <div className="an-two an-widgets">
+            <RangeWidget title="Тотал залив" defFrom={from} defTo={to} tier={tier}>
+              {(k, loading) => (
+                <div className="an-widget-nums">
+                  <div>
+                    <div className="an-kpi-label">Клики</div>
+                    <div className="an-kpi-val">{loading && !k ? "…" : fmt(k?.clicks ?? 0)}</div>
+                  </div>
+                  <div>
+                    <div className="an-kpi-label">Фаны</div>
+                    <div className="an-kpi-val">{loading && !k ? "…" : fmt(k?.fans ?? 0)}</div>
+                  </div>
+                </div>
+              )}
+            </RangeWidget>
+            <RangeWidget title="Общая выплата" defFrom={from} defTo={to} tier={tier}>
+              {(k, loading) => (
+                <div className="an-widget-nums">
+                  <div>
+                    <div className="an-kpi-label">Выплата всем трафферам</div>
+                    <div className="an-kpi-val accent">{loading && !k ? "…" : money(k?.payout ?? 0)}</div>
+                  </div>
+                </div>
+              )}
+            </RangeWidget>
+          </div>
+
           {/* chart */}
           <Chart daily={rep.daily} />
 
@@ -347,6 +375,59 @@ export default function Analytics() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/* === виджет с собственным диапазоном дней ===
+   Тянет /export/analytics за свой период (та же combined-логика = «Таблица»),
+   отдаёт kpi (clicks/fans/payout по активным партнёрам) в render-проп. */
+function RangeWidget({
+  title,
+  defFrom,
+  defTo,
+  tier,
+  children,
+}: {
+  title: string;
+  defFrom: string;
+  defTo: string;
+  tier: Tier;
+  children: (kpi: AnalyticsReport["kpi"] | undefined, loading: boolean) => React.ReactNode;
+}) {
+  const [from, setFrom] = useState(defFrom);
+  const [to, setTo] = useState(defTo);
+  const [kpi, setKpi] = useState<AnalyticsReport["kpi"] | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    setErr(null);
+    fetchAnalytics({ from, to, tier: tier || undefined })
+      .then((r) => alive && setKpi(r.kpi))
+      .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [from, to, tier]);
+
+  return (
+    <div className="an-card an-widget">
+      <div className="an-card-head">
+        <h3>{title}</h3>
+        <div className="an-period">
+          <span className="muted">с</span>
+          <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+          <span className="muted">по</span>
+          <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+        </div>
+      </div>
+      <div className="an-widget-body">
+        {err ? <span className="muted">{err}</span> : children(kpi, loading)}
+      </div>
     </div>
   );
 }
