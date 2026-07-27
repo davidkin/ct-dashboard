@@ -9,11 +9,25 @@
  * иммунен к переходам на летнее/зимнее время, не нужно считать смещение TZ.
  */
 import { captureDailyClicks } from "./capture";
+import { getDb } from "../db/index";
 import { localHHMM, todayLocal, addDays, TRACKING_TZ } from "../lib/tz";
 
 let timer: NodeJS.Timeout | null = null;
 let lastCaptureDay: string | null = null;
 const CAPTURE_AT = process.env.DAILY_CAPTURE_AT || "23:59";
+
+/** Снэпшот за целевой день (вчера) уже есть в daily_om_stats? Идемпотентность: не
+ *  даём рестарту после времени капчи сделать повторный (лишний) снэпшот. */
+function alreadyCaptured(targetDay: string): boolean {
+  try {
+    const row = getDb()
+      .prepare("SELECT 1 FROM daily_om_stats WHERE day = ? LIMIT 1")
+      .get(targetDay);
+    return !!row;
+  } catch {
+    return false;
+  }
+}
 
 export function startDailyCapture(): void {
   if (timer) return;
@@ -22,14 +36,25 @@ export function startDailyCapture(): void {
     return;
   }
 
+  /* При старте: если сегодняшний снэпшот (за вчера) уже сделан — помечаем день
+     как обработанный, чтобы рестарт после времени капчи не запустил повторный. */
+  if (alreadyCaptured(addDays(todayLocal(), -1))) {
+    lastCaptureDay = todayLocal();
+  }
+
   const tick = async () => {
     try {
       const now = localHHMM();
       const today = todayLocal();
-      /* Окно 23:55–23:59: срабатывает один раз за день (guard по lastCaptureDay). */
+      /* Один раз за день (guard по lastCaptureDay + проверка БД от повторов при рестарте). */
       if (now >= CAPTURE_AT && lastCaptureDay !== today) {
         lastCaptureDay = today;
-        console.log(`[daily] capturing clicks for ${addDays(today, -1)} (finalized at ${now} ${TRACKING_TZ})`);
+        const targetDay = addDays(today, -1);
+        if (alreadyCaptured(targetDay)) {
+          console.log(`[daily] snapshot for ${targetDay} already exists — skip (no duplicate)`);
+          return;
+        }
+        console.log(`[daily] capturing clicks for ${targetDay} (finalized at ${now} ${TRACKING_TZ})`);
         const res = await captureDailyClicks({ runSync: true });
         console.log(
           `[daily] captured ${res.links_captured} links, unmatched=${res.links_unmatched}, ` +
