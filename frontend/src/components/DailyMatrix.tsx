@@ -11,6 +11,23 @@ const money = (n: number | null): string => (n == null ? "" : `$${n.toFixed(2)}`
 const pct = (n: number | null): string => (n == null ? "—" : `${(n * 100).toFixed(0)}%`);
 const dmy = (d: string): string =>
   new Date(`${d}T00:00:00`).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+const WD = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+const weekday = (d: string): string => WD[new Date(`${d}T00:00:00`).getDay()];
+const isMonday = (d: string): boolean => new Date(`${d}T00:00:00`).getDay() === 1;
+const isWeekend = (d: string): boolean => {
+  const g = new Date(`${d}T00:00:00`).getDay();
+  return g === 0 || g === 6;
+};
+
+/* Ячейка даты: число + день недели (пн–вс) под ним. */
+function DateCell({ day, className, style }: { day: string; className: string; style?: React.CSSProperties }) {
+  return (
+    <td className={className} style={style}>
+      <span className="dm-date-d">{dmy(day)}</span>
+      <span className="dm-date-w">{weekday(day)}</span>
+    </td>
+  );
+}
 
 /* data-атрибуты для выделяемой ячейки (пусто, если значения нет — не выделяется) */
 const dsel = (
@@ -375,10 +392,8 @@ function TotalMatrix({ campaigns, rows }: { campaigns: Campaigns; rows: Rows }) 
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.date}>
-              <td className="dm-frz dm-date-col dm-date" style={{ left: 0, width: DATE_W, minWidth: DATE_W }}>
-                {dmy(r.date)}
-              </td>
+            <tr key={r.date} className={`${isMonday(r.date) ? "dm-week-start" : ""}${isWeekend(r.date) ? " dm-weekend" : ""}`}>
+              <DateCell day={r.date} className="dm-frz dm-date-col dm-date" style={{ left: 0, width: DATE_W, minWidth: DATE_W }} />
               <td {...frz(0)} {...dsel(`tc-${r.date}`, r.total.clicks, "int")}>{intFmt(r.total.clicks)}</td>
               <td {...frz(1, "dm-b")} {...dsel(`tf-${r.date}`, r.total.subs, "int")}>{intFmt(r.total.subs)}</td>
               <td {...frz(2, "muted")}>{pct(r.total.cr)}</td>
@@ -448,10 +463,8 @@ function RawMatrix({ campaigns, rows }: { campaigns: Campaigns; rows: Rows }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.date}>
-              <td className="dm-frz dm-frz-edge dm-date-col dm-date" style={{ left: 0, width: DATE_W, minWidth: DATE_W }}>
-                {dmy(r.date)}
-              </td>
+            <tr key={r.date} className={`${isMonday(r.date) ? "dm-week-start" : ""}${isWeekend(r.date) ? " dm-weekend" : ""}`}>
+              <DateCell day={r.date} className="dm-frz dm-frz-edge dm-date-col dm-date" style={{ left: 0, width: DATE_W, minWidth: DATE_W }} />
               {campaigns.map((c) => {
                 const cell = r.cells[String(c.link_id)];
                 return (

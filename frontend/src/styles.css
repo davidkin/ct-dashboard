@@ -1318,7 +1318,15 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .dm-table td.accent { color: var(--accent); font-weight: 600; }
 .dm-table .dm-b { font-weight: 700; }
 .dm-table .dm-date-col { text-align: center; }
-.dm-table td.dm-date { text-align: center; color: var(--muted); }
+.dm-table td.dm-date { text-align: center; color: var(--muted); line-height: 1.15; padding-top: 7px; padding-bottom: 7px; }
+.dm-date-d { display: block; font-variant-numeric: tabular-nums; color: var(--text); font-size: 12.5px; font-weight: 600; }
+.dm-date-w { display: block; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-top: 1px; }
+
+/* ── разделение по неделям (пн–вс): линия перед понедельником + заливка выходных ── */
+.dm-table tbody tr.dm-weekend td { background: var(--surface2); }
+.dm-table tbody tr.dm-weekend .dm-frz { background: var(--surface2); }
+.dm-table tbody tr.dm-weekend .dm-date-w { color: var(--accent); }
+.dm-table tbody tr.dm-week-start td { border-top: 2px solid var(--line); }
 
 /* ── зафиксированные слева колонки (Дата + Total) ── */
 .dm-table .dm-frz { position: sticky; z-index: 1; }
