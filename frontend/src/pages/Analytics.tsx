@@ -9,6 +9,7 @@ import {
   patchPartner,
   setPayoutStatus,
 } from "../api";
+import DateRangePicker from "../components/DateRangePicker";
 
 /* Главный экран «Общая аналитика». Строится поверх /export/analytics
    (та же combined-логика, что и «Таблица»). Заметки/статусы/архив — write через админ-креды. */
@@ -144,12 +145,14 @@ export default function Analytics() {
             </button>
           ))}
         </div>
-        <div className="an-period">
-          <span className="muted">с</span>
-          <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
-          <span className="muted">по</span>
-          <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
-        </div>
+        <DateRangePicker
+          from={from}
+          to={to}
+          onChange={(f, t) => {
+            setFrom(f);
+            setTo(t);
+          }}
+        />
       </div>
 
       {err && <div className="alert">{err}</div>}
@@ -418,12 +421,14 @@ function RangeWidget({
     <div className="an-card an-widget">
       <div className="an-card-head">
         <h3>{title}</h3>
-        <div className="an-period">
-          <span className="muted">с</span>
-          <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
-          <span className="muted">по</span>
-          <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
-        </div>
+        <DateRangePicker
+          from={from}
+          to={to}
+          onChange={(f, t) => {
+            setFrom(f);
+            setTo(t);
+          }}
+        />
       </div>
       <div className="an-widget-body">
         {err ? <span className="muted">{err}</span> : children(kpi, loading)}

@@ -1233,7 +1233,58 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .an-card-head h3 { margin: 0; font-size: 16px; font-weight: 700; }
 .an-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
+/* ── Range-календарь (DateRangePicker) ── */
+.drp { position: relative; display: inline-block; }
+.drp-trigger {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; font-size: 13px; color: var(--text);
+  background: var(--surface2); border: 1px solid var(--line); border-radius: 10px;
+  cursor: pointer; transition: border-color .12s;
+}
+.drp-trigger:hover { border-color: var(--accent); }
+.drp-trigger b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.drp-cal { margin-left: 4px; color: var(--muted); font-size: 11px; }
+.drp-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 60;
+  display: flex; gap: 6px;
+  background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, .4);
+  animation: dmSumIn .14s ease-out;
+}
+.drp-cal-side { width: 252px; }
+.drp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.drp-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.drp-nav {
+  width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--surface2); color: var(--text); cursor: pointer; font-size: 15px; line-height: 1;
+}
+.drp-nav:hover { border-color: var(--accent); }
+.drp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.drp-wd { margin-bottom: 4px; }
+.drp-wd-cell { text-align: center; font-size: 10.5px; color: var(--muted); text-transform: uppercase; padding: 2px 0; }
+.drp-day {
+  height: 32px; border: none; background: transparent; color: var(--text);
+  font-size: 12.5px; cursor: pointer; border-radius: 8px; font-variant-numeric: tabular-nums;
+  transition: background .1s;
+}
+.drp-day:hover:not(.disabled) { background: var(--accent-soft); }
+.drp-day.out { color: var(--faint); }
+.drp-day.disabled { color: var(--faint); opacity: .4; cursor: default; }
+.drp-day.today { box-shadow: inset 0 0 0 1px var(--line); }
+.drp-day.inrange { background: var(--accent-soft); border-radius: 0; }
+.drp-day.end {
+  background: var(--accent); color: var(--accent-fg); font-weight: 700;
+  box-shadow: none;
+}
+.drp-presets { display: flex; flex-direction: column; gap: 4px; padding-left: 6px; border-left: 1px solid var(--line); }
+.drp-presets button {
+  padding: 6px 12px; font-size: 12.5px; color: var(--muted); text-align: left;
+  background: transparent; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap;
+}
+.drp-presets button:hover { background: var(--accent-soft); color: var(--text); }
+
 /* виджеты с собственным диапазоном (Тотал залив / Общая выплата) */
+.an-card.an-widget { overflow: visible; } /* чтобы попап календаря не обрезался */
 .an-widget .an-card-head { padding: 14px 18px 8px; }
 .an-widget .an-period input { padding: 4px 6px; }
 .an-widget-body { padding: 6px 18px 18px; }
