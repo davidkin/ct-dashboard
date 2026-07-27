@@ -44,9 +44,21 @@ export interface AnalyticsReport {
   partners: PartnerAnalytics[];
 }
 
-export function buildAnalytics(from: string, to: string, tier?: "free" | "paid"): AnalyticsReport {
+export function buildAnalytics(
+  from: string,
+  to: string,
+  tier?: "free" | "paid",
+  sheetOnly = false,
+): AnalyticsReport {
   const db = getDb();
-  const report = buildDailyReport({ creator: null, from, to, source: "combined", tier });
+  const report = buildDailyReport({
+    creator: null,
+    from,
+    to,
+    source: sheetOnly ? undefined : "combined",
+    sheetOnly,
+    tier,
+  });
 
   /* link_id → partner_id (по кампаниям отчёта) */
   const linkPartner = new Map<number, number | null>();

@@ -51,7 +51,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
   });
 
   /* Общая аналитика по всем партнёрам за период (главный экран). Тот же токен. */
-  app.get<{ Querystring: { key?: string; from?: string; to?: string; tier?: string } }>(
+  app.get<{ Querystring: { key?: string; from?: string; to?: string; tier?: string; sheet_only?: string } }>(
     "/api/export/analytics",
     async (req, reply) => {
       const token = process.env.EXPORT_TOKEN;
@@ -66,7 +66,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       const to = req.query.to || todayLocal();
       const from = req.query.from || addDays(to, -29);
       const tier = req.query.tier === "free" || req.query.tier === "paid" ? req.query.tier : undefined;
-      return { data: buildAnalytics(from, to, tier) };
+      return { data: buildAnalytics(from, to, tier, req.query.sheet_only === "1") };
     },
   );
 

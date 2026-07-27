@@ -11,6 +11,7 @@ import {
 } from "../api";
 import DailyMatrix from "../components/DailyMatrix";
 import DateRangePicker from "../components/DateRangePicker";
+import OmReconcile from "../components/OmReconcile";
 
 /* Профиль партнёра (дизайн, экран 5). Данные — через export-токен (combined),
    поэтому работает на проде. Заметка/статус/архив — write через админ-креды. */
@@ -226,6 +227,9 @@ export default function PartnerDetail() {
       {/* виджеты «Тотал залив» + «Общая выплата» по этому партнёру (свой диапазон) */}
       <PartnerTotalsWidgets pid={pid} />
 
+      {/* сверка тоталов с OM (истина) по этому партнёру */}
+      <OmReconcile partnerId={pid} />
+
       {/* daily chart */}
       {rep && <ProfileChart rows={rep.rows} />}
 
@@ -300,7 +304,7 @@ function PartnerTotalsWidgets({ pid }: { pid: number }) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchExportReport({ partner: pid, from: wFrom, to: wTo, all: true, source: "combined" })
+    fetchExportReport({ partner: pid, from: wFrom, to: wTo, all: true, sheetOnly: true })
       .then((r) => alive && setRep(r))
       .catch(() => alive && setRep(null))
       .finally(() => alive && setLoading(false));

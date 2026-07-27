@@ -398,6 +398,7 @@ export async function fetchExportReport(opts: {
   to?: string;
   all?: boolean;
   source?: "combined";
+  sheetOnly?: boolean;
 }): Promise<DailyReport> {
   if (!EXPORT_BASE || !EXPORT_TOKEN) {
     throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
@@ -411,6 +412,7 @@ export async function fetchExportReport(opts: {
   if (opts.to) u.searchParams.set("to", opts.to);
   if (opts.all) u.searchParams.set("all", "1");
   if (opts.source) u.searchParams.set("source", opts.source);
+  if (opts.sheetOnly) u.searchParams.set("sheet_only", "1");
   const res = await fetch(u.toString());
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const json = await res.json();
@@ -447,7 +449,7 @@ export interface AnalyticsReport {
   partners: AnalyticsPartner[];
 }
 
-export async function fetchAnalytics(opts: { from?: string; to?: string; tier?: "free" | "paid" }): Promise<AnalyticsReport> {
+export async function fetchAnalytics(opts: { from?: string; to?: string; tier?: "free" | "paid"; sheetOnly?: boolean }): Promise<AnalyticsReport> {
   if (!EXPORT_BASE || !EXPORT_TOKEN) {
     throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
   }
@@ -456,10 +458,42 @@ export async function fetchAnalytics(opts: { from?: string; to?: string; tier?: 
   if (opts.from) u.searchParams.set("from", opts.from);
   if (opts.to) u.searchParams.set("to", opts.to);
   if (opts.tier) u.searchParams.set("tier", opts.tier);
+  if (opts.sheetOnly) u.searchParams.set("sheet_only", "1");
   const res = await fetch(u.toString());
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const json = await res.json();
   return json.data as AnalyticsReport;
+}
+
+/* === Сверка тоталов: OM (истина) vs ручная таблица === */
+export interface OmTotalLink {
+  link_id: number;
+  campaign_code: string;
+  partner_id: number | null;
+  tracking_id: string | null;
+  om_clicks: number | null;
+  om_fans: number | null;
+  sheet_clicks: number;
+  sheet_fans: number;
+}
+export interface OmTotalsReport {
+  totals: { om_clicks: number; om_fans: number; sheet_clicks: number; sheet_fans: number };
+  links: OmTotalLink[];
+  cache_age_ms: number | null;
+}
+
+export async function fetchOmTotals(opts: { partner?: number; refresh?: boolean } = {}): Promise<OmTotalsReport> {
+  if (!EXPORT_BASE || !EXPORT_TOKEN) {
+    throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+  }
+  const u = new URL(`${EXPORT_BASE.replace(/\/$/, "")}/export/om-totals`);
+  u.searchParams.set("key", EXPORT_TOKEN);
+  if (opts.partner) u.searchParams.set("partner", String(opts.partner));
+  if (opts.refresh) u.searchParams.set("refresh", "1");
+  const res = await fetch(u.toString());
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.data as OmTotalsReport;
 }
 
 /* === Write-операции (создание/правка партнёра) — Basic-auth админа ===

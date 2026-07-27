@@ -10,6 +10,7 @@ import {
   setPayoutStatus,
 } from "../api";
 import DateRangePicker from "../components/DateRangePicker";
+import OmReconcile from "../components/OmReconcile";
 
 /* Главный экран «Общая аналитика». Строится поверх /export/analytics
    (та же combined-логика, что и «Таблица»). Заметки/статусы/архив — write через админ-креды. */
@@ -232,6 +233,9 @@ export default function Analytics() {
               )}
             </RangeWidget>
           </div>
+
+          {/* сверка тоталов с OM (истина) по всем партнёрам */}
+          <OmReconcile />
 
           {/* chart */}
           <Chart daily={rep.daily} />
@@ -464,7 +468,7 @@ function RangeWidget({
     let alive = true;
     setLoading(true);
     setErr(null);
-    fetchAnalytics({ from, to, tier: tier || undefined })
+    fetchAnalytics({ from, to, tier: tier || undefined, sheetOnly: true })
       .then((r) => alive && setKpi(r.kpi))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => alive && setLoading(false));

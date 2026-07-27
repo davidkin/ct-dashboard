@@ -1243,6 +1243,22 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .an-active-sel.on { color: var(--up); border-color: color-mix(in srgb, var(--up) 45%, var(--line)); }
 .an-active-sel.off { color: var(--muted); }
 
+/* Сверка с OM (OmReconcile) */
+.omr-totals {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+  padding: 4px 20px 14px;
+}
+.omr-stat { background: var(--surface2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.omr-stat-val { font-size: 18px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.omr-stat-val.accent { color: var(--accent); }
+.omr-stat-val.up { color: var(--up); }
+.omr-stat-val.down { color: var(--down); }
+.omr-table td, .omr-table th { font-size: 12.5px; }
+.omr-table tbody tr { cursor: default; }
+.omr-table tr.omr-mismatch td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.omr-note { padding: 8px 20px 18px; font-size: 12px; }
+@media (max-width: 720px) { .omr-totals { grid-template-columns: repeat(3, 1fr); } }
+
 .an-rownum-h, .an-table td.an-rownum { width: 34px; text-align: center; }
 .an-table td.an-rownum { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12px; }
 .an-card-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
