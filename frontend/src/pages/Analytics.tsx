@@ -36,6 +36,9 @@ export default function Analytics() {
   const [to, setTo] = useState(todayISO());
   const [from, setFrom] = useState(addDays(todayISO(), -29));
   const [tier, setTier] = useState<Tier>("");
+  /* общий диапазон дат для виджетов «Тотал залив» + «Общая выплата» */
+  const [wFrom, setWFrom] = useState(addDays(todayISO(), -29));
+  const [wTo, setWTo] = useState(todayISO());
   const [rep, setRep] = useState<AnalyticsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -170,9 +173,20 @@ export default function Analytics() {
             ))}
           </div>
 
-          {/* виджеты с собственным диапазоном дней (агрегат по всем партнёрам) */}
+          {/* виджеты с ОБЩИМ диапазоном дней (агрегат по всем партнёрам) */}
+          <div className="an-widgets-bar">
+            <h3 className="an-widgets-title">Итоги за период</h3>
+            <DateRangePicker
+              from={wFrom}
+              to={wTo}
+              onChange={(f, t) => {
+                setWFrom(f);
+                setWTo(t);
+              }}
+            />
+          </div>
           <div className="an-two an-widgets">
-            <RangeWidget title="Тотал залив" defFrom={from} defTo={to} tier={tier}>
+            <RangeWidget title="Тотал залив" from={wFrom} to={wTo} tier={tier}>
               {(k, loading) => (
                 <div className="an-widget-nums">
                   <div>
@@ -186,7 +200,7 @@ export default function Analytics() {
                 </div>
               )}
             </RangeWidget>
-            <RangeWidget title="Общая выплата" defFrom={from} defTo={to} tier={tier}>
+            <RangeWidget title="Общая выплата" from={wFrom} to={wTo} tier={tier}>
               {(k, loading) => (
                 <div className="an-widget-nums">
                   <div>
@@ -382,24 +396,22 @@ export default function Analytics() {
   );
 }
 
-/* === виджет с собственным диапазоном дней ===
-   Тянет /export/analytics за свой период (та же combined-логика = «Таблица»),
-   отдаёт kpi (clicks/fans/payout по активным партнёрам) в render-проп. */
+/* === виджет-метрика (управляемый диапазон) ===
+   Тянет /export/analytics за переданный период (та же combined-логика =
+   «Таблица»), отдаёт kpi (clicks/fans/payout по активным партнёрам) в render-проп. */
 function RangeWidget({
   title,
-  defFrom,
-  defTo,
+  from,
+  to,
   tier,
   children,
 }: {
   title: string;
-  defFrom: string;
-  defTo: string;
+  from: string;
+  to: string;
   tier: Tier;
   children: (kpi: AnalyticsReport["kpi"] | undefined, loading: boolean) => React.ReactNode;
 }) {
-  const [from, setFrom] = useState(defFrom);
-  const [to, setTo] = useState(defTo);
   const [kpi, setKpi] = useState<AnalyticsReport["kpi"] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -421,14 +433,6 @@ function RangeWidget({
     <div className="an-card an-widget">
       <div className="an-card-head">
         <h3>{title}</h3>
-        <DateRangePicker
-          from={from}
-          to={to}
-          onChange={(f, t) => {
-            setFrom(f);
-            setTo(t);
-          }}
-        />
       </div>
       <div className="an-widget-body">
         {err ? <span className="muted">{err}</span> : children(kpi, loading)}

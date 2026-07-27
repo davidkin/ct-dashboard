@@ -1283,8 +1283,9 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 }
 .drp-presets button:hover { background: var(--accent-soft); color: var(--text); }
 
-/* виджеты с собственным диапазоном (Тотал залив / Общая выплата) */
-.an-card.an-widget { overflow: visible; } /* чтобы попап календаря не обрезался */
+/* виджеты с ОБЩИМ диапазоном (Тотал залив / Общая выплата) */
+.an-widgets-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.an-widgets-title { margin: 0; font-size: 16px; font-weight: 700; }
 .an-widget .an-card-head { padding: 14px 18px 8px; }
 .an-widget .an-period input { padding: 4px 6px; }
 .an-widget-body { padding: 6px 18px 18px; }
