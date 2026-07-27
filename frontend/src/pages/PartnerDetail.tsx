@@ -10,6 +10,7 @@ import {
   setPayoutStatus,
 } from "../api";
 import DailyMatrix from "../components/DailyMatrix";
+import DateRangePicker from "../components/DateRangePicker";
 
 /* Профиль партнёра (дизайн, экран 5). Данные — через export-токен (combined),
    поэтому работает на проде. Заметка/статус/архив — write через админ-креды. */
@@ -222,6 +223,9 @@ export default function PartnerDetail() {
         ))}
       </div>
 
+      {/* виджеты «Тотал залив» + «Общая выплата» по этому партнёру (свой диапазон) */}
+      <PartnerTotalsWidgets pid={pid} />
+
       {/* daily chart */}
       {rep && <ProfileChart rows={rep.rows} />}
 
@@ -282,6 +286,79 @@ export default function PartnerDetail() {
         )}
       </div>
     </div>
+  );
+}
+
+/* Виджеты «Тотал залив» + «Общая выплата» по одному партнёру — свой диапазон дат
+   (общий на оба), тоталы считаются из per-partner отчёта (combined = «Таблица»). */
+function PartnerTotalsWidgets({ pid }: { pid: number }) {
+  const [wFrom, setWFrom] = useState(addDays(todayISO(), -29));
+  const [wTo, setWTo] = useState(todayISO());
+  const [rep, setRep] = useState<DailyReport | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    fetchExportReport({ partner: pid, from: wFrom, to: wTo, all: true, source: "combined" })
+      .then((r) => alive && setRep(r))
+      .catch(() => alive && setRep(null))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [pid, wFrom, wTo]);
+
+  const t = useMemo(() => {
+    const rows = rep?.rows ?? [];
+    return {
+      clicks: rows.reduce((s, r) => s + (r.total.clicks ?? 0), 0),
+      fans: rows.reduce((s, r) => s + r.total.subs, 0),
+      payout: rows.reduce((s, r) => s + r.total.payout, 0),
+    };
+  }, [rep]);
+
+  const busy = loading && !rep;
+
+  return (
+    <>
+      <div className="an-widgets-bar">
+        <h3 className="an-widgets-title">Итоги за период</h3>
+        <DateRangePicker from={wFrom} to={wTo} onChange={(f, to2) => { setWFrom(f); setWTo(to2); }} />
+      </div>
+      <div className="an-two an-widgets">
+        <div className="an-card an-widget">
+          <div className="an-card-head">
+            <h3>Тотал залив</h3>
+          </div>
+          <div className="an-widget-body">
+            <div className="an-widget-nums">
+              <div>
+                <div className="an-kpi-label">Клики</div>
+                <div className="an-kpi-val">{busy ? "…" : fmt(t.clicks)}</div>
+              </div>
+              <div>
+                <div className="an-kpi-label">Фаны</div>
+                <div className="an-kpi-val">{busy ? "…" : fmt(t.fans)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="an-card an-widget">
+          <div className="an-card-head">
+            <h3>Общая выплата</h3>
+          </div>
+          <div className="an-widget-body">
+            <div className="an-widget-nums">
+              <div>
+                <div className="an-kpi-label">Выплата</div>
+                <div className="an-kpi-val accent">{busy ? "…" : money(t.payout)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
