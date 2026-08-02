@@ -89,14 +89,20 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       const partnerNum = req.query.partner ? Number(req.query.partner) : null;
       const partner = Number.isFinite(partnerNum) ? partnerNum : null;
 
-      /* наши линки (+ сумма по ручной таблице = daily_sheet_stats) */
+      /* наши линки + актуальный кумулятив кликов/фанов из дневных снимков
+         дашборда (daily_link_clicks, последний захваченный день на линк) —
+         НЕ из ручного листа daily_sheet_stats (он одноразовый и протухает). */
       const rows = db
         .prepare(
           `SELECT l.id AS link_id, l.campaign_code, l.partner_id,
                   COALESCE(s.clicks,0) AS sheet_clicks, COALESCE(s.fans,0) AS sheet_fans
              FROM links l
-             LEFT JOIN (SELECT link_id, SUM(clicks) AS clicks, SUM(fans) AS fans
-                          FROM daily_sheet_stats GROUP BY link_id) s ON s.link_id = l.id
+             LEFT JOIN (SELECT d.link_id,
+                               d.clicks_cumulative AS clicks,
+                               COALESCE(d.fans_cumulative,0) AS fans
+                          FROM daily_link_clicks d
+                         WHERE d.day = (SELECT MAX(day) FROM daily_link_clicks d2
+                                         WHERE d2.link_id = d.link_id)) s ON s.link_id = l.id
             WHERE (@partner IS NULL OR l.partner_id = @partner)
               AND l.campaign_code IS NOT NULL AND l.campaign_code <> ''`,
         )
