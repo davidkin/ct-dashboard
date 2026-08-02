@@ -227,13 +227,7 @@ export default function PartnerDetail() {
       {/* виджеты «Тотал залив» + «Общая выплата» по этому партнёру (свой диапазон) */}
       <PartnerTotalsWidgets pid={pid} />
 
-      {/* сверка тоталов с OM (истина) по этому партнёру */}
-      <OmReconcile partnerId={pid} />
-
-      {/* daily chart */}
-      {rep && <ProfileChart rows={rep.rows} />}
-
-      {/* персональная таблица трафика (день × кампания) — над кампаниями */}
+      {/* персональная таблица трафика (день × кампания) — сразу под «Итоги за период» */}
       {rep && (
         <DailyMatrix
           campaigns={rep.campaigns}
@@ -242,6 +236,12 @@ export default function PartnerDetail() {
           onChanged={() => setReloadNonce((n) => n + 1)}
         />
       )}
+
+      {/* daily chart — «Динамика по дням» */}
+      {rep && <ProfileChart rows={rep.rows} />}
+
+      {/* сверка тоталов с OM (истина) — свёрнута, под «Динамика по дням» */}
+      <OmReconcile partnerId={pid} collapsible />
 
       {/* кампании / ссылки — свёрнуты в аккордеон */}
       <div className="an-card">

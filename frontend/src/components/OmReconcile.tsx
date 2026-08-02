@@ -8,11 +8,12 @@ import { fetchOmTotals, OmTotalsReport } from "../api";
 const fmt = (n: number | null) => (n == null ? "—" : new Intl.NumberFormat("en-US").format(Math.round(n)));
 const delta = (om: number | null, sheet: number) => (om == null ? null : om - sheet);
 
-export default function OmReconcile({ partnerId }: { partnerId?: number }) {
+export default function OmReconcile({ partnerId, collapsible = false }: { partnerId?: number; collapsible?: boolean }) {
   const [rep, setRep] = useState<OmTotalsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [open, setOpen] = useState(!collapsible); // свёрнут по умолчанию, если collapsible
 
   const load = (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -45,18 +46,36 @@ export default function OmReconcile({ partnerId }: { partnerId?: number }) {
   const t = rep?.totals;
   const ageMin = rep?.cache_age_ms != null ? Math.floor(rep.cache_age_ms / 60000) : null;
 
+  const refreshBtn = (
+    <button className="btn ghost" onClick={(e) => { e.stopPropagation(); load(true); }} disabled={refreshing || loading}>
+      {refreshing ? "обновляю…" : "⟳ Обновить OM"}
+      {ageMin != null && !refreshing ? ` · ${ageMin}м` : ""}
+    </button>
+  );
+
   return (
     <div className="an-card">
-      <div className="an-card-head">
-        <h3>
-          Сверка с OM <span className="faint">· тотал по трафик-линкам</span>
-        </h3>
-        <button className="btn ghost" onClick={() => load(true)} disabled={refreshing || loading}>
-          {refreshing ? "обновляю…" : "⟳ Обновить OM"}
-          {ageMin != null && !refreshing ? ` · ${ageMin}м` : ""}
-        </button>
-      </div>
+      {collapsible ? (
+        <div className={`pd-acc-head${open ? " open" : ""}`} onClick={() => setOpen((s) => !s)}>
+          <h3>
+            Сверка с OM <span className="faint">· тотал по трафик-линкам</span>
+          </h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {open && refreshBtn}
+            <span className="pd-acc-caret">▶</span>
+          </div>
+        </div>
+      ) : (
+        <div className="an-card-head">
+          <h3>
+            Сверка с OM <span className="faint">· тотал по трафик-линкам</span>
+          </h3>
+          {refreshBtn}
+        </div>
+      )}
 
+      {(!collapsible || open) && (
+        <>
       {err && <div className="alert" style={{ margin: "0 20px 16px" }}>{err}</div>}
       {loading && !rep && <p className="muted" style={{ padding: "0 20px 20px" }}>Загружаю OM…</p>}
 
@@ -114,6 +133,8 @@ export default function OmReconcile({ partnerId }: { partnerId?: number }) {
           <p className="muted omr-note">
             OM — источник истины (кумулятив за всё время). «Δ &gt; 0» = в таблице недозаполнено против OM.
           </p>
+        </>
+      )}
         </>
       )}
     </div>
