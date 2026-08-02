@@ -234,9 +234,6 @@ export default function Analytics() {
             </RangeWidget>
           </div>
 
-          {/* сверка тоталов с OM (истина) по всем партнёрам */}
-          <OmReconcile />
-
           {/* chart */}
           <Chart daily={rep.daily} />
 
@@ -438,6 +435,9 @@ export default function Analytics() {
               </div>
             </div>
           )}
+
+          {/* сверка тоталов с OM (истина) — свёрнута, под «Топ-5» */}
+          <OmReconcile collapsible />
         </>
       )}
     </div>
