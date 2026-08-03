@@ -468,7 +468,7 @@ function RangeWidget({
     let alive = true;
     setLoading(true);
     setErr(null);
-    fetchAnalytics({ from, to, tier: tier || undefined, sheetOnly: true })
+    fetchAnalytics({ from, to, tier: tier || undefined })
       .then((r) => alive && setKpi(r.kpi))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => alive && setLoading(false));

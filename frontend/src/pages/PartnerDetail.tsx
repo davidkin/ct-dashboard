@@ -304,7 +304,7 @@ function PartnerTotalsWidgets({ pid }: { pid: number }) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchExportReport({ partner: pid, from: wFrom, to: wTo, all: true, sheetOnly: true })
+    fetchExportReport({ partner: pid, from: wFrom, to: wTo, all: true, source: "combined" })
       .then((r) => alive && setRep(r))
       .catch(() => alive && setRep(null))
       .finally(() => alive && setLoading(false));
