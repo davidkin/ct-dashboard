@@ -8,6 +8,8 @@
  * Rate limit: 25 req/s глобально, 15/endpoint (default). Cursor-based пагинация.
  * platform_account_id = OnlyFans numeric id (совпадает с onlyfans_id из OnlyFansAPI).
  */
+import { getOMTokenForAccount } from "../config/creators";
+
 const BASE = "https://omapi.onlymonster.ai";
 const PLATFORM = "onlyfans";
 
@@ -60,14 +62,26 @@ export interface OMAccount {
   subscription_expiration_date: string | null;
 }
 
-function authHeaders(): Record<string, string> {
-  const token = process.env.ONLYMONSTER_TOKEN;
-  if (!token) throw new Error("ONLYMONSTER_TOKEN not set");
+/**
+ * Токен выдаётся на организацию, а не на аккаунт: у каждой модели он свой.
+ * Резолвим по platform_account_id через конфиг creator-ов, фолбэк — общий ONLYMONSTER_TOKEN.
+ */
+function authHeaders(platformAccountId?: string): Record<string, string> {
+  const token =
+    (platformAccountId ? getOMTokenForAccount(platformAccountId) : null) ??
+    process.env.ONLYMONSTER_TOKEN;
+  if (!token) {
+    throw new Error(
+      platformAccountId
+        ? `OM token not set for account ${platformAccountId}`
+        : "ONLYMONSTER_TOKEN not set",
+    );
+  }
   return { "x-om-auth-token": token, Accept: "application/json" };
 }
 
-async function request<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
+async function request<T>(path: string, platformAccountId?: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders(platformAccountId) });
   if (res.status === 429) throw new Error("OM API 429: rate limit exceeded");
   if (!res.ok) {
     const text = await res.text();
@@ -85,12 +99,15 @@ interface CursorResponse<T> {
 }
 
 /** Тянет все страницы cursor-based endpoint-а. */
-async function paginate<T>(buildPath: (cursor?: string) => string): Promise<T[]> {
+async function paginate<T>(
+  buildPath: (cursor?: string) => string,
+  platformAccountId?: string,
+): Promise<T[]> {
   const all: T[] = [];
   let cursor: string | undefined;
   let guard = 0;
   while (guard++ < 500) {
-    const res = await request<CursorResponse<T>>(buildPath(cursor));
+    const res = await request<CursorResponse<T>>(buildPath(cursor), platformAccountId);
     all.push(...(res.items ?? []));
     if (!res.cursor) break;
     cursor = res.cursor;
@@ -118,7 +135,7 @@ export async function listTrackingLinkUsers(
     if (opts.linkId) p.set("link_id", opts.linkId);
     if (cursor) p.set("cursor", cursor);
     return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/tracking-link-users?${p}`;
-  });
+  }, platformAccountId);
 }
 
 /** tracking-links — список ссылок с агрегатами (subscribers/clicks). */
@@ -133,7 +150,7 @@ export async function listTrackingLinks(
     const p = new URLSearchParams({ start, end, limit: String(limit) });
     if (cursor) p.set("cursor", cursor);
     return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/tracking-links?${p}`;
-  });
+  }, platformAccountId);
 }
 
 /** transactions — выручка с fan.id + timestamp. Для RevShare-компонента. */
@@ -148,7 +165,7 @@ export async function listTransactions(
     const p = new URLSearchParams({ start, end, limit: String(limit) });
     if (cursor) p.set("cursor", cursor);
     return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/transactions?${p}`;
-  });
+  }, platformAccountId);
 }
 
 /** chargebacks — возвраты/диспуты с fan.id. */
@@ -163,5 +180,5 @@ export async function listChargebacks(
     const p = new URLSearchParams({ start, end, limit: String(limit) });
     if (cursor) p.set("cursor", cursor);
     return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/chargebacks?${p}`;
-  });
+  }, platformAccountId);
 }

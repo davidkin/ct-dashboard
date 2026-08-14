@@ -55,13 +55,16 @@ export async function registerDailyRoutes(app: FastifyInstance): Promise<void> {
    * Точный снимок ручной таблицы Traffic Tracking (клики + фаны) → daily_sheet_stats.
    * Эти значения перебивают OM-derived в отчёте, чтобы цифры совпадали с таблицей.
    */
-  app.post("/api/daily-tracking/import-sheet", async (_req, reply) => {
+  app.post("/api/daily-tracking/import-sheet", async (req, reply) => {
     if (!process.env.GOOGLE_CREDENTIALS_PATH) {
       reply.code(503);
       return { error: "GOOGLE_CREDENTIALS_PATH not configured" };
     }
+    /* ?models=Lily — импортировать табы только одной модели */
+    const modelsParam = (req.query as { models?: string }).models;
+    const models = modelsParam ? modelsParam.split(",").map((m) => m.trim()).filter(Boolean) : undefined;
     try {
-      const results = await importTrafficSheet();
+      const results = await importTrafficSheet({ models });
       return { data: results };
     } catch (err) {
       reply.code(500);

@@ -8,16 +8,20 @@
  *   col 0   = Дата (DD.MM)
  *   col 1-5 = Total: Клики · Фаны · Конверт · Сумма · Status
  *   далее блоки компаний по 4 кол: Клики · Фаны · CR · Сумма
- *   код компании [camp_X]/[camp_paid_X] стоит в шапке (row 14) на старте блока
+ *   код компании в шапке (row 14) на старте блока: [camp_X] или просто camp_X
  *
- * Коды кампаний ГЛОБАЛЬНО уникальны → маппим camp_code → link_id по всей базе,
- * без привязки к партнёру. Одним прогоном сидим все таблицы из реестра.
+ * У каждого партнёра свой таб на модель, и вкладки — клоны одного шаблона,
+ * поэтому определяем модель по gid, а не по названию таба: часть партнёров
+ * не переименовала шаблонный «Jennie | Total», хотя данные там уже Lily.
+ *
+ * Коды кампаний уникальны только ВНУТРИ модели (у Lily нумерация начинается
+ * заново и пересекается с Nekoletta), поэтому маппим пару модель+код → link_id.
  */
 import { google } from "googleapis";
 import { getDb } from "../db/index";
+import { getModelGroup } from "../config/creators";
 
-/** Реестр таблиц-сидов: имя (для отчёта) + spreadsheetId. Вкладка у всех «Velora | Total»
- *  (Jennie — пустой шаблон, пропускаем). Добавление партнёра = строка сюда. */
+/** Реестр таблиц-сидов: имя (для отчёта) + spreadsheetId. Добавление партнёра = строка сюда. */
 const SHEETS: Array<{ name: string; sheetId: string }> = [
   { name: "Adult Angels", sheetId: "1R9P8KGHGfV5Y4nVIxyDg7mBB6SyryVTFCSx5_aZsXP4" },
   { name: "TraffZone", sheetId: "1dbxXlnJ_lnDg8wMgRKLhQRCycKvSr8lAtrGMDJKoW1M" },
@@ -39,11 +43,24 @@ const SHEETS: Array<{ name: string; sheetId: string }> = [
   { name: "@pullupinmyx6", sheetId: "1XWClXQREAnmP7npcpDd6Fxcv1Qin-fJi_Fq5L0hKA6g" },
 ];
 
-const TAB = "Velora | Total";
+/**
+ * Вкладки — клоны одного шаблона, поэтому gid одинаковый во всех таблицах,
+ * а название может быть неактуальным («Jennie | Total» с данными Lily).
+ * model_group должен совпадать с getModelGroup() у creator-ов этой модели.
+ */
+const MODEL_TABS: Array<{ gid: number; modelGroup: string }> = [
+  { gid: 508899617, modelGroup: "Nekoletta" },
+  { gid: 46666697, modelGroup: "Lily" },
+];
+
+/** Код кампании в шапке: «[camp_44]» у одних моделей, «camp_2» у других. */
+const CAMPAIGN_CODE_RE = /\[?(camp_[a-z0-9_]+)\]?/i;
 
 export interface SheetImportResult {
   name: string;
   sheet_id: string;
+  model: string;
+  tab: string;
   rows_imported: number;
   skipped_reset_rows: number;
   campaigns_matched: string[];
@@ -58,9 +75,17 @@ function num(s: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-export async function importTrafficSheet(): Promise<SheetImportResult[]> {
+/** opts.models — импортировать только эти модели (по умолчанию все из MODEL_TABS). */
+export async function importTrafficSheet(
+  opts: { models?: string[] } = {},
+): Promise<SheetImportResult[]> {
   const creds = process.env.GOOGLE_CREDENTIALS_PATH;
   if (!creds) throw new Error("GOOGLE_CREDENTIALS_PATH not set");
+
+  const models = opts.models?.length
+    ? MODEL_TABS.filter((t) => opts.models!.includes(t.modelGroup))
+    : MODEL_TABS;
+  if (!models.length) throw new Error(`unknown models: ${opts.models?.join(", ")}`);
 
   const auth = new google.auth.GoogleAuth({
     keyFile: creds,
@@ -69,12 +94,16 @@ export async function importTrafficSheet(): Promise<SheetImportResult[]> {
   const sheets = google.sheets({ version: "v4", auth: auth as never });
   const db = getDb();
 
-  /* ГЛОБАЛЬНЫЙ маппинг camp_code → link_id (коды уникальны по всей базе) */
+  /* маппинг "модель::camp_code" → link_id: код уникален только внутри модели */
   const linkMap = new Map<string, number>();
   for (const row of db
-    .prepare(`SELECT campaign_code, id FROM links WHERE campaign_code IS NOT NULL AND campaign_code <> ''`)
-    .all() as Array<{ campaign_code: string; id: number }>) {
-    linkMap.set(row.campaign_code, row.id);
+    .prepare(
+      `SELECT campaign_code, creator, id FROM links WHERE campaign_code IS NOT NULL AND campaign_code <> ''`,
+    )
+    .all() as Array<{ campaign_code: string; creator: string; id: number }>) {
+    const group = getModelGroup(row.creator);
+    if (!group) continue;
+    linkMap.set(`${group}::${row.campaign_code}`, row.id);
   }
 
   const upsert = db.prepare(`
@@ -88,90 +117,129 @@ export async function importTrafficSheet(): Promise<SheetImportResult[]> {
   const results: SheetImportResult[] = [];
 
   for (const { name, sheetId } of SHEETS) {
+    /* название таба ненадёжно (шаблонный «Jennie» с данными Lily) → резолвим по gid */
+    let tabByGid = new Map<number, string>();
     try {
-      const res = await sheets.spreadsheets.values.get({
+      const meta = await sheets.spreadsheets.get({
         spreadsheetId: sheetId,
-        range: `'${TAB}'!A14:CN400`,
-        valueRenderOption: "FORMATTED_VALUE",
+        fields: "sheets.properties(title,sheetId)",
       });
-      const rows = (res.data.values ?? []) as string[][];
-      const header = rows[0] ?? [];
-
-      /* компании: сканируем всю шапку, код на старте блока → clicks=col, fans=col+1 */
-      const camps: Array<{ code: string; col: number }> = [];
-      for (let i = 0; i < header.length; i++) {
-        const m = String(header[i] ?? "").trim().match(/\[(camp_\w+)\]/);
-        if (m) camps.push({ code: m[1], col: i });
+      tabByGid = new Map(
+        (meta.data.sheets ?? []).map((s) => [s.properties?.sheetId ?? -1, s.properties?.title ?? ""]),
+      );
+    } catch (err) {
+      for (const { modelGroup } of models) {
+        results.push(emptyResult(name, sheetId, modelGroup, "", err));
       }
+      continue;
+    }
 
-      const matched = new Set<string>();
-      const unmatched = new Set<string>();
-      let imported = 0;
-      let skippedResets = 0;
-      let minDay: string | null = null;
-      let maxDay: string | null = null;
+    for (const { gid, modelGroup } of models) {
+      const tabTitle = tabByGid.get(gid);
+      if (!tabTitle) {
+        results.push(emptyResult(name, sheetId, modelGroup, "", `tab gid=${gid} not found`));
+        continue;
+      }
+      try {
+        const res = await sheets.spreadsheets.values.get({
+          spreadsheetId: sheetId,
+          range: `'${tabTitle}'!A14:CN400`,
+          valueRenderOption: "FORMATTED_VALUE",
+        });
+        const rows = (res.data.values ?? []) as string[][];
+        const header = rows[0] ?? [];
 
-      const tx = db.transaction(() => {
-        /* полный рефреш: чистим значения по компаниям, встреченным в ЭТОЙ таблице */
-        const ids = camps.map((c) => linkMap.get(c.code)).filter((x): x is number => !!x);
-        if (ids.length) {
-          db.prepare(
-            `DELETE FROM daily_sheet_stats WHERE link_id IN (${ids.map(() => "?").join(",")})`,
-          ).run(...ids);
+        /* компании: сканируем всю шапку, код на старте блока → clicks=col, fans=col+1 */
+        const camps: Array<{ code: string; col: number }> = [];
+        for (let i = 0; i < header.length; i++) {
+          const m = String(header[i] ?? "").trim().match(CAMPAIGN_CODE_RE);
+          if (m) camps.push({ code: m[1], col: i });
         }
-        for (let r = 2; r < rows.length; r++) {
-          const row = rows[r] ?? [];
-          const dm = String(row[0] ?? "").trim().match(dateRe);
-          if (!dm) continue;
-          /* строка месячного «сброса» (отрицательный Total) — не дневные данные */
-          if (num(row[1]) < 0) {
-            skippedResets++;
-            continue;
+
+        const matched = new Set<string>();
+        const unmatched = new Set<string>();
+        let imported = 0;
+        let skippedResets = 0;
+        let minDay: string | null = null;
+        let maxDay: string | null = null;
+        const key = (code: string) => `${modelGroup}::${code}`;
+
+        const tx = db.transaction(() => {
+          /* полный рефреш: чистим значения по компаниям, встреченным в ЭТОМ табе */
+          const ids = camps.map((c) => linkMap.get(key(c.code))).filter((x): x is number => !!x);
+          if (ids.length) {
+            db.prepare(
+              `DELETE FROM daily_sheet_stats WHERE link_id IN (${ids.map(() => "?").join(",")})`,
+            ).run(...ids);
           }
-          const day = `2026-${dm[2]}-${dm[1]}`; // DD.MM → 2026-MM-DD
-          for (const c of camps) {
-            const clicks = num(row[c.col]);
-            const fans = num(row[c.col + 1]);
-            if (!clicks && !fans) continue;
-            const linkId = linkMap.get(c.code);
-            if (!linkId) {
-              unmatched.add(c.code);
+          for (let r = 2; r < rows.length; r++) {
+            const row = rows[r] ?? [];
+            const dm = String(row[0] ?? "").trim().match(dateRe);
+            if (!dm) continue;
+            /* строка месячного «сброса» (отрицательный Total) — не дневные данные */
+            if (num(row[1]) < 0) {
+              skippedResets++;
               continue;
             }
-            upsert.run({ link_id: linkId, day, clicks, fans });
-            matched.add(c.code);
-            imported++;
-            if (!minDay || day < minDay) minDay = day;
-            if (!maxDay || day > maxDay) maxDay = day;
+            const day = `2026-${dm[2]}-${dm[1]}`; // DD.MM → 2026-MM-DD
+            for (const c of camps) {
+              const clicks = num(row[c.col]);
+              const fans = num(row[c.col + 1]);
+              if (!clicks && !fans) continue;
+              const linkId = linkMap.get(key(c.code));
+              if (!linkId) {
+                unmatched.add(c.code);
+                continue;
+              }
+              upsert.run({ link_id: linkId, day, clicks, fans });
+              matched.add(c.code);
+              imported++;
+              if (!minDay || day < minDay) minDay = day;
+              if (!maxDay || day > maxDay) maxDay = day;
+            }
           }
-        }
-      });
-      tx();
+        });
+        tx();
 
-      results.push({
-        name,
-        sheet_id: sheetId,
-        rows_imported: imported,
-        skipped_reset_rows: skippedResets,
-        campaigns_matched: [...matched],
-        campaigns_unmatched: [...unmatched],
-        min_day: minDay,
-        max_day: maxDay,
-      });
-    } catch (err) {
-      results.push({
-        name,
-        sheet_id: sheetId,
-        rows_imported: 0,
-        skipped_reset_rows: 0,
-        campaigns_matched: [],
-        campaigns_unmatched: [],
-        min_day: null,
-        max_day: null,
-        error: err instanceof Error ? err.message : String(err),
-      });
+        results.push({
+          name,
+          sheet_id: sheetId,
+          model: modelGroup,
+          tab: tabTitle,
+          rows_imported: imported,
+          skipped_reset_rows: skippedResets,
+          campaigns_matched: [...matched],
+          campaigns_unmatched: [...unmatched],
+          min_day: minDay,
+          max_day: maxDay,
+        });
+      } catch (err) {
+        results.push(emptyResult(name, sheetId, modelGroup, tabTitle, err));
+      }
     }
   }
 
   return results;
+}
+
+function emptyResult(
+  name: string,
+  sheetId: string,
+  model: string,
+  tab: string,
+  err: unknown,
+): SheetImportResult {
+  return {
+    name,
+    sheet_id: sheetId,
+    model,
+    tab,
+    rows_imported: 0,
+    skipped_reset_rows: 0,
+    campaigns_matched: [],
+    campaigns_unmatched: [],
+    min_day: null,
+    max_day: null,
+    error: err instanceof Error ? err.message : String(err),
+  };
 }

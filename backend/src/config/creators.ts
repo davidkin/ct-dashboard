@@ -13,13 +13,17 @@ interface CreatorConfig {
   envKey: string;
   /** env-переменная с OnlyMonster platform_account_id (OF numeric id) */
   omEnvKey: string;
+  /** env-переменная с OM-токеном: токен выдаётся на организацию, у каждой модели свой */
+  omTokenEnvKey: string;
   type: CreatorType;
   modelGroup: string;
 }
 
 const CREATOR_CONFIG: Record<string, CreatorConfig> = {
-  "Nekoletta Free": { envKey: "ONLYFANSAPI_ACCOUNT_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_FREE", type: "free", modelGroup: "Nekoletta" },
-  "Nekoletta Vip": { envKey: "ONLYFANSAPI_ACCOUNT_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_VIP", type: "vip", modelGroup: "Nekoletta" },
+  "Nekoletta Free": { envKey: "ONLYFANSAPI_ACCOUNT_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_FREE", omTokenEnvKey: "ONLYMONSTER_TOKEN", type: "free", modelGroup: "Nekoletta" },
+  "Nekoletta Vip": { envKey: "ONLYFANSAPI_ACCOUNT_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN", type: "vip", modelGroup: "Nekoletta" },
+  "Lily Free": { envKey: "ONLYFANSAPI_ACCOUNT_LILY_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_LILY_FREE", omTokenEnvKey: "ONLYMONSTER_TOKEN_LILY", type: "free", modelGroup: "Lily" },
+  "Lily Vip": { envKey: "ONLYFANSAPI_ACCOUNT_LILY_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_LILY_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN_LILY", type: "vip", modelGroup: "Lily" },
 };
 
 export function getAccountIdForCreator(name: string): string | null {
@@ -37,6 +41,26 @@ export function getOMAccountForCreator(name: string): string | null {
 
 export function getCreatorType(name: string): CreatorType | null {
   return CREATOR_CONFIG[name]?.type ?? null;
+}
+
+/** OM-токен для creator. Токен организации, у каждой модели свой. */
+export function getOMTokenForCreator(name: string): string | null {
+  const cfg = CREATOR_CONFIG[name];
+  if (!cfg) return null;
+  return process.env[cfg.omTokenEnvKey] ?? null;
+}
+
+/**
+ * OM-токен по platform_account_id — клиент знает только id аккаунта,
+ * а токен привязан к организации модели.
+ */
+export function getOMTokenForAccount(platformAccountId: string): string | null {
+  for (const cfg of Object.values(CREATOR_CONFIG)) {
+    if (process.env[cfg.omEnvKey] === platformAccountId) {
+      return process.env[cfg.omTokenEnvKey] ?? null;
+    }
+  }
+  return null;
 }
 
 /**
