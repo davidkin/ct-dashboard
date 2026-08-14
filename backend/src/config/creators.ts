@@ -26,6 +26,25 @@ const CREATOR_CONFIG: Record<string, CreatorConfig> = {
   "Lily Vip": { envKey: "ONLYFANSAPI_ACCOUNT_LILY_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_LILY_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN_LILY", type: "vip", modelGroup: "Lily" },
 };
 
+/**
+ * Модели для переключателя в интерфейсе. group = model_group у creator-ов,
+ * label — как модель называют в таблицах (в глоссарии Nekoletta, в листах Velora).
+ */
+export interface ModelOption {
+  group: string;
+  label: string;
+}
+
+const MODELS: ModelOption[] = [
+  { group: "Nekoletta", label: "Velora" },
+  { group: "Lily", label: "Lily" },
+];
+
+/** Список моделей, у которых есть хотя бы один сконфигурированный creator. */
+export function listModels(): ModelOption[] {
+  return MODELS.filter((m) => creatorsInModelGroup(m.group).length > 0);
+}
+
 export function getAccountIdForCreator(name: string): string | null {
   const cfg = CREATOR_CONFIG[name];
   if (!cfg) return null;

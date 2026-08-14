@@ -13,6 +13,7 @@
  * клики задним числом восстановить нельзя, сабы — можно за всю историю.
  */
 import { getDb } from "../db/index";
+import { creatorsInModelGroup } from "../config/creators";
 import { localDay, dayRange, TRACKING_TZ, todayLocal, nextCaptureAt } from "../lib/tz";
 
 export interface DailyCampaign {
@@ -83,6 +84,8 @@ export interface DailyReport {
 
 interface BuildOpts {
   creator: string | null;
+  /** фильтр по модели (model_group, напр. "Lily"); null = все модели */
+  model?: string | null;
   from: string;
   to: string;
   /** фильтр по партнёру (partners.id); null = все партнёры */
@@ -121,6 +124,8 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
   const db = getDb();
   const { creator, from, to } = opts;
   const partner = opts.partner ?? null;
+  /* модель → список её creator-ов (Free+Vip); JSON, чтобы уйти в json_each прямо в SQL */
+  const modelCreators = opts.model ? JSON.stringify(creatorsInModelGroup(opts.model)) : null;
   const days = dayRange(from, to);
 
   /* === компании (ссылки) + их CPF + партнёр-владелец === */
@@ -132,9 +137,10 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
        FROM links l
        LEFT JOIN partners p ON p.id = l.partner_id
        WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
          AND (@partner IS NULL OR l.partner_id = @partner)`,
     )
-    .all({ creator: creator ?? null, partner }) as Array<{
+    .all({ creator: creator ?? null, modelCreators, partner }) as Array<{
       link_id: number;
       campaign_code: string;
       creator: string;
@@ -171,9 +177,10 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
        FROM link_subscribers ls JOIN links l ON l.id = ls.link_id
        WHERE ls.om_subscribed_at IS NOT NULL
          AND (@creator IS NULL OR l.creator = @creator)
+         AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
          AND (@partner IS NULL OR l.partner_id = @partner)`,
     )
-    .all({ creator: creator ?? null, partner }) as Array<{ link_id: number; om_subscribed_at: string }>;
+    .all({ creator: creator ?? null, modelCreators, partner }) as Array<{ link_id: number; om_subscribed_at: string }>;
 
   const subsByLinkDay = new Map<number, Map<string, number>>();
   for (const s of subRows) {
@@ -193,10 +200,11 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       `SELECT dc.link_id, dc.day, dc.clicks_cumulative, dc.fans_cumulative
        FROM daily_link_clicks dc JOIN links l ON l.id = dc.link_id
        WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
          AND (@partner IS NULL OR l.partner_id = @partner)
        ORDER BY dc.link_id, dc.day`,
     )
-    .all({ creator: creator ?? null, partner }) as Array<{
+    .all({ creator: creator ?? null, modelCreators, partner }) as Array<{
       link_id: number;
       day: string;
       clicks_cumulative: number;
@@ -242,9 +250,10 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       `SELECT ds.link_id, ds.day, ds.clicks, ds.fans
        FROM daily_sheet_stats ds JOIN links l ON l.id = ds.link_id
        WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
          AND (@partner IS NULL OR l.partner_id = @partner)`,
     )
-    .all({ creator: creator ?? null, partner }) as Array<{
+    .all({ creator: creator ?? null, modelCreators, partner }) as Array<{
       link_id: number;
       day: string;
       clicks: number;
@@ -265,9 +274,10 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       `SELECT do2.link_id, do2.day, do2.clicks, do2.fans
        FROM daily_om_stats do2 JOIN links l ON l.id = do2.link_id
        WHERE (@creator IS NULL OR l.creator = @creator)
+         AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
          AND (@partner IS NULL OR l.partner_id = @partner)`,
     )
-    .all({ creator: creator ?? null, partner }) as Array<{
+    .all({ creator: creator ?? null, modelCreators, partner }) as Array<{
       link_id: number;
       day: string;
       clicks: number;

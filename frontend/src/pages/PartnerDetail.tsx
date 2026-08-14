@@ -9,6 +9,7 @@ import {
   patchPartner,
   setPayoutStatus,
 } from "../api";
+import { useModel } from "../hooks/useModel";
 import DailyMatrix from "../components/DailyMatrix";
 import DateRangePicker from "../components/DateRangePicker";
 import OmReconcile from "../components/OmReconcile";
@@ -40,6 +41,7 @@ interface CampAgg {
 }
 
 export default function PartnerDetail() {
+  const { model } = useModel();
   const { id } = useParams<{ id: string }>();
   const pid = Number(id);
   const navigate = useNavigate();
@@ -61,8 +63,8 @@ export default function PartnerDetail() {
     setLoading(true);
     setErr(null);
     Promise.all([
-      fetchAnalytics({ from, to }),
-      fetchExportReport({ partner: pid, from, to, all: true, source: "combined" }),
+      fetchAnalytics({ from, to, model: model || undefined }),
+      fetchExportReport({ partner: pid, from, to, all: true, source: "combined", model: model || undefined }),
     ])
       .then(([an, report]) => {
         setMeta(an.partners.find((p) => p.partner_id === pid) ?? null);
@@ -74,7 +76,7 @@ export default function PartnerDetail() {
       })
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [pid, from, to, reloadNonce]);
+  }, [pid, from, to, reloadNonce, model]);
 
   const campaigns = useMemo<CampAgg[]>(() => {
     if (!rep) return [];
@@ -296,6 +298,7 @@ export default function PartnerDetail() {
 /* Виджеты «Тотал залив» + «Общая выплата» по одному партнёру — свой диапазон дат
    (общий на оба), тоталы считаются из per-partner отчёта (combined = «Таблица»). */
 function PartnerTotalsWidgets({ pid }: { pid: number }) {
+  const { model } = useModel();
   const [wFrom, setWFrom] = useState(addDays(todayISO(), -29));
   const [wTo, setWTo] = useState(todayISO());
   const [rep, setRep] = useState<DailyReport | null>(null);
@@ -304,14 +307,14 @@ function PartnerTotalsWidgets({ pid }: { pid: number }) {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchExportReport({ partner: pid, from: wFrom, to: wTo, all: true, source: "combined" })
+    fetchExportReport({ partner: pid, from: wFrom, to: wTo, all: true, source: "combined", model: model || undefined })
       .then((r) => alive && setRep(r))
       .catch(() => alive && setRep(null))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [pid, wFrom, wTo]);
+  }, [pid, wFrom, wTo, model]);
 
   const t = useMemo(() => {
     const rows = rep?.rows ?? [];

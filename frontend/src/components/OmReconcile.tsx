@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchOmTotals, OmTotalsReport } from "../api";
+import { useModel } from "../hooks/useModel";
 
 /* Сверка тоталов: OM (истина по трафик-линкам, кумулятив за всё время) vs
    сумма из ручной таблицы. Показывает Δ по каждой кампании + итог, подсвечивает
@@ -9,6 +10,7 @@ const fmt = (n: number | null) => (n == null ? "—" : new Intl.NumberFormat("en
 const delta = (om: number | null, sheet: number) => (om == null ? null : om - sheet);
 
 export default function OmReconcile({ partnerId, collapsible = false }: { partnerId?: number; collapsible?: boolean }) {
+  const { model } = useModel();
   const [rep, setRep] = useState<OmTotalsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export default function OmReconcile({ partnerId, collapsible = false }: { partne
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setErr(null);
-    fetchOmTotals({ partner: partnerId, refresh })
+    fetchOmTotals({ partner: partnerId, refresh, model: model || undefined })
       .then(setRep)
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => {
@@ -30,14 +32,14 @@ export default function OmReconcile({ partnerId, collapsible = false }: { partne
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchOmTotals({ partner: partnerId })
+    fetchOmTotals({ partner: partnerId, model: model || undefined })
       .then((r) => alive && setRep(r))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [partnerId]);
+  }, [partnerId, model]);
 
   const rows = (rep?.links ?? [])
     .filter((l) => (l.om_clicks ?? 0) > 0 || l.sheet_clicks > 0 || (l.om_fans ?? 0) > 0 || l.sheet_fans > 0)

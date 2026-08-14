@@ -3,6 +3,7 @@ import {
   CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { DailyReport, DailySnapshotInfo, fetchExportReport, isExportConfigured } from "../api";
+import { useModel } from "../hooks/useModel";
 
 /* Партнёры для дропдауна (id → лейбл), по промпту. Меняется только partner в fetch;
    контракт /export и рендер таблицы неизменны. Креатор пока фиксируем Nekoletta Free
@@ -52,6 +53,7 @@ const dmy = (d: string): string =>
 type SheetTab = "total" | "raw";
 
 export default function TrafficSheet() {
+  const { model } = useModel();
   const [partnerId, setPartnerId] = useState<number>(initialPartnerId);
   const [tier, setTier] = useState<Tier>(""); // "" = объединённый Free+Paid
   const [from, setFrom] = useState("2026-06-01");
@@ -76,11 +78,11 @@ export default function TrafficSheet() {
     }
     setLoading(true);
     setError(null);
-    fetchExportReport({ partner: partnerId, tier: tier || undefined, from: from || undefined, to: to || undefined, all: true, source: "combined" })
+    fetchExportReport({ partner: partnerId, tier: tier || undefined, from: from || undefined, to: to || undefined, all: true, source: "combined", model: model || undefined })
       .then(setReport)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [partnerId, tier, from, to]);
+  }, [partnerId, tier, from, to, model]);
 
   useEffect(() => { load(); }, [load]);
 

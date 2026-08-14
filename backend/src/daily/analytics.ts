@@ -10,6 +10,7 @@
  */
 import { getDb } from "../db/index";
 import { buildDailyReport } from "./report";
+import { creatorsInModelGroup } from "../config/creators";
 import { TRACKING_TZ, lastCompletedWeekStart } from "../lib/tz";
 
 export interface PartnerAnalytics {
@@ -49,10 +50,12 @@ export function buildAnalytics(
   to: string,
   tier?: "free" | "paid",
   sheetOnly = false,
+  model?: string | null,
 ): AnalyticsReport {
   const db = getDb();
   const report = buildDailyReport({
     creator: null,
+    model: model ?? null,
     from,
     to,
     source: sheetOnly ? undefined : "combined",
@@ -118,10 +121,11 @@ export function buildAnalytics(
          JOIN link_subscribers ls ON ls.of_fan_id = t.fan_id
          JOIN links l ON l.id = ls.link_id
          WHERE l.partner_id IS NOT NULL
+           AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
            AND date(t.occurred_at) BETWEEN @from AND @to
          GROUP BY l.partner_id`,
       )
-      .all({ from, to }) as Array<{ pid: number; rev: number }>;
+      .all({ from, to, modelCreators: model ? JSON.stringify(creatorsInModelGroup(model)) : null }) as Array<{ pid: number; rev: number }>;
     for (const r of rev) revById.set(r.pid, r.rev);
   } catch {
     /* нет таблицы/данных — выручка 0 */

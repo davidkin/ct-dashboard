@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useModel } from "../hooks/useModel";
 import { useNavigate } from "react-router-dom";
 import {
   AnalyticsPartner,
@@ -33,6 +34,7 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 type Tier = "" | "free" | "paid";
 
 export default function Analytics() {
+  const { model } = useModel();
   const navigate = useNavigate();
   const [to, setTo] = useState(todayISO());
   const [from, setFrom] = useState(addDays(todayISO(), -29));
@@ -62,7 +64,7 @@ export default function Analytics() {
     }
     setLoading(true);
     setErr(null);
-    fetchAnalytics({ from, to, tier: tier || undefined })
+    fetchAnalytics({ from, to, tier: tier || undefined, model: model || undefined })
       .then((r) => {
         setRep(r);
         setStatusOv({});
@@ -73,7 +75,7 @@ export default function Analytics() {
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [from, to, tier]);
+  useEffect(load, [from, to, tier, model]);
 
   const statusOf = (p: AnalyticsPartner) => statusOv[p.partner_id] ?? p.payout_status;
   const noteOf = (p: AnalyticsPartner) => (p.partner_id in noteOv ? noteOv[p.partner_id] : p.note ?? "");
@@ -460,6 +462,7 @@ function RangeWidget({
   tier: Tier;
   children: (kpi: AnalyticsReport["kpi"] | undefined, loading: boolean) => React.ReactNode;
 }) {
+  const { model } = useModel();
   const [kpi, setKpi] = useState<AnalyticsReport["kpi"] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -468,14 +471,14 @@ function RangeWidget({
     let alive = true;
     setLoading(true);
     setErr(null);
-    fetchAnalytics({ from, to, tier: tier || undefined })
+    fetchAnalytics({ from, to, tier: tier || undefined, model: model || undefined })
       .then((r) => alive && setKpi(r.kpi))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [from, to, tier]);
+  }, [from, to, tier, model]);
 
   return (
     <div className="an-card an-widget">

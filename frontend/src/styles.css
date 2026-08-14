@@ -1572,3 +1572,17 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .pd-tier-free { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); background: color-mix(in srgb, var(--up) 14%, transparent); }
 .pd-tier-paid { color: #7FA8C9; border-color: rgba(127,168,201,.4); background: rgba(127,168,201,.14); }
 @media (max-width: 1100px) { .pd-kpis { grid-template-columns: repeat(2, 1fr); } .pd-head-actions { width: 100%; margin-left: 0; } }
+
+/* ===== ПЕРЕКЛЮЧАТЕЛЬ МОДЕЛЕЙ (шапка) ===== */
+.model-switch {
+  display: inline-flex; gap: 2px; padding: 2px;
+  background: var(--hover-bg); border: 1px solid var(--border); border-radius: 999px;
+}
+.model-switch-btn {
+  padding: 5px 14px; border: none; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--muted);
+  font-size: 12.5px; font-weight: 600; font-family: inherit;
+  transition: color 0.15s, background 0.15s;
+}
+.model-switch-btn:hover { color: var(--text); }
+.model-switch-btn.active { background: var(--accent); color: var(--accent-fg); }

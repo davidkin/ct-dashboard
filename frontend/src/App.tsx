@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "./hooks/useTheme";
+import { ModelSwitch } from "./components/ModelSwitch";
 import PartnerManage from "./pages/PartnerManage";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           </nav>
         </div>
         <div className="app-header-actions">
+          <ModelSwitch />
           <button
             className="theme-toggle"
             onClick={toggleTheme}

@@ -393,6 +393,7 @@ export function isExportConfigured(): boolean {
 export async function fetchExportReport(opts: {
   partner?: number;
   creator?: string;
+  model?: string;
   tier?: "free" | "paid";
   from?: string;
   to?: string;
@@ -407,6 +408,7 @@ export async function fetchExportReport(opts: {
   u.searchParams.set("key", EXPORT_TOKEN);
   if (opts.partner) u.searchParams.set("partner", String(opts.partner));
   if (opts.creator) u.searchParams.set("creator", opts.creator);
+  if (opts.model) u.searchParams.set("model", opts.model);
   if (opts.tier) u.searchParams.set("tier", opts.tier);
   if (opts.from) u.searchParams.set("from", opts.from);
   if (opts.to) u.searchParams.set("to", opts.to);
@@ -449,7 +451,7 @@ export interface AnalyticsReport {
   partners: AnalyticsPartner[];
 }
 
-export async function fetchAnalytics(opts: { from?: string; to?: string; tier?: "free" | "paid"; sheetOnly?: boolean }): Promise<AnalyticsReport> {
+export async function fetchAnalytics(opts: { from?: string; to?: string; tier?: "free" | "paid"; sheetOnly?: boolean; model?: string }): Promise<AnalyticsReport> {
   if (!EXPORT_BASE || !EXPORT_TOKEN) {
     throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
   }
@@ -459,10 +461,30 @@ export async function fetchAnalytics(opts: { from?: string; to?: string; tier?: 
   if (opts.to) u.searchParams.set("to", opts.to);
   if (opts.tier) u.searchParams.set("tier", opts.tier);
   if (opts.sheetOnly) u.searchParams.set("sheet_only", "1");
+  if (opts.model) u.searchParams.set("model", opts.model);
   const res = await fetch(u.toString());
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const json = await res.json();
   return json.data as AnalyticsReport;
+}
+
+/* === Модели (переключатель в шапке) === */
+export interface ModelOption {
+  group: string;
+  label: string;
+  links: number;
+}
+
+export async function fetchModels(): Promise<ModelOption[]> {
+  if (!EXPORT_BASE || !EXPORT_TOKEN) {
+    throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+  }
+  const u = new URL(`${EXPORT_BASE.replace(/\/$/, "")}/export/models`);
+  u.searchParams.set("key", EXPORT_TOKEN);
+  const res = await fetch(u.toString());
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.data as ModelOption[];
 }
 
 /* === Сверка тоталов: OM (истина) vs ручная таблица === */
@@ -482,7 +504,7 @@ export interface OmTotalsReport {
   cache_age_ms: number | null;
 }
 
-export async function fetchOmTotals(opts: { partner?: number; refresh?: boolean } = {}): Promise<OmTotalsReport> {
+export async function fetchOmTotals(opts: { partner?: number; refresh?: boolean; model?: string } = {}): Promise<OmTotalsReport> {
   if (!EXPORT_BASE || !EXPORT_TOKEN) {
     throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
   }
@@ -490,6 +512,7 @@ export async function fetchOmTotals(opts: { partner?: number; refresh?: boolean 
   u.searchParams.set("key", EXPORT_TOKEN);
   if (opts.partner) u.searchParams.set("partner", String(opts.partner));
   if (opts.refresh) u.searchParams.set("refresh", "1");
+  if (opts.model) u.searchParams.set("model", opts.model);
   const res = await fetch(u.toString());
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
   const json = await res.json();
