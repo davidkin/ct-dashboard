@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { buildDailyReport } from "../daily/report";
 import { buildAnalytics } from "../daily/analytics";
 import { getDb } from "../db/index";
-import { getOmLinkTotals, omTotalsCacheAgeMs, omTotalsKey } from "../om/totals";
+import { getOmLinkTotals, omTotalsCacheAgeMs, findOmTotal } from "../om/totals";
 import { creatorsInModelGroup, getModelGroup, listModels } from "../config/creators";
 import { todayLocal, addDays } from "../lib/tz";
 
@@ -145,7 +145,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
         }>;
 
       const links = rows.map((r) => {
-        const o = om.get(omTotalsKey(getModelGroup(r.creator), r.campaign_code));
+        const o = findOmTotal(om, getModelGroup(r.creator), r.creator, r.campaign_code);
         return {
           link_id: r.link_id,
           campaign_code: r.campaign_code,

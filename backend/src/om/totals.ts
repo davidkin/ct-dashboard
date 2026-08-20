@@ -21,9 +21,42 @@ export interface OmLinkTotal {
 let cache: { at: number; data: Map<string, OmLinkTotal> } | null = null;
 const TTL_MS = 10 * 60 * 1000;
 
-/** Ключ кэша тоталов: модель + код кампании. */
-export function omTotalsKey(model: string | null | undefined, campaignCode: string): string {
-  return `${model ?? ""}::${campaignCode}`;
+/**
+ * Ключ кэша тоталов: модель + тир + код кампании.
+ * Тир обязателен: в VIP-аккаунте часть линков названа как во free (camp_79,
+ * а не camp_paid_79) — без тира vip затирал бы free в мапе.
+ */
+export function omTotalsKey(
+  model: string | null | undefined,
+  tier: "free" | "vip",
+  campaignCode: string,
+): string {
+  return `${model ?? ""}::${tier}::${campaignCode}`;
+}
+
+export function tierForCreator(creator: string | null | undefined, campaignCode: string): "free" | "vip" {
+  if (creator) return creator.toLowerCase().endsWith("vip") ? "vip" : "free";
+  return campaignCode.startsWith("camp_paid_") ? "vip" : "free";
+}
+
+/**
+ * Найти OM-тотал для нашего линка. У vip-линков код в глоссарии — camp_paid_N,
+ * а в OM линк может называться и camp_paid_N, и просто camp_N — пробуем оба.
+ */
+export function findOmTotal(
+  m: Map<string, OmLinkTotal>,
+  model: string | null | undefined,
+  creator: string | null | undefined,
+  campaignCode: string,
+): OmLinkTotal | null {
+  const tier = tierForCreator(creator, campaignCode);
+  const candidates =
+    tier === "vip" ? [campaignCode, campaignCode.replace(/^camp_paid_/, "camp_")] : [campaignCode];
+  for (const code of candidates) {
+    const hit = m.get(omTotalsKey(model, tier, code));
+    if (hit) return hit;
+  }
+  return null;
 }
 
 /** "модель::campaign_code" → OM cumulative { clicks, subscribers }. Кэшируется на TTL_MS. */
@@ -40,7 +73,7 @@ export async function getOmLinkTotals(force = false): Promise<Map<string, OmLink
       const links = await listTrackingLinks(acct);
       for (const l of links) {
         if (!l.name) continue;
-        m.set(omTotalsKey(getModelGroup(creator), l.name), {
+        m.set(omTotalsKey(getModelGroup(creator), tag, l.name), {
           campaign_code: l.name,
           model: group,
           tracking_id: String(l.id),
