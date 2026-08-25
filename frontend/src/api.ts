@@ -519,6 +519,54 @@ export async function fetchOmTotals(opts: { partner?: number; refresh?: boolean;
   return json.data as OmTotalsReport;
 }
 
+/* === Самопроверка данных: дыры, которые иначе заметить нечем === */
+export interface IntegrityUntracked {
+  om_id: string;
+  name: string | null;
+  creator: string;
+  model: string | null;
+  url: string | null;
+  clicks: number;
+  fans: number;
+  is_campaign: boolean;
+}
+
+export interface IntegrityDrift {
+  link_id: number;
+  campaign_code: string;
+  creator: string;
+  partner: string | null;
+  our_cumulative: number;
+  om_cumulative: number;
+  diff: number;
+  tolerance: number;
+  last_snapshot_day: string | null;
+}
+
+export interface IntegrityReport {
+  checked_at: string;
+  status: "ok" | "warn" | "fail";
+  days_checked: number;
+  untracked: IntegrityUntracked[];
+  untracked_with_traffic: number;
+  drift: IntegrityDrift[];
+  gaps: string[];
+  errors: string[];
+}
+
+export async function fetchIntegrity(refresh = false): Promise<IntegrityReport> {
+  if (!EXPORT_BASE || !EXPORT_TOKEN) {
+    throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+  }
+  const u = new URL(`${EXPORT_BASE.replace(/\/$/, "")}/export/integrity`);
+  u.searchParams.set("key", EXPORT_TOKEN);
+  if (refresh) u.searchParams.set("refresh", "1");
+  const res = await fetch(u.toString());
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.data as IntegrityReport;
+}
+
 /* === Write-операции (создание/правка партнёра) — Basic-auth админа ===
    Хост тот же (EXPORT_BASE). Креды в .env.local: VITE_ADMIN_USER + VITE_ADMIN_PASS. */
 const ADMIN_USER = import.meta.env.VITE_ADMIN_USER as string | undefined;

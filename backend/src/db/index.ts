@@ -165,6 +165,22 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_daily_om_link_day ON daily_om_stats(link_id, day);
   `);
 
+  /* Самопроверка данных: история прогонов, чтобы UI показывал последний
+     результат без похода в OM, а расхождения было видно в динамике. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS integrity_checks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      checked_at TEXT NOT NULL,
+      status TEXT NOT NULL,                    /* ok | warn | fail */
+      untracked_count INTEGER NOT NULL DEFAULT 0,
+      untracked_with_traffic INTEGER NOT NULL DEFAULT 0,
+      drift_count INTEGER NOT NULL DEFAULT 0,
+      gap_count INTEGER NOT NULL DEFAULT 0,
+      report_json TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_integrity_checked_at ON integrity_checks(checked_at);
+  `);
+
   /* OnlyMonster transactions/chargebacks — реальная выручка с fan.id + датами. */
   db.exec(`
     CREATE TABLE IF NOT EXISTS om_transactions (

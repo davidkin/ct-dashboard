@@ -9,6 +9,7 @@
  * иммунен к переходам на летнее/зимнее время, не нужно считать смещение TZ.
  */
 import { captureDailyClicks } from "./capture";
+import { runIntegrityCheck } from "./integrity";
 import { getDb } from "../db/index";
 import { localHHMM, todayLocal, addDays, TRACKING_TZ } from "../lib/tz";
 
@@ -61,6 +62,20 @@ export function startDailyCapture(): void {
             `om_synced=${res.om_synced}, ${res.duration_ms}ms` +
             (res.errors.length ? `, errors: ${res.errors.join("; ")}` : ""),
         );
+
+        /* Сразу после съёмки — самопроверка: пропущенный день или незаведённый
+           линк из OM восстановить потом нечем, узнать надо в тот же день. */
+        try {
+          const check = await runIntegrityCheck();
+          console.log(
+            `[integrity] ${check.status}: без учёта ${check.untracked.length} линков ` +
+              `(с трафиком ${check.untracked_with_traffic}), расхождений ${check.drift.length}, ` +
+              `дней без снимка ${check.gaps.length}` +
+              (check.gaps.length ? ` (${check.gaps.join(", ")})` : ""),
+          );
+        } catch (err) {
+          console.error("[integrity] check failed:", err);
+        }
       }
     } catch (err) {
       console.error("[daily] capture error:", err);

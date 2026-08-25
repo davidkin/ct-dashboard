@@ -4,6 +4,7 @@ import {
 } from "recharts";
 import { DailyReport, DailySnapshotInfo, fetchExportReport, isExportConfigured } from "../api";
 import { useModel } from "../hooks/useModel";
+import { IntegrityPanel } from "../components/IntegrityPanel";
 
 /* Партнёры для дропдауна (id → лейбл), по промпту. Меняется только partner в fetch;
    контракт /export и рендер таблицы неизменны. Креатор пока фиксируем Nekoletta Free
@@ -106,6 +107,9 @@ export default function TrafficSheet() {
 
   return (
     <div className="gs-doc">
+      {/* Самопроверка: сверять цифры больше не с чем, дыры показывает сам дашборд */}
+      <IntegrityPanel />
+
       {/* ── Панель управления ── */}
       <div className="gs-controls">
         <select className="gs-select" value={partnerId} onChange={(e) => setPartnerId(Number(e.target.value))}>

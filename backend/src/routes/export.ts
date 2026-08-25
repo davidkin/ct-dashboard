@@ -5,6 +5,7 @@ import { getDb } from "../db/index";
 import { getOmLinkTotals, omTotalsCacheAgeMs, findOmTotal } from "../om/totals";
 import { creatorsInModelGroup, getModelGroup, listModels } from "../config/creators";
 import { todayLocal, addDays } from "../lib/tz";
+import { getLastIntegrityReport, runIntegrityCheck } from "../daily/integrity";
 
 /**
  * Read-only выгрузка для внешнего фетча (напр. ассистентом).
@@ -77,6 +78,29 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       data: listModels().map((m) => ({ ...m, links: linksByModel.get(m.group) ?? 0 })),
     };
   });
+
+  /* Самопроверка данных. По умолчанию отдаёт последний сохранённый прогон
+     (мгновенно), refresh=1 — гоняет заново с походом в OM. */
+  app.get<{ Querystring: { key?: string; refresh?: string } }>(
+    "/api/export/integrity",
+    async (req, reply) => {
+      const token = process.env.EXPORT_TOKEN;
+      if (!token) {
+        reply.code(503);
+        return { error: "EXPORT_TOKEN not configured" };
+      }
+      if (!req.query.key || req.query.key !== token) {
+        reply.code(401);
+        return { error: "invalid or missing key" };
+      }
+      if (req.query.refresh === "1") {
+        return { data: await runIntegrityCheck() };
+      }
+      const last = getLastIntegrityReport();
+      if (!last) return { data: await runIntegrityCheck() };
+      return { data: last };
+    },
+  );
 
   /* Общая аналитика по всем партнёрам за период (главный экран). Тот же токен. */
   app.get<{
