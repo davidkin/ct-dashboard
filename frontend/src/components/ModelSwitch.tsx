@@ -2,11 +2,19 @@ import { useModel } from "../hooks/useModel";
 
 /**
  * Переключатель моделей в шапке: «Все» + по кнопке на модель.
- * Пока модель одна — не показываем, переключать нечего.
+ * Когда модель одна — переключать нечего, но её имя всё равно показываем:
+ * должно быть видно, по какой модели смотришь цифры.
  */
 export function ModelSwitch() {
   const { model, setModel, models } = useModel();
-  if (models.length < 2) return null;
+  if (!models.length) return null;
+  if (models.length === 1) {
+    return (
+      <div className="model-switch" role="group" aria-label="Модель">
+        <span className="model-switch-single">{models[0].label}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="model-switch" role="group" aria-label="Модель">

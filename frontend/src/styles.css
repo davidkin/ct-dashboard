@@ -1586,3 +1586,9 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 }
 .model-switch-btn:hover { color: var(--text); }
 .model-switch-btn.active { background: var(--accent); color: var(--accent-fg); }
+/* одна модель — не кнопка, а подпись «по какой модели смотрим» */
+.model-switch-single {
+  padding: 5px 14px; border-radius: 999px;
+  background: var(--accent); color: var(--accent-fg);
+  font-size: 12.5px; font-weight: 600;
+}
