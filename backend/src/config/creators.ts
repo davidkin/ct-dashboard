@@ -33,16 +33,25 @@ const CREATOR_CONFIG: Record<string, CreatorConfig> = {
 export interface ModelOption {
   group: string;
   label: string;
+  /** Модель больше не льётся: скрыта в интерфейсе, но данные и синк остаются. */
+  hidden?: boolean;
 }
 
 const MODELS: ModelOption[] = [
-  { group: "Nekoletta", label: "Velora" },
+  { group: "Nekoletta", label: "Velora", hidden: true },
   { group: "Lily", label: "Lily" },
 ];
 
-/** Список моделей, у которых есть хотя бы один сконфигурированный creator. */
-export function listModels(): ModelOption[] {
-  return MODELS.filter((m) => creatorsInModelGroup(m.group).length > 0);
+/**
+ * Список моделей, у которых есть хотя бы один сконфигурированный creator.
+ * По умолчанию — только видимые (для интерфейса); includeHidden=true нужен
+ * внутренним потребителям (OM-синк, тоталы), чтобы неактивные модели
+ * продолжали собираться.
+ */
+export function listModels(includeHidden = false): ModelOption[] {
+  return MODELS.filter(
+    (m) => creatorsInModelGroup(m.group).length > 0 && (includeHidden || !m.hidden),
+  );
 }
 
 export function getAccountIdForCreator(name: string): string | null {

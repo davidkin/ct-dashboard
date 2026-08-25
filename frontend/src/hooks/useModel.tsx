@@ -31,8 +31,15 @@ export function ModelProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isExportConfigured()) return;
     fetchModels()
-      .then(setModels)
+      .then((list) => {
+        setModels(list);
+        /* Осталась одна активная модель — показываем только её: «Все» дало бы
+           данные скрытых моделей, а сохранённый выбор мог указывать на них. */
+        if (list.length === 1) setModel(list[0].group);
+        else if (model && !list.some((m) => m.group === model)) setModel("");
+      })
       .catch(() => setModels([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

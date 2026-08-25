@@ -65,7 +65,8 @@ export async function getOmLinkTotals(force = false): Promise<Map<string, OmLink
 
   const m = new Map<string, OmLinkTotal>();
 
-  for (const { group } of listModels()) {
+  /* скрытые модели тоже тянем: сверка и синк должны видеть все аккаунты */
+  for (const { group } of listModels(true)) {
     for (const creator of creatorsInModelGroup(group)) {
       const acct = getOMAccountForCreator(creator);
       if (!acct) continue;
