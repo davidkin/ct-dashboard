@@ -19,6 +19,7 @@ export interface OmLinkTotal {
 }
 
 let cache: { at: number; data: Map<string, OmLinkTotal> } | null = null;
+let lastErrors: string[] = [];
 const TTL_MS = 10 * 60 * 1000;
 
 /**
@@ -65,13 +66,23 @@ export async function getOmLinkTotals(force = false): Promise<Map<string, OmLink
 
   const m = new Map<string, OmLinkTotal>();
 
+  const failed: string[] = [];
+
   /* скрытые модели тоже тянем: сверка и синк должны видеть все аккаунты */
   for (const { group } of listModels(true)) {
     for (const creator of creatorsInModelGroup(group)) {
       const acct = getOMAccountForCreator(creator);
       if (!acct) continue;
       const tag: "free" | "vip" = creator.toLowerCase().endsWith("vip") ? "vip" : "free";
-      const links = await listTrackingLinks(acct);
+      /* Аккаунт отвалившейся модели (у организации отобрали доступ) не должен
+         ронять всю сверку — пропускаем его и продолжаем с остальными. */
+      let links: Awaited<ReturnType<typeof listTrackingLinks>>;
+      try {
+        links = await listTrackingLinks(acct);
+      } catch (err) {
+        failed.push(`${creator}: ${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
       for (const l of links) {
         if (!l.name) continue;
         m.set(omTotalsKey(getModelGroup(creator), tag, l.name), {
@@ -87,9 +98,16 @@ export async function getOmLinkTotals(force = false): Promise<Map<string, OmLink
   }
 
   cache = { at: Date.now(), data: m };
+  lastErrors = failed;
   return m;
 }
 
 export function omTotalsCacheAgeMs(): number | null {
   return cache ? Date.now() - cache.at : null;
+}
+
+/** Аккаунты, которые не удалось прочитать в последнюю выгрузку (403 у отвалившейся
+ *  модели и т.п.) — сверка по ним неполная, UI должен это показать. */
+export function omTotalsErrors(): string[] {
+  return lastErrors;
 }

@@ -502,6 +502,8 @@ export interface OmTotalsReport {
   totals: { om_clicks: number; om_fans: number; sheet_clicks: number; sheet_fans: number };
   links: OmTotalLink[];
   cache_age_ms: number | null;
+  /** аккаунты, недоступные в OM (отключённая модель) — сверка по ним неполная */
+  om_errors?: string[];
 }
 
 export async function fetchOmTotals(opts: { partner?: number; refresh?: boolean; model?: string } = {}): Promise<OmTotalsReport> {

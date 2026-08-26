@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { buildDailyReport } from "../daily/report";
 import { buildAnalytics } from "../daily/analytics";
 import { getDb } from "../db/index";
-import { getOmLinkTotals, omTotalsCacheAgeMs, findOmTotal } from "../om/totals";
+import { getOmLinkTotals, omTotalsCacheAgeMs, omTotalsErrors, findOmTotal } from "../om/totals";
 import { creatorsInModelGroup, getModelGroup, listModels } from "../config/creators";
 import { todayLocal, addDays } from "../lib/tz";
 import { getLastIntegrityReport, runIntegrityCheck } from "../daily/integrity";
@@ -192,7 +192,9 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
         { om_clicks: 0, om_fans: 0, sheet_clicks: 0, sheet_fans: 0 },
       );
 
-      return { data: { totals, links, cache_age_ms: omTotalsCacheAgeMs() } };
+      /* om_errors — аккаунты, недоступные в OM (отвалившаяся модель): по ним
+         сверка неполная, и молчать об этом нельзя. */
+      return { data: { totals, links, cache_age_ms: omTotalsCacheAgeMs(), om_errors: omTotalsErrors() } };
     },
   );
 }

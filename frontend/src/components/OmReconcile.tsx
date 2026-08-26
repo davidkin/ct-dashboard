@@ -79,6 +79,12 @@ export default function OmReconcile({ partnerId, collapsible = false }: { partne
       {(!collapsible || open) && (
         <>
       {err && <div className="alert" style={{ margin: "0 20px 16px" }}>{err}</div>}
+      {/* аккаунт отключённой модели недоступен — сверка неполная, молчать нельзя */}
+      {rep?.om_errors?.length ? (
+        <div className="alert" style={{ margin: "0 20px 16px" }}>
+          Часть аккаунтов OM недоступна, по ним сверка не делалась: {rep.om_errors.join("; ")}
+        </div>
+      ) : null}
       {loading && !rep && <p className="muted" style={{ padding: "0 20px 20px" }}>Загружаю OM…</p>}
 
       {rep && (

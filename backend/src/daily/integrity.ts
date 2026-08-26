@@ -54,6 +54,8 @@ export interface IntegrityReport {
   drift: DriftLink[];
   gaps: string[];
   errors: string[];
+  /** аккаунты отключённых моделей, недоступные в OM — сверка по ним не делается */
+  skipped: string[];
 }
 
 /* Допуск на дрейф: за время между съёмкой и проверкой линк успевает набрать
@@ -73,6 +75,12 @@ export async function runIntegrityCheck(): Promise<IntegrityReport> {
   /* --- линки OM по всем аккаунтам (включая скрытые модели) --- */
   const omByTracking = new Map<string, { name: string | null; creator: string; clicks: number; fans: number; url: string | null }>();
   const seenAccounts = new Set<string>();
+  /* Отключённая модель (доступ к её OM-аккаунту отозван) — это ожидаемое
+     состояние, а не поломка проверки: пишем отдельно и статус не роняем. */
+  const skipped: string[] = [];
+  const hiddenGroups = new Set(
+    listModels(true).filter((m) => m.hidden).map((m) => m.group),
+  );
   for (const { group } of listModels(true)) {
     for (const creator of creatorsInModelGroup(group)) {
       const acct = getOMAccountForCreator(creator);
@@ -89,7 +97,9 @@ export async function runIntegrityCheck(): Promise<IntegrityReport> {
           });
         }
       } catch (err) {
-        errors.push(`${creator}: ${err instanceof Error ? err.message : String(err)}`);
+        const msg = `${creator}: ${err instanceof Error ? err.message : String(err)}`;
+        if (hiddenGroups.has(group)) skipped.push(msg);
+        else errors.push(msg);
       }
     }
   }
@@ -185,6 +195,7 @@ export async function runIntegrityCheck(): Promise<IntegrityReport> {
     drift,
     gaps,
     errors,
+    skipped,
   };
 
   saveReport(report);
