@@ -161,7 +161,42 @@ export function buildAnalytics(
       payout_status: statusById.get(pid) === "done" ? "done" : "pending",
     });
   }
-  partners.sort((x, y) => y.payout - x.payout);
+  /* Партнёры без трафика за период тоже должны быть в списке: ссылки им выдали,
+     и их нужно видеть (иначе только что заведённый партнёр «пропадает» из софта,
+     пока не придёт первый клик). Добавляем нулевыми строками. */
+  const seen = new Set(partners.map((p) => p.partner_id));
+  const withLinks = db
+    .prepare(
+      `SELECT DISTINCT l.partner_id AS pid
+         FROM links l
+        WHERE l.partner_id IS NOT NULL
+          AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))`,
+    )
+    .all({ modelCreators: model ? JSON.stringify(creatorsInModelGroup(model)) : null }) as Array<{ pid: number }>;
+  for (const { pid } of withLinks) {
+    if (seen.has(pid)) continue;
+    const meta = metaById.get(pid);
+    if (!meta) continue;
+    partners.push({
+      partner_id: pid,
+      display_name: meta.display_name,
+      telegram: meta.telegram,
+      type: meta.type,
+      source: meta.source,
+      note: meta.note,
+      archived: !!meta.archived,
+      active: !!meta.active,
+      clicks: 0,
+      fans: 0,
+      cr: null,
+      revenue: revById.get(pid) ?? 0,
+      payout: 0,
+      trend: null,
+      payout_status: statusById.get(pid) === "done" ? "done" : "pending",
+    });
+  }
+
+  partners.sort((x, y) => y.payout - x.payout || y.clicks - x.clicks);
 
   /* источники трафика (по активным = не-архивным партнёрам) */
   const srcMap = new Map<string, { clicks: number; fans: number }>();
