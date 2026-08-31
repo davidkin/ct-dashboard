@@ -2,13 +2,13 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import {
   CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { DailyReport, DailySnapshotInfo, fetchExportReport, isExportConfigured } from "../api";
+import { DailyReport, DailySnapshotInfo, fetchExportReport, fetchPartnerOptions, isExportConfigured, type PartnerOption } from "../api";
 import { useModel } from "../hooks/useModel";
 import { IntegrityPanel } from "../components/IntegrityPanel";
 
-/* Партнёры для дропдауна (id → лейбл), по промпту. Меняется только partner в fetch;
-   контракт /export и рендер таблицы неизменны. Креатор пока фиксируем Nekoletta Free
-   (Free/Velora-скоуп); список креаторов статичный — листы партнёров за Basic-auth не тянем. */
+/* Партнёры для дропдауна. Список приходит с бэка (/export/partners): раньше он был
+   зашит здесь, и партнёры, заведённые в глоссарии позже, в интерфейс не попадали.
+   Захардкоженный список остаётся стартовым значением, пока запрос не ответил. */
 const PARTNERS: Array<{ id: number; label: string }> = [
   { id: 6,   label: "Adult Angels (@adultangels)" },
   { id: 43,  label: "TraffZone" },
@@ -41,7 +41,12 @@ const TIER_OPTIONS: Array<{ v: Tier; label: string }> = [
 /* Начальный партнёр: из ?partner= в URL (чтобы refresh сохранял выбор), иначе первый. */
 function initialPartnerId(): number {
   const q = Number(new URLSearchParams(window.location.search).get("partner"));
-  return PARTNERS.some((p) => p.id === q) ? q : PARTNERS[0].id;
+  return Number.isFinite(q) && q > 0 ? q : PARTNERS[0].id;
+}
+
+function partnerLabelOf(p: PartnerOption): string {
+  const tg = p.telegram ? ` (${p.telegram})` : "";
+  return `${p.display_name}${tg}`;
 }
 
 /* ── форматтеры под вид Google Sheets ── */
@@ -56,6 +61,7 @@ type SheetTab = "total" | "raw";
 export default function TrafficSheet() {
   const { model } = useModel();
   const [partnerId, setPartnerId] = useState<number>(initialPartnerId);
+  const [partners, setPartners] = useState<Array<{ id: number; label: string }>>(PARTNERS);
   const [tier, setTier] = useState<Tier>(""); // "" = объединённый Free+Paid
   const [from, setFrom] = useState("2026-06-01");
   const [to, setTo] = useState("");
@@ -63,6 +69,21 @@ export default function TrafficSheet() {
   const [tab, setTab] = useState<SheetTab>("total");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* Партнёров тянем с бэка: список меняется, когда в глоссарий добавляют людей. */
+  useEffect(() => {
+    if (!isExportConfigured()) return;
+    let alive = true;
+    fetchPartnerOptions(model || undefined)
+      .then((list) => {
+        if (!alive || !list.length) return;
+        setPartners(list.map((p) => ({ id: p.id, label: partnerLabelOf(p) })));
+        /* выбранного партнёра нет у этой модели — переключаемся на первого */
+        setPartnerId((cur) => (list.some((p) => p.id === cur) ? cur : list[0].id));
+      })
+      .catch(() => { /* остаётся стартовый список */ });
+    return () => { alive = false; };
+  }, [model]);
 
   /* Держим выбранного партнёра в ?partner= — refresh сохраняет выбор. */
   useEffect(() => {
@@ -102,7 +123,7 @@ export default function TrafficSheet() {
     [rows],
   );
 
-  const partnerLabel = PARTNERS.find((p) => p.id === partnerId)?.label ?? "";
+  const partnerLabel = partners.find((p) => p.id === partnerId)?.label ?? "";
   const partnerName = report?.campaigns[0]?.partner_name ?? partnerLabel;
 
   return (
@@ -113,7 +134,7 @@ export default function TrafficSheet() {
       {/* ── Панель управления ── */}
       <div className="gs-controls">
         <select className="gs-select" value={partnerId} onChange={(e) => setPartnerId(Number(e.target.value))}>
-          {PARTNERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          {partners.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
         </select>
         <div className="gs-seg" role="group" aria-label="Tier">
           {TIER_OPTIONS.map((t) => (

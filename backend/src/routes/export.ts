@@ -79,6 +79,43 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
     };
   });
 
+  /* Список партнёров для выпадашки. Раньше он был зашит в код фронта, из-за
+     чего новые партнёры из глоссария в интерфейсе не появлялись. */
+  app.get<{ Querystring: { key?: string; model?: string } }>(
+    "/api/export/partners",
+    async (req, reply) => {
+      const token = process.env.EXPORT_TOKEN;
+      if (!token) {
+        reply.code(503);
+        return { error: "EXPORT_TOKEN not configured" };
+      }
+      if (!req.query.key || req.query.key !== token) {
+        reply.code(401);
+        return { error: "invalid or missing key" };
+      }
+      const model = req.query.model || null;
+      const modelCreators = model ? JSON.stringify(creatorsInModelGroup(model)) : "[]";
+      const rows = getDb()
+        .prepare(
+          `SELECT p.id, p.display_name, p.telegram,
+                  COUNT(l.id) AS links,
+                  COALESCE(SUM(CASE WHEN l.of_tracking_link_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS tracked,
+                  (SELECT COALESCE(SUM(o.clicks),0) FROM daily_om_stats o
+                    JOIN links l2 ON l2.id = o.link_id
+                   WHERE l2.partner_id = p.id) AS clicks
+             FROM partners p JOIN links l ON l.partner_id = p.id
+            WHERE (@model IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
+            GROUP BY p.id, p.display_name, p.telegram
+            ORDER BY clicks DESC, p.display_name COLLATE NOCASE`,
+        )
+        .all({ model, modelCreators }) as Array<{
+          id: number; display_name: string; telegram: string | null;
+          links: number; tracked: number; clicks: number;
+        }>;
+      return { data: rows };
+    },
+  );
+
   /* Самопроверка данных. По умолчанию отдаёт последний сохранённый прогон
      (мгновенно), refresh=1 — гоняет заново с походом в OM. */
   app.get<{ Querystring: { key?: string; refresh?: string } }>(

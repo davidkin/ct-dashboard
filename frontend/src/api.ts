@@ -521,6 +521,29 @@ export async function fetchOmTotals(opts: { partner?: number; refresh?: boolean;
   return json.data as OmTotalsReport;
 }
 
+/* === Список партнёров для выпадашки (раньше был зашит в код) === */
+export interface PartnerOption {
+  id: number;
+  display_name: string;
+  telegram: string | null;
+  links: number;
+  tracked: number;
+  clicks: number;
+}
+
+export async function fetchPartnerOptions(model?: string): Promise<PartnerOption[]> {
+  if (!EXPORT_BASE || !EXPORT_TOKEN) {
+    throw new Error("VITE_API_BASE / VITE_EXPORT_TOKEN не заданы в .env.local");
+  }
+  const u = new URL(`${EXPORT_BASE.replace(/\/$/, "")}/export/partners`);
+  u.searchParams.set("key", EXPORT_TOKEN);
+  if (model) u.searchParams.set("model", model);
+  const res = await fetch(u.toString());
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  const json = await res.json();
+  return json.data as PartnerOption[];
+}
+
 /* === Самопроверка данных: дыры, которые иначе заметить нечем === */
 export interface IntegrityUntracked {
   om_id: string;
