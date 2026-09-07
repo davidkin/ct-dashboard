@@ -35,10 +35,13 @@ export interface ModelOption {
   label: string;
   /** Модель больше не льётся: скрыта в интерфейсе, но данные и синк остаются. */
   hidden?: boolean;
+  /** Доступ к OM-аккаунту отобран (403). Данные в базе остаются, но в OM за
+      ними больше не ходим и в сверки модель не берём. */
+  retired?: boolean;
 }
 
 const MODELS: ModelOption[] = [
-  { group: "Nekoletta", label: "Velora", hidden: true },
+  { group: "Nekoletta", label: "Velora", hidden: true, retired: true },
   { group: "Lily", label: "Lily" },
 ];
 
@@ -98,6 +101,17 @@ export function getOMTokenForAccount(platformAccountId: string): string | null {
 export function getModelGroup(name: string | null | undefined): string | null {
   if (!name) return null;
   return CREATOR_CONFIG[name]?.modelGroup ?? name;
+}
+
+/** Модель с отобранным доступом к OM: за её creator-ами в OM не ходим. */
+export function isRetiredModel(modelGroup: string | null | undefined): boolean {
+  if (!modelGroup) return false;
+  return MODELS.some((m) => m.group === modelGroup && m.retired === true);
+}
+
+/** То же по имени creator — удобнее там, где список берётся из links. */
+export function isRetiredCreator(creator: string | null | undefined): boolean {
+  return isRetiredModel(getModelGroup(creator));
 }
 
 /** Все creator в одном model_group (например Free + Vip одной модели). */

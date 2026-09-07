@@ -7,7 +7,7 @@
  * модели (у Lily нумерация начинается заново и пересекается с Nekoletta).
  */
 import { listTrackingLinks } from "./client";
-import { getModelGroup, getOMAccountForCreator, listModels, creatorsInModelGroup } from "../config/creators";
+import { getModelGroup, getOMAccountForCreator, listModels, creatorsInModelGroup, isRetiredModel } from "../config/creators";
 
 export interface OmLinkTotal {
   campaign_code: string;
@@ -70,6 +70,7 @@ export async function getOmLinkTotals(force = false): Promise<Map<string, OmLink
 
   /* скрытые модели тоже тянем: сверка и синк должны видеть все аккаунты */
   for (const { group } of listModels(true)) {
+    if (isRetiredModel(group)) continue;   // доступ к OM отобран — сверять нечего
     for (const creator of creatorsInModelGroup(group)) {
       const acct = getOMAccountForCreator(creator);
       if (!acct) continue;

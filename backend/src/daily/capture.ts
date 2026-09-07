@@ -10,7 +10,7 @@
  * реальные даты подписки за сегодня), потом снимаем клики.
  */
 import { getDb } from "../db/index";
-import { getOMAccountForCreator } from "../config/creators";
+import { getOMAccountForCreator, isRetiredCreator } from "../config/creators";
 import { listTrackingLinks } from "../om/client";
 import { syncOMAllCreators } from "../om/sync";
 import { todayLocal, addDays } from "../lib/tz";
@@ -53,9 +53,11 @@ export async function captureDailyClicks(
     linkMap.set(String(row.of_tracking_link_id), row.id);
   }
 
+  /* Модели с отобранным доступом к OM исключаем: их линки в базе остаются,
+     но каждый поход за ними возвращает 403 и только сорит в лог. */
   const creators = (
     db.prepare(`SELECT DISTINCT creator FROM links ORDER BY creator`).all() as Array<{ creator: string }>
-  ).map((r) => r.creator);
+  ).map((r) => r.creator).filter((c) => !isRetiredCreator(c));
 
   const upsert = db.prepare(`
     INSERT INTO daily_link_clicks (link_id, day, clicks_cumulative, fans_cumulative, captured_at)
