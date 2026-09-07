@@ -29,21 +29,29 @@ async function fetchSheet(): Promise<SheetRow[]> {
   const sheets = google.sheets({ version: "v4", auth: auth as never });
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: `${TAB}!A2:K2000`,
+    range: `${TAB}!A2:L2000`,
   });
   const rows = res.data.values ?? [];
+  // Column order in the sheet:
+  //   A PARTNER · B Affiliates · C Accountable · D SOURCE · E OF CAMPAIGN
+  //   F OF LINK · G CPF · H RevShare · I Total Cost · J Monthly Fee · K Creator
+  // "Accountable" (C) was added after this importer was written; reading the
+  // old positions put SOURCE into campaign_code and Monthly Fee into creator.
   return rows
     .map((r) => ({
       partner: (r[0] ?? "").toString().trim(),
       type: (r[1] ?? "").toString().trim(),
-      source: (r[2] ?? "").toString().trim(),
-      campaign: (r[3] ?? "").toString().trim(),
-      ofUrl: (r[4] ?? "").toString().trim(),
-      cpf: (r[5] ?? "").toString().trim(),
-      revshare: (r[6] ?? "").toString().trim(),
-      creator: (r[9] ?? "").toString().trim(),
+      source: (r[3] ?? "").toString().trim(),
+      campaign: (r[4] ?? "").toString().trim(),
+      ofUrl: (r[5] ?? "").toString().trim(),
+      cpf: (r[6] ?? "").toString().trim(),
+      revshare: (r[7] ?? "").toString().trim(),
+      creator: (r[10] ?? "").toString().trim(),
     }))
-    .filter((r) => r.partner && r.ofUrl);
+    // A real row carries all four. Section dividers ("VIP") and the header
+    // repeated mid-sheet fail this and would otherwise land as fake links.
+    .filter((r) => r.partner && r.ofUrl && r.campaign && r.creator)
+    .filter((r) => r.partner !== "PARTNER" && r.campaign !== "OF CAMPAIGN");
 }
 
 async function run() {
