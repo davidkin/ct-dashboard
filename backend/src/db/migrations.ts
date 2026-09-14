@@ -168,6 +168,32 @@ const MIGRATIONS: Migration[] = [
     ALTER TABLE fan_link_touches ADD COLUMN cpf_eligibility_reason TEXT;
     `,
   },
+  {
+    id: "003_users_and_sessions",
+    sql: `
+    /* ===== Пользователи приложения: вход внутри дашборда вместо общего пароля ===== */
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      display_name TEXT,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'manager',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    /* Сессии в базе, а не в памяти: рестарт бэкенда не разлогинивает всех. */
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      last_seen_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

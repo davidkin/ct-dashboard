@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   addGlossaryLinks,
+  patchPartner,
   createGlossaryPartner,
   deleteGlossaryLink,
   fetchGlossary,
@@ -54,6 +55,7 @@ export default function Glossary() {
   const [model, setModel] = useState("all");
   const [source, setSource] = useState("all");
   const [tier, setTier] = useState<"all" | "free" | "paid">("all");
+  const [status, setStatus] = useState<"all" | "active" | "lost">("all");
   const [problemFilter, setProblemFilter] = useState<ProblemFilter>("all");
   const [open, setOpen] = useState<Set<number>>(new Set());
 
@@ -105,13 +107,14 @@ export default function Glossary() {
         });
         return { ...p, links };
       })
+      .filter((p) => status === "all" || p.status === status)
       .filter((p) => {
         if (p.links.length > 0) return true;
         if (problemFilter !== "all" || model !== "all" || source !== "all" || tier !== "all") return false;
         if (!q) return true;
         return p.display_name.toLowerCase().includes(q) || (p.telegram ?? "").toLowerCase().includes(q);
       });
-  }, [partners, search, model, source, tier, problemFilter]);
+  }, [partners, search, model, source, tier, problemFilter, status]);
 
   const toggleOpen = (id: number) =>
     setOpen((s) => {
@@ -166,6 +169,18 @@ export default function Glossary() {
               onClick={() => setTier(t)}
             >
               {t === "all" ? "Все типы" : t === "free" ? "Free" : "Paid"}
+            </button>
+          ))}
+        </div>
+        <div className="seg">
+          {(["all", "active", "lost"] as const).map((st) => (
+            <button
+              key={st}
+              type="button"
+              className={`seg-btn${status === st ? " active" : ""}`}
+              onClick={() => setStatus(st)}
+            >
+              {st === "all" ? "Все" : st === "active" ? "Active" : "Lost"}
             </button>
           ))}
         </div>
@@ -282,7 +297,10 @@ export default function Glossary() {
                         <div className="an-partner">
                           <span className="an-ava">{initials(p.display_name)}</span>
                           <div className="an-partner-txt">
-                            <span className="an-partner-name">{p.display_name}</span>
+                            <span className="an-partner-name">
+                              {p.display_name}
+                              <StatusTag partner={p} onChanged={() => void load()} />
+                            </span>
                             {p.telegram && <span className="an-partner-tg">{p.telegram}</span>}
                           </div>
                         </div>
@@ -343,6 +361,39 @@ export default function Glossary() {
         />
       )}
     </div>
+  );
+}
+
+/** Тег партнёра: клик переключает active ↔ lost. */
+function StatusTag({ partner, onChanged }: { partner: GlossaryPartner; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  /* Старый бэкенд поля не отдаёт — тогда тега просто нет, а не "undefined". */
+  if (!partner.status) return null;
+  const lost = partner.status === "lost";
+
+  async function toggle(e: React.MouseEvent) {
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await patchPartner(partner.id, { active: lost });
+      onChanged();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className={`gl-tag gl-tag-${partner.status}`}
+      disabled={busy}
+      onClick={toggle}
+      title={lost ? "Партнёр помечен как потерянный — нажми, чтобы вернуть в active" : "Партнёр активен — нажми, чтобы пометить как lost"}
+    >
+      {partner.status}
+    </button>
   );
 }
 

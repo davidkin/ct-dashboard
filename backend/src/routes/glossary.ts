@@ -41,6 +41,7 @@ interface PartnerRow {
   cpf_free: number | null;
   cpf_paid: number | null;
   archived: number;
+  active: number;
 }
 
 interface NewLinkInput {
@@ -81,7 +82,8 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
   app.get<{ Querystring: { verify?: string; all?: string } }>("/api/glossary", async (req) => {
     const partners = db
       .prepare(
-        `SELECT id, glossary_name, display_name, telegram, type, source, cpf_free, cpf_paid, archived
+        `SELECT id, glossary_name, display_name, telegram, type, source, cpf_free, cpf_paid,
+                COALESCE(archived, 0) AS archived, COALESCE(active, 1) AS active
          FROM partners ORDER BY display_name COLLATE NOCASE`,
       )
       .all() as PartnerRow[];
@@ -146,6 +148,8 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
         cpf_free: p.cpf_free,
         cpf_paid: p.cpf_paid,
         archived: !!p.archived,
+        /* Тег партнёра: active — работает, lost — отвалился. Правится из глоссария. */
+        status: p.active ? "active" : "lost",
         links: own.map((l) => {
           const paid = isPaidCode(l.campaign_code);
           const cpf = paid ? (l.cpf_paid ?? l.cpf_free) : l.cpf_free;

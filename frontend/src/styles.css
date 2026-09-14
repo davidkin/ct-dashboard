@@ -1687,5 +1687,14 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .gl-del:hover { color: var(--bad); border-color: var(--line); background: var(--surface2); }
 .gl-del:disabled { opacity: .4; cursor: default; }
 
+.gl-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+  padding: 1px 7px; border-radius: 999px; cursor: pointer; border: 1px solid transparent;
+}
+.gl-tag-active { background: rgba(70,190,130,.14); color: #4bbd85; }
+.gl-tag-lost { background: rgba(212,102,92,.14); color: #d4665c; }
+.gl-tag:hover { border-color: currentColor; }
+.gl-tag:disabled { opacity: .5; cursor: default; }
+
 .gl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .gl-errors { margin-top: var(--space-sm); padding-left: 18px; font-size: 13px; color: var(--bad); }

@@ -782,6 +782,8 @@ export interface GlossaryPartner {
   cpf_free: number | null;
   cpf_paid: number | null;
   archived: boolean;
+  /** Тег партнёра: active — работает, lost — отвалился. */
+  status: "active" | "lost";
   links: GlossaryLink[];
 }
 
