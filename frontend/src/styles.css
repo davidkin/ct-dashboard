@@ -1646,28 +1646,42 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 
 /* вложенная таблица ссылок партнёра */
 .an-table tbody tr.gl-subrow, .an-table tbody tr.gl-subrow:hover { background: var(--bg); cursor: default; }
-.gl-subrow > td { padding: 0 14px 14px 48px; }
-.gl-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.gl-subrow > td { padding: 0 20px 16px 52px; border-top: none; }
+.gl-sub { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px; }
+.gl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gl-table th {
-  text-align: left; padding: 8px 12px 6px 0; font-size: 11px; font-weight: 600;
-  letter-spacing: .3px; text-transform: uppercase; color: var(--faint);
-  border-bottom: 1px solid var(--line);
+  text-align: left; padding: 10px 16px 8px 0; font-size: 10.5px; font-weight: 600;
+  letter-spacing: .4px; text-transform: uppercase; color: var(--faint);
+  border-bottom: 1px solid var(--line); white-space: nowrap;
 }
-.gl-table td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--lineSoft); vertical-align: middle; }
+.gl-table td { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--lineSoft); vertical-align: middle; }
 .gl-table tbody tr:last-child td { border-bottom: none; }
-.gl-table tbody tr.gl-row-warn td { background: rgba(255,179,0,.05); }
-.gl-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: nowrap; }
+.gl-table tbody tr:hover td { background: var(--accent-soft); }
+.gl-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; white-space: nowrap; }
 .gl-table td.gl-status, .gl-table th:nth-last-child(2) { text-align: right; }
-.gl-table td.gl-actions { text-align: right; width: 1%; white-space: nowrap; }
-.gl-table td.gl-url { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-table td.gl-actions, .gl-table th:last-child { text-align: right; width: 1%; padding-right: 0; }
+.gl-table td.gl-url { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gl-url a { color: var(--muted); }
 .gl-url a:hover { color: var(--accent); }
+
+.gl-cpf-cell { width: 110px; }
+.gl-cpf-wrap { position: relative; display: inline-flex; align-items: center; }
+.gl-cpf-cur { position: absolute; left: 9px; font-size: 12px; color: var(--faint); pointer-events: none; }
 .gl-cpf {
-  width: 72px; padding: 3px 8px; font-size: 12.5px; text-align: right;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text);
+  width: 84px; padding: 5px 9px 5px 20px; font-size: 13px; text-align: right;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  color: var(--text); font-variant-numeric: tabular-nums;
 }
-.gl-cpf:focus { border-color: var(--accent); }
-.gl-inline-err { font-size: 11px; margin-top: 2px; }
+.gl-cpf:hover { border-color: var(--muted); }
+.gl-cpf:focus { border-color: var(--accent); outline: none; }
+.gl-inline-err { font-size: 11px; margin-top: 3px; }
+
+.gl-del {
+  width: 24px; height: 24px; line-height: 1; border-radius: 6px; font-size: 12px;
+  background: transparent; border: 1px solid transparent; color: var(--faint); cursor: pointer;
+}
+.gl-del:hover { color: var(--bad); border-color: var(--line); background: var(--surface2); }
+.gl-del:disabled { opacity: .4; cursor: default; }
 
 .gl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .gl-errors { margin-top: var(--space-sm); padding-left: 18px; font-size: 13px; color: var(--bad); }

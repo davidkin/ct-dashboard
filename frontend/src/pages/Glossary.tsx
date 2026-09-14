@@ -260,6 +260,7 @@ export default function Glossary() {
                           {p.links.length === 0 ? (
                             <p className="gl-empty">Ссылок нет.</p>
                           ) : (
+                            <div className="gl-sub">
                             <table className="gl-table">
                               <thead>
                                 <tr>
@@ -279,6 +280,7 @@ export default function Glossary() {
                                 ))}
                               </tbody>
                             </table>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -367,16 +369,19 @@ function LinkRow({
       <td>
         <span className={`pm-tier pm-tier-${link.tier}`}>{link.tier}</span>
       </td>
-      <td>
-        <input
-          className="gl-cpf"
-          value={cpf}
-          disabled={busy}
-          onChange={(e) => setCpf(e.target.value)}
-          onBlur={saveCpf}
-          onKeyDown={(e) => e.key === "Enter" && saveCpf()}
-          placeholder="0.00"
-        />
+      <td className="gl-cpf-cell">
+        <span className="gl-cpf-wrap">
+          <span className="gl-cpf-cur">$</span>
+          <input
+            className="gl-cpf"
+            value={cpf}
+            disabled={busy}
+            onChange={(e) => setCpf(e.target.value)}
+            onBlur={saveCpf}
+            onKeyDown={(e) => e.key === "Enter" && saveCpf()}
+            placeholder="0.00"
+          />
+        </span>
         {err && <div className="pm-err gl-inline-err">{err}</div>}
       </td>
       <td>{link.source ?? "—"}</td>
@@ -393,8 +398,14 @@ function LinkRow({
         )}
       </td>
       <td className="gl-actions">
-        <button type="button" className="btn ghost btn-sm" disabled={busy} onClick={remove}>
-          Удалить
+        <button
+          type="button"
+          className="gl-del"
+          disabled={busy}
+          onClick={remove}
+          title={`Удалить ${link.campaign_code} из глоссария`}
+        >
+          ✕
         </button>
       </td>
     </tr>
