@@ -17,6 +17,14 @@ import {
 /* Глоссарий: словарь партнёр → ссылки. Повторяет гугл-таблицу, но строка не может
    «выпасть» из-за пустой ячейки — всё, что не проходит проверку, видно на экране. */
 
+/** Инициалы для аватарки партнёра — как в таблице аналитики. */
+function initials(name: string): string {
+  const clean = name.replace(/^@/, "").trim();
+  const parts = clean.split(/[\s|]+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : clean.slice(0, 2);
+  return letters.toUpperCase();
+}
+
 const SOURCES = ["Instagram", "Facebook", "TikTok", "Telegram", "X", "Reddit", "Other"];
 
 export default function Glossary() {
@@ -93,37 +101,62 @@ export default function Glossary() {
 
   if (!isAdminConfigured()) {
     return (
-      <div className="an fadeUp gl-page">
-        <h1 className="gl-title">Глоссарий</h1>
-        <p className="muted">
-          Не заданы админ-креды (VITE_ADMIN_USER / VITE_ADMIN_PASS) — страница работает только на запись и чтение под админом.
-        </p>
+      <div className="an fadeUp">
+        <div className="an-card">
+          <div className="an-card-head">
+            <h3>Глоссарий</h3>
+          </div>
+          <p className="gl-empty">
+            Не заданы админ-креды (VITE_ADMIN_USER / VITE_ADMIN_PASS) — страница работает под админом.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="an fadeUp gl-page">
-      <div className="gl-head">
-        <div>
-          <h1 className="gl-title">Глоссарий</h1>
-          {meta && (
-            <div className="gl-meta">
-              <span>{meta.partners} партнёров</span>
-              <span>{meta.links} ссылок</span>
-              {meta.no_cpf > 0 && <span className="gl-chip-warn">{meta.no_cpf} без CPF</span>}
-              {meta.untracked > 0 && <span className="gl-chip-warn">{meta.untracked} без привязки к OM</span>}
-              {meta.orphans.length > 0 && <span className="gl-chip-warn">{meta.orphans.length} без партнёра</span>}
-            </div>
-          )}
-        </div>
-        <div className="gl-head-actions">
-          <button type="button" className="gl-btn" onClick={() => setNewPartner(true)}>
-            Новый партнёр
-          </button>
+    <div className="an fadeUp">
+      <div className="an-toolbar">
+        <div className="seg">
           <button
             type="button"
-            className="gl-btn gl-btn-ghost"
+            className={`seg-btn${model === "all" ? " active" : ""}`}
+            onClick={() => setModel("all")}
+          >
+            Все модели
+          </button>
+          {(meta?.models ?? []).map((m) => (
+            <button
+              key={m.group}
+              type="button"
+              className={`seg-btn${model === m.group ? " active" : ""}`}
+              onClick={() => setModel(m.group)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={`seg-btn${onlyProblems ? " active" : ""}`}
+          onClick={() => setOnlyProblems((v) => !v)}
+          title="Показать только ссылки без CPF или без привязки к OnlyMonster"
+        >
+          Только проблемные
+        </button>
+        <div className="input-with-icon an-search gl-search">
+          <span className="input-icon">⌕</span>
+          <input
+            className="input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Партнёр, хэндл или код кампании…"
+          />
+        </div>
+        <div className="gl-toolbar-right">
+          <button
+            type="button"
+            className={`btn ghost${verify ? " active" : ""}`}
             disabled={loading}
             onClick={() => {
               const next = !verify;
@@ -132,33 +165,14 @@ export default function Glossary() {
             }}
             title="Сверить каждую ссылку с OnlyMonster (медленнее)"
           >
-            {verify ? "Сверка с OM включена" : "Сверить с OM"}
+            {verify ? "Сверка с OM: вкл" : "Сверить с OM"}
+          </button>
+          <button type="button" className="btn" onClick={() => setNewPartner(true)}>
+            Новый партнёр
           </button>
         </div>
       </div>
 
-      <div className="gl-filters">
-        <input
-          className="gl-search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="поиск по партнёру, хэндлу или коду кампании…"
-        />
-        <select value={model} onChange={(e) => setModel(e.target.value)}>
-          <option value="all">Все модели</option>
-          {(meta?.models ?? []).map((m) => (
-            <option key={m.group} value={m.group}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <label className="gl-check">
-          <input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} />
-          только проблемные
-        </label>
-      </div>
-
-      {loading && <p className="muted">Загружаю…</p>}
       {error && <p className="pm-err">Ошибка: {error}</p>}
       {meta?.om_errors.map((e) => (
         <p key={e} className="pm-err">
@@ -166,62 +180,116 @@ export default function Glossary() {
         </p>
       ))}
 
-      {!loading &&
-        filtered.map((p) => {
-          const isOpen = open.has(p.id);
-          const problems = p.links.filter((l) => problem(l)).length;
-          return (
-            <section key={p.id} className={`gl-partner${isOpen ? " open" : ""}`}>
-              <header className="gl-partner-head" onClick={() => toggleOpen(p.id)}>
-                <span className="gl-caret">{isOpen ? "▾" : "▸"}</span>
-                <span className="gl-partner-name">{p.display_name}</span>
-                {p.telegram && <span className="gl-partner-tg">{p.telegram}</span>}
-                {p.source && <span className="gl-partner-src">{p.source}</span>}
-                <span className="gl-partner-count">{p.links.length} ссылок</span>
-                {problems > 0 && <span className="gl-chip-warn">{problems} с проблемой</span>}
-                <button
-                  type="button"
-                  className="gl-btn gl-btn-small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setAddFor(p);
-                  }}
-                >
-                  Добавить ссылки
-                </button>
-              </header>
+      <div className="an-card">
+        <div className="an-card-head">
+          <h3>
+            Партнёры <span className="faint">· {filtered.length}</span>
+          </h3>
+          {meta && (
+            <div className="an-card-head-actions gl-counters">
+              <span className="gl-count">{meta.links} ссылок</span>
+              {meta.no_cpf > 0 && <span className="gl-chip-warn">{meta.no_cpf} без CPF</span>}
+              {meta.untracked > 0 && <span className="gl-chip-warn">{meta.untracked} без привязки к OM</span>}
+              {meta.orphans.length > 0 && <span className="gl-chip-warn">{meta.orphans.length} без партнёра</span>}
+            </div>
+          )}
+        </div>
 
-              {isOpen && (
-                <div className="gl-links">
-                  {p.links.length === 0 && <p className="muted">Ссылок нет.</p>}
-                  {p.links.length > 0 && (
-                    <table className="gl-table">
-                      <thead>
-                        <tr>
-                          <th>Кампания</th>
-                          <th>Модель</th>
-                          <th>Тип</th>
-                          <th>CPF</th>
-                          <th>Источник</th>
-                          <th>Ссылка</th>
-                          <th>Статус</th>
-                          <th />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {p.links.map((l) => (
-                          <LinkRow key={l.id} link={l} problem={problem(l)} onChanged={() => void load()} />
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
+        <div className="an-table-wrap">
+          <table className="an-table gl-partners">
+            <thead>
+              <tr>
+                <th className="an-rownum-h" />
+                <th>Партнёр</th>
+                <th>Источник</th>
+                <th className="num">Ссылок</th>
+                <th>Проблемы</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr className="gl-norow">
+                  <td colSpan={6} className="muted">
+                    Загружаю…
+                  </td>
+                </tr>
               )}
-            </section>
-          );
-        })}
+              {!loading && filtered.length === 0 && (
+                <tr className="gl-norow">
+                  <td colSpan={6} className="muted">
+                    Ничего не найдено.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                filtered.map((p) => {
+                  const isOpen = open.has(p.id);
+                  const problems = p.links.filter((l) => problem(l)).length;
+                  return [
+                    <tr key={p.id} className={isOpen ? "gl-open" : undefined} onClick={() => toggleOpen(p.id)}>
+                      <td className="an-rownum gl-caret">{isOpen ? "▾" : "▸"}</td>
+                      <td>
+                        <div className="an-partner">
+                          <span className="an-ava">{initials(p.display_name)}</span>
+                          <div className="an-partner-txt">
+                            <span className="an-partner-name">{p.display_name}</span>
+                            {p.telegram && <span className="an-partner-tg">{p.telegram}</span>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="muted">{p.source ?? "—"}</td>
+                      <td className="num">{p.links.length}</td>
+                      <td>{problems > 0 ? <span className="gl-chip-warn">{problems}</span> : <span className="faint">—</span>}</td>
+                      <td className="gl-actions">
+                        <button
+                          type="button"
+                          className="btn ghost btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAddFor(p);
+                          }}
+                        >
+                          + ссылки
+                        </button>
+                      </td>
+                    </tr>,
+                    isOpen && (
+                      <tr key={`${p.id}-links`} className="gl-subrow">
+                        <td colSpan={6}>
+                          {p.links.length === 0 ? (
+                            <p className="gl-empty">Ссылок нет.</p>
+                          ) : (
+                            <table className="gl-table">
+                              <thead>
+                                <tr>
+                                  <th>Кампания</th>
+                                  <th>Модель</th>
+                                  <th>Тип</th>
+                                  <th>CPF</th>
+                                  <th>Источник</th>
+                                  <th>Ссылка</th>
+                                  <th>Статус</th>
+                                  <th />
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {p.links.map((l) => (
+                                  <LinkRow key={l.id} link={l} problem={problem(l)} onChanged={() => void load()} />
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    ),
+                  ];
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {!loading && filtered.length === 0 && <p className="muted">Ничего не найдено.</p>}
 
       {addFor && (
         <AddLinksModal
@@ -317,15 +385,15 @@ function LinkRow({
           {link.of_url.replace(/^https?:\/\/(www\.)?onlyfans\.com\//, "")}
         </a>
       </td>
-      <td>
+      <td className="gl-status">
         {problem ? (
           <span className="gl-chip-warn">{problem}</span>
         ) : (
           <span className="gl-chip-ok">ок</span>
         )}
       </td>
-      <td>
-        <button type="button" className="gl-btn gl-btn-ghost gl-btn-small" disabled={busy} onClick={remove}>
+      <td className="gl-actions">
+        <button type="button" className="btn ghost btn-sm" disabled={busy} onClick={remove}>
           Удалить
         </button>
       </td>
@@ -426,11 +494,11 @@ function AddLinksModal({
           <div className="pm-grid">
             <label>
               CPF* за фана
-              <input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="1.20" />
+              <input className="input" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="1.20" />
             </label>
             <label>
               Источник
-              <select value={source} onChange={(e) => setSource(e.target.value)}>
+              <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
                 {SOURCES.map((s) => (
                   <option key={s}>{s}</option>
                 ))}
@@ -445,7 +513,7 @@ function AddLinksModal({
             <span className="muted">выбрано: {selected.size}</span>
           </div>
           <input
-            className="pm-search"
+            className="input pm-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="поиск по коду…"
@@ -475,7 +543,7 @@ function AddLinksModal({
         </section>
 
         <div className="pm-actions">
-          <button type="button" className="pm-submit" disabled={busy} onClick={submit}>
+          <button type="button" className="btn" disabled={busy} onClick={submit}>
             {busy ? "Сохраняю…" : `Добавить ${selected.size || ""}`.trim()}
           </button>
         </div>
@@ -536,15 +604,15 @@ function NewPartnerModal({ onClose, onDone }: { onClose: () => void; onDone: () 
           <div className="pm-grid">
             <label>
               Имя*
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" />
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Имя" />
             </label>
             <label>
               Telegram
-              <input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" />
+              <input className="input" value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="@handle" />
             </label>
             <label>
               Источник
-              <select value={source} onChange={(e) => setSource(e.target.value)}>
+              <select className="input" value={source} onChange={(e) => setSource(e.target.value)}>
                 {SOURCES.map((s) => (
                   <option key={s}>{s}</option>
                 ))}
@@ -564,7 +632,7 @@ function NewPartnerModal({ onClose, onDone }: { onClose: () => void; onDone: () 
           </>
         )}
         <div className="pm-actions">
-          <button type="button" className="pm-submit" disabled={busy} onClick={submit}>
+          <button type="button" className="btn" disabled={busy} onClick={submit}>
             {busy ? "Создаю…" : "Создать"}
           </button>
         </div>
