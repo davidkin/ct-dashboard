@@ -31,6 +31,35 @@ function addDays(day: string, delta: number): string {
 }
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+type CampSortKey = "code" | "clicks" | "fans" | "cr" | "payout";
+
+/** Заголовок-сортировщик: клик меняет колонку, повторный — направление. */
+function SortTh({
+  label,
+  col,
+  sort,
+  onSort,
+  num,
+}: {
+  label: string;
+  col: CampSortKey;
+  sort: { key: CampSortKey; dir: "asc" | "desc" };
+  onSort: (s: { key: CampSortKey; dir: "asc" | "desc" }) => void;
+  num?: boolean;
+}) {
+  const active = sort.key === col;
+  return (
+    <th
+      className={`pd-sort-th${num ? " num" : ""}${active ? " active" : ""}`}
+      onClick={() => onSort({ key: col, dir: active && sort.dir === "asc" ? "desc" : "asc" })}
+      title="Сортировать"
+    >
+      {label}
+      <span className="pd-sort-caret">{active ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}</span>
+    </th>
+  );
+}
+
 interface CampAgg {
   link_id: number;
   code: string;
@@ -78,6 +107,12 @@ export default function PartnerDetail() {
       .finally(() => setLoading(false));
   }, [pid, from, to, reloadNonce, model]);
 
+  /* Сортировка таблицы кампаний: по умолчанию по номеру кампании, free перед paid. */
+  const [campSort, setCampSort] = useState<{ key: CampSortKey; dir: "asc" | "desc" }>({
+    key: "code",
+    dir: "asc",
+  });
+
   const campaigns = useMemo<CampAgg[]>(() => {
     if (!rep) return [];
     const agg = new Map<number, CampAgg>();
@@ -94,8 +129,30 @@ export default function PartnerDetail() {
         a.payout += cell.payout;
       }
     }
-    return [...agg.values()].sort((a, b) => b.payout - a.payout);
-  }, [rep]);
+    const list = [...agg.values()];
+    const sign = campSort.dir === "asc" ? 1 : -1;
+    const cr = (c: CampAgg) => (c.clicks > 0 ? c.fans / c.clicks : 0);
+    list.sort((a, b) => {
+      switch (campSort.key) {
+        case "clicks":
+          return sign * (a.clicks - b.clicks);
+        case "fans":
+          return sign * (a.fans - b.fans);
+        case "cr":
+          return sign * (cr(a) - cr(b));
+        case "payout":
+          return sign * (a.payout - b.payout);
+        default: {
+          /* free перед paid, внутри группы — по номеру, а не по алфавиту. */
+          const paidA = a.tier === "paid" ? 1 : 0;
+          const paidB = b.tier === "paid" ? 1 : 0;
+          if (paidA !== paidB) return sign * (paidA - paidB);
+          return sign * a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: "base" });
+        }
+      }
+    });
+    return list;
+  }, [rep, campSort]);
 
   const totals = useMemo(() => {
     const t = campaigns.reduce((s, c) => ({ clicks: s.clicks + c.clicks, fans: s.fans + c.fans, payout: s.payout + c.payout }), {
@@ -258,12 +315,12 @@ export default function PartnerDetail() {
             <table className="an-table">
               <thead>
                 <tr>
-                  <th>Кампания</th>
+                  <SortTh label="Кампания" col="code" sort={campSort} onSort={setCampSort} />
                   <th>Тир</th>
-                  <th className="num">Клики</th>
-                  <th className="num">Фаны</th>
-                  <th className="num">Конверт</th>
-                  <th className="num">Выплата</th>
+                  <SortTh label="Клики" col="clicks" sort={campSort} onSort={setCampSort} num />
+                  <SortTh label="Фаны" col="fans" sort={campSort} onSort={setCampSort} num />
+                  <SortTh label="Конверт" col="cr" sort={campSort} onSort={setCampSort} num />
+                  <SortTh label="Выплата" col="payout" sort={campSort} onSort={setCampSort} num />
                 </tr>
               </thead>
               <tbody>

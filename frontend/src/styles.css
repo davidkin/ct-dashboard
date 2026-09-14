@@ -1719,6 +1719,12 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .gl-head-filter { padding: 5px 8px; font-size: 12.5px; width: 100%; max-width: 190px; }
 .gl-filter-row th.num .gl-head-filter { margin-left: auto; display: block; max-width: 130px; }
 
+.pd-sort-th { cursor: pointer; user-select: none; white-space: nowrap; }
+.pd-sort-th:hover { color: var(--text); }
+.pd-sort-th.active { color: var(--accent); }
+.pd-sort-caret { margin-left: 5px; font-size: 9px; opacity: .55; }
+.pd-sort-th.active .pd-sort-caret { opacity: 1; }
+
 .gl-type-select {
   appearance: none; -webkit-appearance: none;
   display: inline-block; padding: 2px 20px 2px 9px; border-radius: 999px; font-size: 11px;
