@@ -303,37 +303,18 @@ export default function Glossary() {
                         </button>
                       </td>
                     </tr>,
-                    isOpen && (
-                      <tr key={`${p.id}-links`} className="gl-subrow">
-                        <td colSpan={6}>
-                          {p.links.length === 0 ? (
-                            <p className="gl-empty">Ссылок нет.</p>
-                          ) : (
-                            <div className="gl-sub">
-                            <table className="gl-table">
-                              <thead>
-                                <tr>
-                                  <th>Кампания</th>
-                                  <th>Модель</th>
-                                  <th>Тип</th>
-                                  <th>CPF</th>
-                                  <th>Источник</th>
-                                  <th>Ссылка</th>
-                                  <th className="gl-status-h">Статус</th>
-                                  <th className="gl-actions-h" />
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {p.links.map((l) => (
-                                  <LinkRow key={l.id} link={l} onChanged={() => void load()} />
-                                ))}
-                              </tbody>
-                            </table>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ),
+                    ...(isOpen
+                      ? p.links.length === 0
+                        ? [
+                            <tr key={`${p.id}-empty`} className="gl-link-row gl-norow">
+                              <td />
+                              <td colSpan={5} className="muted">
+                                Ссылок нет.
+                              </td>
+                            </tr>,
+                          ]
+                        : p.links.map((l) => <LinkRow key={l.id} link={l} onChanged={() => void load()} />)
+                      : []),
                   ];
                 })}
             </tbody>
@@ -404,14 +385,23 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
     }
   }
 
+  /* Колонки те же, что у таблицы партнёров: кампания под партнёром, источник
+     под источником, CPF в числовой колонке, статус под проблемами. */
   return (
-    <tr>
-      <td className="gl-code">{link.campaign_code}</td>
-      <td>{link.model ?? link.creator}</td>
+    <tr className="gl-link-row">
+      <td />
       <td>
-        <span className={`pm-tier pm-tier-${link.tier}`}>{link.tier}</span>
+        <div className="gl-link-main">
+          <span className="gl-code">{link.campaign_code}</span>
+          <span className={`pm-tier pm-tier-${link.tier}`}>{link.tier}</span>
+          <span className="gl-model">{link.model ?? link.creator}</span>
+        </div>
+        <a className="gl-link-url" href={link.of_url} target="_blank" rel="noreferrer">
+          {link.of_url.replace(/^https?:\/\/(www\.)?onlyfans\.com\//, "")}
+        </a>
       </td>
-      <td className="gl-cpf-cell">
+      <td className="muted">{link.source ?? "—"}</td>
+      <td className="num gl-cpf-cell">
         <span className="gl-cpf-wrap">
           <span className="gl-cpf-cur">$</span>
           <input
@@ -426,15 +416,7 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
         </span>
         {err && <div className="pm-err gl-inline-err">{err}</div>}
       </td>
-      <td>{link.source ?? "—"}</td>
-      <td className="gl-url">
-        <a href={link.of_url} target="_blank" rel="noreferrer">
-          {link.of_url.replace(/^https?:\/\/(www\.)?onlyfans\.com\//, "")}
-        </a>
-      </td>
-      <td className="gl-status">
-        {kind ? <span className="gl-chip-warn">{PROBLEM_LABEL[kind]}</span> : <span className="gl-chip-ok">ок</span>}
-      </td>
+      <td>{kind ? <span className="gl-chip-warn">{PROBLEM_LABEL[kind]}</span> : <span className="faint">—</span>}</td>
       <td className="gl-actions">
         <button
           type="button"
