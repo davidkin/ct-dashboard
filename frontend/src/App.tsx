@@ -19,9 +19,6 @@ export default function App() {
             <NavLink to="/" end className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
               Аналитика
             </NavLink>
-            <NavLink to="/traffic" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
-              Трафик
-            </NavLink>
             <NavLink to="/glossary" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
               Глоссарий
             </NavLink>

@@ -336,9 +336,9 @@ export default function Glossary() {
                             <span className="an-partner-name">
                               <Link
                                 className="gl-partner-link"
-                                to={`/traffic?partner=${p.id}`}
+                                to={`/partners/${p.id}`}
                                 onClick={(e) => e.stopPropagation()}
-                                title="Открыть таблицу трафика этого партнёра"
+                                title="Открыть карточку партнёра с его таблицей трафика"
                               >
                                 {p.display_name}
                               </Link>
@@ -431,6 +431,7 @@ function OmReportCell({ partner, onChanged }: { partner: GlossaryPartner; onChan
   const [editing, setEditing] = useState(false);
   const [url, setUrl] = useState(partner.om_report_url ?? "");
   const [busy, setBusy] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   async function save(e: React.SyntheticEvent) {
     e.stopPropagation();
@@ -444,8 +445,8 @@ function OmReportCell({ partner, onChanged }: { partner: GlossaryPartner; onChan
       await patchPartner(partner.id, { om_report_url: value || null });
       setEditing(false);
       onChanged();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+    } catch (e2) {
+      setSaveErr(e2 instanceof Error ? e2.message : String(e2));
     } finally {
       setBusy(false);
     }
@@ -453,6 +454,8 @@ function OmReportCell({ partner, onChanged }: { partner: GlossaryPartner; onChan
 
   if (editing) {
     return (
+      <>
+      {saveErr && <div className="gl-inline-err pm-err">{saveErr}</div>}
       <input
         className="input gl-om-input"
         autoFocus
@@ -470,6 +473,7 @@ function OmReportCell({ partner, onChanged }: { partner: GlossaryPartner; onChan
           }
         }}
       />
+      </>
     );
   }
 
@@ -523,25 +527,36 @@ function TypeSelect({
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const options = types.length ? types : ["In-house", "External"];
   const value = partner.type ?? "";
+  const tone = value.toLowerCase().includes("in-house") ? " in-house" : value ? " external" : "";
 
   async function change(e: React.ChangeEvent<HTMLSelectElement>) {
     e.stopPropagation();
     setBusy(true);
+    setErr(null);
     try {
       await patchPartner(partner.id, { type: e.target.value || null });
       onChanged();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : String(e2));
     } finally {
       setBusy(false);
     }
   }
 
+  if (err) {
+    return (
+      <span className="gl-inline-err pm-err" title={err}>
+        не сохранилось
+      </span>
+    );
+  }
+
   return (
     <select
-      className={`gl-type-select${value ? "" : " empty"}`}
+      className={`gl-type-select${tone}`}
       value={value}
       disabled={busy}
       onClick={(e) => e.stopPropagation()}
@@ -561,6 +576,7 @@ function TypeSelect({
 /** Статус партнёра: селект active / lost, сохраняется сразу при выборе. */
 function StatusTag({ partner, onChanged }: { partner: GlossaryPartner; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   /* Старый бэкенд поля не отдаёт — тогда селекта просто нет. */
   if (!partner.status) return null;
 
@@ -568,14 +584,23 @@ function StatusTag({ partner, onChanged }: { partner: GlossaryPartner; onChanged
     e.stopPropagation();
     const next = e.target.value === "active";
     setBusy(true);
+    setErr(null);
     try {
       await patchPartner(partner.id, { active: next });
       onChanged();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : String(err));
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : String(e2));
     } finally {
       setBusy(false);
     }
+  }
+
+  if (err) {
+    return (
+      <span className="gl-inline-err pm-err" title={err}>
+        не сохранилось
+      </span>
+    );
   }
 
   return (
