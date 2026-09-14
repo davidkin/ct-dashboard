@@ -55,7 +55,8 @@ export default function Glossary() {
   const [model, setModel] = useState("all");
   const [source, setSource] = useState("all");
   const [tier, setTier] = useState<"all" | "free" | "paid">("all");
-  const [status, setStatus] = useState<"all" | "active" | "lost">("all");
+  /* По умолчанию показываем только активных: потерянные партнёры только мешают. */
+  const [status, setStatus] = useState<"all" | "active" | "lost">("active");
   const [problemFilter, setProblemFilter] = useState<ProblemFilter>("all");
   const [open, setOpen] = useState<Set<number>>(new Set());
 
@@ -320,7 +321,17 @@ export default function Glossary() {
                         </div>
                       </td>
                       <td className="muted">{p.source ?? "—"}</td>
-                      <td className="num">{p.links.length}</td>
+                      <td className="num">
+                        {p.links.length}
+                        {p.status === "active" && p.links.length === 0 && (
+                          <span
+                            className="gl-alert"
+                            title="Партнёр активен, но у него нет ни одной ссылки — лить ему нечего"
+                          >
+                            !
+                          </span>
+                        )}
+                      </td>
                       <td>{problems > 0 ? <span className="gl-chip-warn">{problems}</span> : <span className="faint">—</span>}</td>
                       <td className="gl-om-cell">
                         <OmReportCell partner={p} onChanged={() => void load()} />
