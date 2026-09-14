@@ -777,6 +777,7 @@ export interface GlossaryPartner {
   display_name: string;
   glossary_name: string;
   telegram: string | null;
+  /** Тип партнёра: In-house / External. */
   type: string | null;
   source: string | null;
   cpf_free: number | null;

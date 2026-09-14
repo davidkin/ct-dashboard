@@ -144,6 +144,7 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
         display_name: p.display_name,
         glossary_name: p.glossary_name,
         telegram: p.telegram,
+        /* Тип партнёра из глоссария: In-house / External. */
         type: p.type,
         source: p.source,
         cpf_free: p.cpf_free,

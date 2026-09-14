@@ -80,7 +80,9 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
   });
 
   /* Список партнёров для выпадашки. Раньше он был зашит в код фронта, из-за
-     чего новые партнёры из глоссария в интерфейсе не появлялись. */
+     чего новые партнёры из глоссария в интерфейсе не появлялись.
+     LEFT JOIN, а не JOIN: партнёр, заведённый в глоссарии, должен получить свою
+     таблицу в «Трафике» сразу — ещё до того, как к нему привязали первую ссылку. */
   app.get<{ Querystring: { key?: string; model?: string } }>(
     "/api/export/partners",
     async (req, reply) => {
@@ -103,8 +105,10 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
                   (SELECT COALESCE(SUM(o.clicks),0) FROM daily_om_stats o
                     JOIN links l2 ON l2.id = o.link_id
                    WHERE l2.partner_id = p.id) AS clicks
-             FROM partners p JOIN links l ON l.partner_id = p.id
-            WHERE (@model IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
+             FROM partners p
+             LEFT JOIN links l ON l.partner_id = p.id
+                   AND (@model IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
+            WHERE COALESCE(p.archived, 0) = 0
             GROUP BY p.id, p.display_name, p.telegram
             ORDER BY clicks DESC, p.display_name COLLATE NOCASE`,
         )

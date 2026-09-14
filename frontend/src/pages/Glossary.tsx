@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   addGlossaryLinks,
   patchPartner,
@@ -57,6 +58,7 @@ export default function Glossary() {
   const [tier, setTier] = useState<"all" | "free" | "paid">("all");
   /* По умолчанию показываем только активных: потерянные партнёры только мешают. */
   const [status, setStatus] = useState<"all" | "active" | "lost">("active");
+  const [type, setType] = useState("all");
   const [problemFilter, setProblemFilter] = useState<ProblemFilter>("all");
   const [open, setOpen] = useState<Set<number>>(new Set());
 
@@ -83,6 +85,13 @@ export default function Glossary() {
   }, []);
 
   /** Источники, которые реально встречаются в данных — их и предлагаем в фильтре. */
+  /** Типы партнёров, которые реально встречаются: In-house / External. */
+  const types = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of partners) if (p.type) set.add(p.type);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [partners]);
+
   const sources = useMemo(() => {
     const set = new Set<string>();
     for (const p of partners) for (const l of p.links) if (l.source) set.add(l.source);
@@ -109,13 +118,14 @@ export default function Glossary() {
         return { ...p, links };
       })
       .filter((p) => status === "all" || p.status === status)
+      .filter((p) => type === "all" || (p.type ?? "") === type)
       .filter((p) => {
         if (p.links.length > 0) return true;
         if (problemFilter !== "all" || model !== "all" || source !== "all" || tier !== "all") return false;
         if (!q) return true;
         return p.display_name.toLowerCase().includes(q) || (p.telegram ?? "").toLowerCase().includes(q);
       });
-  }, [partners, search, model, source, tier, problemFilter, status]);
+  }, [partners, search, model, source, tier, problemFilter, status, type]);
 
   const toggleOpen = (id: number) =>
     setOpen((s) => {
@@ -214,6 +224,7 @@ export default function Glossary() {
               <tr>
                 <th className="an-rownum-h" />
                 <th>Партнёр</th>
+                <th>Статус</th>
                 <th>Источник</th>
                 <th className="num">Ссылок</th>
                 <th>Проблемы</th>
@@ -233,16 +244,26 @@ export default function Glossary() {
                         placeholder="Партнёр, хэндл, код…"
                       />
                     </div>
-                    <select
-                      className="input gl-head-filter"
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as "all" | "active" | "lost")}
-                    >
-                      <option value="all">Все статусы</option>
-                      <option value="active">Active</option>
-                      <option value="lost">Lost</option>
+                    <select className="input gl-head-filter" value={type} onChange={(e) => setType(e.target.value)}>
+                      <option value="all">Все типы партнёров</option>
+                      {types.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
                     </select>
                   </div>
+                </th>
+                <th>
+                  <select
+                    className="input gl-head-filter"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as "all" | "active" | "lost")}
+                  >
+                    <option value="all">Все статусы</option>
+                    <option value="active">Active</option>
+                    <option value="lost">Lost</option>
+                  </select>
                 </th>
                 <th>
                   <select
@@ -289,14 +310,14 @@ export default function Glossary() {
             <tbody>
               {loading && (
                 <tr className="gl-norow">
-                  <td colSpan={7} className="muted">
+                  <td colSpan={8} className="muted">
                     Загружаю…
                   </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr className="gl-norow">
-                  <td colSpan={7} className="muted">
+                  <td colSpan={8} className="muted">
                     Ничего не найдено.
                   </td>
                 </tr>
@@ -313,26 +334,39 @@ export default function Glossary() {
                           <span className="an-ava">{initials(p.display_name)}</span>
                           <div className="an-partner-txt">
                             <span className="an-partner-name">
-                              {p.display_name}
-                              <StatusTag partner={p} onChanged={() => void load()} />
+                              <Link
+                                className="gl-partner-link"
+                                to={`/traffic?partner=${p.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                title="Открыть таблицу трафика этого партнёра"
+                              >
+                                {p.display_name}
+                              </Link>
+                              <TypeSelect partner={p} types={types} onChanged={() => void load()} />
                             </span>
                             {p.telegram && <span className="an-partner-tg">{p.telegram}</span>}
                           </div>
                         </div>
                       </td>
+                      <td>
+                        <StatusTag partner={p} onChanged={() => void load()} />
+                      </td>
                       <td className="muted">{p.source ?? "—"}</td>
-                      <td className="num">
-                        {p.links.length}
-                        {p.status === "active" && p.links.length === 0 && (
+                      <td className="num">{p.links.length}</td>
+                      <td>
+                        {problems > 0 ? (
+                          <span className="gl-chip-warn">{problems}</span>
+                        ) : p.status === "active" && p.links.length === 0 ? (
                           <span
                             className="gl-alert"
                             title="Партнёр активен, но у него нет ни одной ссылки — лить ему нечего"
                           >
                             !
                           </span>
+                        ) : (
+                          <span className="faint">—</span>
                         )}
                       </td>
-                      <td>{problems > 0 ? <span className="gl-chip-warn">{problems}</span> : <span className="faint">—</span>}</td>
                       <td className="gl-om-cell">
                         <OmReportCell partner={p} onChanged={() => void load()} />
                       </td>
@@ -354,7 +388,7 @@ export default function Glossary() {
                         ? [
                             <tr key={`${p.id}-empty`} className="gl-link-row gl-norow">
                               <td />
-                              <td colSpan={6} className="muted">
+                              <td colSpan={7} className="muted">
                                 Ссылок нет.
                               </td>
                             </tr>,
@@ -478,6 +512,52 @@ function OmReportCell({ partner, onChanged }: { partner: GlossaryPartner; onChan
   );
 }
 
+/** Тип партнёра: In-house / External. Правится прямо в строке. */
+function TypeSelect({
+  partner,
+  types,
+  onChanged,
+}: {
+  partner: GlossaryPartner;
+  types: string[];
+  onChanged: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const options = types.length ? types : ["In-house", "External"];
+  const value = partner.type ?? "";
+
+  async function change(e: React.ChangeEvent<HTMLSelectElement>) {
+    e.stopPropagation();
+    setBusy(true);
+    try {
+      await patchPartner(partner.id, { type: e.target.value || null });
+      onChanged();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <select
+      className={`gl-type-select${value ? "" : " empty"}`}
+      value={value}
+      disabled={busy}
+      onClick={(e) => e.stopPropagation()}
+      onChange={change}
+      title="Тип партнёра"
+    >
+      <option value="">тип не задан</option>
+      {options.map((t) => (
+        <option key={t} value={t}>
+          {t}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /** Статус партнёра: селект active / lost, сохраняется сразу при выборе. */
 function StatusTag({ partner, onChanged }: { partner: GlossaryPartner; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -574,6 +654,7 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
           )}
         </div>
       </td>
+      <td />
       <td className="muted">{link.source ?? "—"}</td>
       <td className="num gl-cpf-cell">
         <span className={`gl-cpf-wrap${kind === "no_cpf" || err ? " warn" : ""}`}>
