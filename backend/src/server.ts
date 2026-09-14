@@ -15,6 +15,7 @@ import { registerWebhookRoutes } from "./routes/webhooks";
 import { registerDailyRoutes } from "./routes/daily";
 import { registerExportRoutes } from "./routes/export";
 import { registerManageRoutes } from "./routes/manage";
+import { registerGlossaryRoutes } from "./routes/glossary";
 import { startScheduler } from "./of/scheduler";
 import { startDailyCapture } from "./daily/scheduler";
 
@@ -44,6 +45,7 @@ async function main() {
   await registerDailyRoutes(app);
   await registerExportRoutes(app);
   await registerManageRoutes(app);
+  await registerGlossaryRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
   /* В проде за nginx ставь HOST=127.0.0.1 — тогда 3001 не торчит наружу. */

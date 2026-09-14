@@ -1623,3 +1623,53 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .integrity-table th { color: var(--muted); font-weight: 500; }
 .integrity-dim { color: var(--muted); }
 .integrity-bad { color: #d4665c; font-weight: 600; }
+
+/* === Глоссарий: словарь партнёр → ссылки === */
+.gl-page { display: flex; flex-direction: column; gap: var(--space); }
+.gl-title { font-size: 20px; font-weight: 700; margin: 0; }
+
+.gl-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space); flex-wrap: wrap; }
+.gl-head-actions { display: flex; gap: var(--space-sm); }
+.gl-meta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+.gl-btn {
+  background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent);
+  border-radius: var(--radius-sm); padding: 7px 14px; font-size: 13px; cursor: pointer;
+}
+.gl-btn:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
+.gl-btn:disabled { opacity: .55; cursor: default; }
+.gl-btn-ghost { background: transparent; color: var(--text); border-color: var(--line); }
+.gl-btn-ghost:hover { background: var(--surface2); border-color: var(--accent); color: var(--text); }
+.gl-btn-small { padding: 4px 10px; font-size: 12px; }
+
+.gl-filters { display: flex; gap: var(--space-sm); align-items: center; flex-wrap: wrap; }
+.gl-search { flex: 1 1 320px; min-width: 220px; }
+.gl-filters select { min-width: 150px; }
+.gl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+.gl-partner { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.gl-partner-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px; cursor: pointer;
+}
+.gl-partner.open .gl-partner-head { border-bottom: 1px solid var(--lineSoft); }
+.gl-partner-head:hover { background: var(--surface2); }
+.gl-caret { color: var(--muted); width: 12px; }
+.gl-partner-name { font-weight: 600; }
+.gl-partner-tg, .gl-partner-src, .gl-partner-count { font-size: 12px; color: var(--muted); }
+.gl-partner-head .gl-btn { margin-left: auto; }
+
+.gl-links { padding: 10px 16px 16px; overflow-x: auto; }
+.gl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.gl-table th, .gl-table td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--lineSoft); }
+.gl-table th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.gl-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.gl-url a { color: var(--muted); }
+.gl-url a:hover { color: var(--accent); }
+.gl-row-warn td { background: rgba(255,179,0,.06); }
+.gl-cpf { width: 76px; padding: 3px 6px; font-size: 13px; }
+.gl-inline-err { font-size: 11px; margin-top: 2px; }
+
+.gl-chip-warn { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: rgba(255,179,0,.18); color: var(--warn); }
+.gl-chip-ok { font-size: 11px; padding: 1px 8px; border-radius: 10px; background: rgba(0,175,240,.12); color: var(--muted); }
+.gl-errors { margin-top: var(--space-sm); padding-left: 18px; font-size: 13px; color: var(--bad); }

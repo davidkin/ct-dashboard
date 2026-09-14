@@ -627,6 +627,8 @@ export interface OmLink {
   clicks: number;
   is_active: boolean;
   tier: "free" | "paid";
+  /** Модель, на аккаунте которой живёт ссылка ("Lily Free" / "Lily Vip"). */
+  creator: string;
   assigned_to: string | null;
 }
 
@@ -748,3 +750,115 @@ export const api = {
     return json.data as Partner;
   },
 };
+
+/* === Глоссарий: словарь партнёр → ссылки === */
+
+export interface GlossaryLink {
+  id: number;
+  campaign_code: string;
+  creator: string;
+  model: string | null;
+  tier: "free" | "paid";
+  of_url: string;
+  cpf: number | null;
+  /** В какое поле писать правку CPF (у платных бывает и cpf_paid). */
+  cpf_field: "cpf_free" | "cpf_paid";
+  source: string | null;
+  of_tracking_link_id: number | null;
+  tracked: boolean;
+  /** null, если страница загружена без сверки с OM (verify=0). */
+  in_om: boolean | null;
+  retired: boolean;
+  created_at: string;
+}
+
+export interface GlossaryPartner {
+  id: number;
+  display_name: string;
+  glossary_name: string;
+  telegram: string | null;
+  type: string | null;
+  source: string | null;
+  cpf_free: number | null;
+  cpf_paid: number | null;
+  archived: boolean;
+  links: GlossaryLink[];
+}
+
+export interface GlossaryMeta {
+  partners: number;
+  links: number;
+  untracked: number;
+  no_cpf: number;
+  orphans: Array<{ id: number; campaign_code: string; creator: string; partner_id: number }>;
+  models: Array<{ group: string; label: string; creators: string[] }>;
+  om_errors: string[];
+}
+
+export async function fetchGlossary(verify = false): Promise<{ data: GlossaryPartner[]; meta: GlossaryMeta }> {
+  const res = await fetch(manageUrl(`/glossary${verify ? "?verify=1" : ""}`), { headers: adminHeaders() });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json as { data: GlossaryPartner[]; meta: GlossaryMeta };
+}
+
+export interface NewGlossaryLink {
+  campaign_code: string;
+  creator: string;
+  cpf: number;
+  source?: string | null;
+}
+
+export interface GlossaryLinkError {
+  campaign_code: string;
+  error: string;
+}
+
+/** Ошибки валидации приходят списком: сервер не пишет ничего, пока не пройдут все строки. */
+export class GlossaryValidationError extends Error {
+  constructor(message: string, readonly errors: GlossaryLinkError[]) {
+    super(message);
+  }
+}
+
+export async function addGlossaryLinks(
+  partner_id: number,
+  links: NewGlossaryLink[],
+): Promise<{ partner_id: number; created: number }> {
+  const res = await fetch(manageUrl("/glossary/links"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ partner_id, links }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new GlossaryValidationError(json?.error || `${res.status}`, json?.errors ?? []);
+  }
+  return json.data;
+}
+
+export async function createGlossaryPartner(body: {
+  display_name: string;
+  telegram?: string | null;
+  type?: string | null;
+  source?: string | null;
+  force?: boolean;
+}): Promise<GlossaryPartner> {
+  const res = await fetch(manageUrl("/glossary/partners"), {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as GlossaryPartner;
+}
+
+export async function deleteGlossaryLink(id: number): Promise<void> {
+  const res = await fetch(manageUrl(`/glossary/links/${id}`), {
+    method: "DELETE",
+    headers: adminHeaders(),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+}

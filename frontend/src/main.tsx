@@ -6,6 +6,7 @@ import { ModelProvider } from "./hooks/useModel";
 import Analytics from "./pages/Analytics";
 import CreatorPage from "./pages/CreatorPage";
 import TrafficSheet from "./pages/TrafficSheet";
+import Glossary from "./pages/Glossary";
 import PartnerDetail from "./pages/PartnerDetail";
 import "./styles.css";
 
@@ -17,6 +18,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
           <Route element={<App />}>
             <Route index element={<Analytics />} />
             <Route path="traffic" element={<TrafficSheet />} />
+            <Route path="glossary" element={<Glossary />} />
             <Route path="partners/:id" element={<PartnerDetail />} />
             <Route path="creators/:slug" element={<CreatorPage />} />
           </Route>

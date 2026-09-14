@@ -7,7 +7,13 @@
 import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
 import { listTrackingLinks } from "../om/client";
-import { getOMAccountForCreator } from "../config/creators";
+import {
+  creatorsInModelGroup,
+  getCreatorType,
+  getOMAccountForCreator,
+  isRetiredCreator,
+  listModels,
+} from "../config/creators";
 import { lastCompletedWeekStart } from "../lib/tz";
 
 interface NewLink {
@@ -22,11 +28,16 @@ interface NewLink {
   revshare_pct?: number | null;
 }
 
-/** creator по tier/коду (у Couture все линки идут на Nekoletta Free/Vip). */
+/** creator по tier/коду: модель берём первую живую из конфига, а не захардкоженную. */
 function creatorFor(l: NewLink): string {
   if (l.creator) return l.creator;
   const paid = l.tier === "paid" || l.campaign_code.startsWith("camp_paid");
-  return paid ? "Nekoletta Vip" : "Nekoletta Free";
+  const wanted = paid ? "vip" : "free";
+  const model = listModels()[0];
+  const creator = model
+    ? creatorsInModelGroup(model.group).find((c) => getCreatorType(c) === wanted)
+    : undefined;
+  return creator ?? (paid ? "Nekoletta Vip" : "Nekoletta Free");
 }
 
 export async function registerManageRoutes(app: FastifyInstance): Promise<void> {
@@ -37,10 +48,17 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
    * для селекта при создании партнёра. Помечаем уже привязанные к партнёру.
    */
   app.get("/api/om/tracking-links", async (_req, reply) => {
-    const accts = [
-      { id: process.env.ONLYMONSTER_ACCOUNT_FREE, tier: "free" as const },
-      { id: process.env.ONLYMONSTER_ACCOUNT_VIP, tier: "paid" as const },
-    ].filter((a): a is { id: string; tier: "free" | "paid" } => !!a.id);
+    /* Аккаунты берём из конфига моделей: захардкоженные ONLYMONSTER_ACCOUNT_FREE/VIP —
+       это Nekoletta, к которой доступ отобран, и её ссылки в селекте бесполезны. */
+    const accts = listModels()
+      .flatMap((m) => creatorsInModelGroup(m.group))
+      .filter((creator) => !isRetiredCreator(creator))
+      .map((creator) => ({
+        id: getOMAccountForCreator(creator),
+        tier: (getCreatorType(creator) === "vip" ? "paid" : "free") as "free" | "paid",
+        creator,
+      }))
+      .filter((a): a is { id: string; tier: "free" | "paid"; creator: string } => !!a.id);
 
     const assigned = new Map<number, string>();
     for (const r of db
@@ -68,6 +86,7 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
             clicks: l.clicks,
             is_active: l.is_active,
             tier,
+            creator: a.creator,
             assigned_to: assigned.get(Number(l.id)) ?? null,
           });
         }

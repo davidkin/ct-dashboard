@@ -22,6 +22,9 @@ export default function App() {
             <NavLink to="/traffic" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
               Трафик
             </NavLink>
+            <NavLink to="/glossary" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
+              Глоссарий
+            </NavLink>
           </nav>
         </div>
         <div className="app-header-actions">
