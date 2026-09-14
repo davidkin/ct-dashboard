@@ -1698,14 +1698,34 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .gl-om-edit:hover, .gl-om-add:hover { color: var(--text); border-color: var(--line); background: var(--surface2); }
 .gl-om-input { width: 260px; padding: 5px 8px; font-size: 12px; }
 
-.gl-tag {
-  font-size: 10px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
-  padding: 1px 7px; border-radius: 999px; cursor: pointer; border: 1px solid transparent;
+.gl-filter-row th {
+  background: var(--surface); border-top: 1px solid var(--lineSoft);
+  padding: 8px 14px; font-weight: 400; text-transform: none; letter-spacing: 0;
 }
-.gl-tag-active { background: rgba(70,190,130,.14); color: #4bbd85; }
-.gl-tag-lost { background: rgba(212,102,92,.14); color: #d4665c; }
-.gl-tag:hover { border-color: currentColor; }
-.gl-tag:disabled { opacity: .5; cursor: default; }
+.gl-filter-cell { display: flex; align-items: center; gap: 8px; }
+.gl-head-search { flex: 1 1 200px; max-width: 280px; }
+.gl-head-search .input { padding: 5px 10px 5px 30px; font-size: 12.5px; }
+.gl-head-search .input-icon { font-size: 13px; }
+.gl-head-filter { padding: 5px 8px; font-size: 12.5px; width: 100%; max-width: 190px; }
+.gl-filter-row th.num .gl-head-filter { margin-left: auto; display: block; max-width: 130px; }
+
+.gl-status-select {
+  appearance: none; -webkit-appearance: none;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+  padding: 2px 18px 2px 8px; border-radius: 999px; cursor: pointer; border: 1px solid transparent;
+  background-repeat: no-repeat; background-position: right 6px center; background-size: 7px;
+}
+.gl-status-active {
+  background-color: rgba(70,190,130,.14); color: #4bbd85;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'><path d='M0 0h8L4 5z' fill='%234bbd85'/></svg>");
+}
+.gl-status-lost {
+  background-color: rgba(212,102,92,.14); color: #d4665c;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'><path d='M0 0h8L4 5z' fill='%23d4665c'/></svg>");
+}
+.gl-status-select:hover { border-color: currentColor; }
+.gl-status-select:disabled { opacity: .5; cursor: default; }
+.gl-status-select option { background: var(--surface); color: var(--text); text-transform: none; font-weight: 500; }
 
 .gl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .gl-errors { margin-top: var(--space-sm); padding-left: 18px; font-size: 13px; color: var(--bad); }

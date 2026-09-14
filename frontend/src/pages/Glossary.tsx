@@ -160,58 +160,6 @@ export default function Glossary() {
             </button>
           ))}
         </div>
-        <div className="seg">
-          {(["all", "free", "paid"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={`seg-btn${tier === t ? " active" : ""}`}
-              onClick={() => setTier(t)}
-            >
-              {t === "all" ? "Все типы" : t === "free" ? "Free" : "Paid"}
-            </button>
-          ))}
-        </div>
-        <div className="seg">
-          {(["all", "active", "lost"] as const).map((st) => (
-            <button
-              key={st}
-              type="button"
-              className={`seg-btn${status === st ? " active" : ""}`}
-              onClick={() => setStatus(st)}
-            >
-              {st === "all" ? "Все" : st === "active" ? "Active" : "Lost"}
-            </button>
-          ))}
-        </div>
-        <select className="input gl-filter" value={source} onChange={(e) => setSource(e.target.value)}>
-          <option value="all">Все источники</option>
-          {sources.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input gl-filter"
-          value={problemFilter}
-          onChange={(e) => setProblemFilter(e.target.value as ProblemFilter)}
-        >
-          <option value="all">Все ссылки</option>
-          <option value="any">Только проблемные</option>
-          <option value="no_cpf">Без CPF</option>
-          <option value="untracked">Без привязки к OM</option>
-          <option value="not_in_om">Нет в OnlyMonster</option>
-        </select>
-        <div className="input-with-icon an-search gl-search">
-          <span className="input-icon">⌕</span>
-          <input
-            className="input"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Партнёр, хэндл или код кампании…"
-          />
-        </div>
         <div className="gl-toolbar-right">
           <button
             type="button"
@@ -269,6 +217,71 @@ export default function Glossary() {
                 <th className="num">Ссылок</th>
                 <th>Проблемы</th>
                 <th>Отчёт OM</th>
+                <th />
+              </tr>
+              <tr className="gl-filter-row">
+                <th />
+                <th>
+                  <div className="gl-filter-cell">
+                    <div className="input-with-icon gl-head-search">
+                      <span className="input-icon">⌕</span>
+                      <input
+                        className="input"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Партнёр, хэндл, код…"
+                      />
+                    </div>
+                    <select
+                      className="input gl-head-filter"
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value as "all" | "active" | "lost")}
+                    >
+                      <option value="all">Все статусы</option>
+                      <option value="active">Active</option>
+                      <option value="lost">Lost</option>
+                    </select>
+                  </div>
+                </th>
+                <th>
+                  <select
+                    className="input gl-head-filter"
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                  >
+                    <option value="all">Все источники</option>
+                    {sources.map((src) => (
+                      <option key={src} value={src}>
+                        {src}
+                      </option>
+                    ))}
+                  </select>
+                </th>
+                <th className="num">
+                  <select
+                    className="input gl-head-filter"
+                    value={tier}
+                    onChange={(e) => setTier(e.target.value as "all" | "free" | "paid")}
+                  >
+                    <option value="all">Все типы</option>
+                    <option value="free">Free</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                </th>
+                <th>
+                  <select
+                    className="input gl-head-filter"
+                    value={problemFilter}
+                    onChange={(e) => setProblemFilter(e.target.value as ProblemFilter)}
+                  >
+                    <option value="all">Все ссылки</option>
+                    <option value="any">Только проблемные</option>
+                    <option value="no_cpf">Без CPF</option>
+                    <option value="untracked">Без привязки к OM</option>
+                    <option value="not_in_om">Нет в OnlyMonster</option>
+                  </select>
+                </th>
+                <th />
                 <th />
               </tr>
             </thead>
@@ -454,18 +467,18 @@ function OmReportCell({ partner, onChanged }: { partner: GlossaryPartner; onChan
   );
 }
 
-/** Тег партнёра: клик переключает active ↔ lost. */
+/** Статус партнёра: селект active / lost, сохраняется сразу при выборе. */
 function StatusTag({ partner, onChanged }: { partner: GlossaryPartner; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
-  /* Старый бэкенд поля не отдаёт — тогда тега просто нет, а не "undefined". */
+  /* Старый бэкенд поля не отдаёт — тогда селекта просто нет. */
   if (!partner.status) return null;
-  const lost = partner.status === "lost";
 
-  async function toggle(e: React.MouseEvent) {
+  async function change(e: React.ChangeEvent<HTMLSelectElement>) {
     e.stopPropagation();
+    const next = e.target.value === "active";
     setBusy(true);
     try {
-      await patchPartner(partner.id, { active: lost });
+      await patchPartner(partner.id, { active: next });
       onChanged();
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
@@ -475,15 +488,17 @@ function StatusTag({ partner, onChanged }: { partner: GlossaryPartner; onChanged
   }
 
   return (
-    <button
-      type="button"
-      className={`gl-tag gl-tag-${partner.status}`}
+    <select
+      className={`gl-status-select gl-status-${partner.status}`}
+      value={partner.status}
       disabled={busy}
-      onClick={toggle}
-      title={lost ? "Партнёр помечен как потерянный — нажми, чтобы вернуть в active" : "Партнёр активен — нажми, чтобы пометить как lost"}
+      onClick={(e) => e.stopPropagation()}
+      onChange={change}
+      title="Статус партнёра"
     >
-      {partner.status}
-    </button>
+      <option value="active">active</option>
+      <option value="lost">lost</option>
+    </select>
   );
 }
 
