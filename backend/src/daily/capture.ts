@@ -29,8 +29,9 @@ export async function captureDailyClicks(
 ): Promise<DailyCaptureResult> {
   const db = getDb();
   const started = Date.now();
-  /* Джоб в 13:30 финализирует ПРЕДЫДУЩИЙ день — как ручной ввод в таблицу
-     (партнёр в 13:30 вписывает данные за вчера). Поэтому метим снепшот вчерашним днём. */
+  /* Джоб финализирует ПРЕДЫДУЩИЙ день: запускается ночью (DAILY_CAPTURE_AT,
+     сейчас 00:05 по TRACKING_TZ), когда сутки уже закрылись. Поэтому метим
+     снепшот вчерашним днём. */
   const day = addDays(todayLocal(), -1);
   const errors: string[] = [];
   let omSynced = false;
