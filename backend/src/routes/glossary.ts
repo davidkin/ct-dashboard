@@ -54,6 +54,11 @@ interface NewLinkInput {
   of_tracking_link_id?: number | null;
 }
 
+/** Натуральная сортировка: camp_11 должен идти после camp_2, а не после camp_101. */
+function naturalCmp(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
 /** Ссылка платная по коду: это же правило используют отчёты. */
 function isPaidCode(code: string): boolean {
   return code.startsWith("camp_paid");
@@ -93,7 +98,7 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
       .prepare(
         `SELECT id, partner_id, campaign_code, creator, of_url, cpf_free, cpf_paid,
                 revshare_pct, source, of_tracking_link_id, created_at
-         FROM links ORDER BY campaign_code COLLATE NOCASE`,
+         FROM links`,
       )
       .all() as LinkRow[];
 
@@ -135,6 +140,15 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
       const list = byPartner.get(l.partner_id);
       if (list) list.push(l);
       else byPartner.set(l.partner_id, [l]);
+    }
+    /* Внутри партнёра: сначала free, потом paid, и в каждой группе по номеру кампании. */
+    for (const list of byPartner.values()) {
+      list.sort((a, b) => {
+        const paidA = isPaidCode(a.campaign_code) ? 1 : 0;
+        const paidB = isPaidCode(b.campaign_code) ? 1 : 0;
+        if (paidA !== paidB) return paidA - paidB;
+        return naturalCmp(a.campaign_code, b.campaign_code);
+      });
     }
 
     const data = partners.map((p) => {
