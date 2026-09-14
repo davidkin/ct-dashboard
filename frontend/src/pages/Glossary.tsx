@@ -396,9 +396,16 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
           <span className={`pm-tier pm-tier-${link.tier}`}>{link.tier}</span>
           <span className="gl-model">{link.model ?? link.creator}</span>
         </div>
-        <a className="gl-link-url" href={link.of_url} target="_blank" rel="noreferrer">
-          {link.of_url.replace(/^https?:\/\/(www\.)?onlyfans\.com\//, "")}
-        </a>
+        <div className="gl-link-sub">
+          <a className="gl-link-url" href={link.of_url} target="_blank" rel="noreferrer" title="Открыть ссылку OnlyFans">
+            {link.of_url}
+          </a>
+          {link.of_tracking_link_id !== null && (
+            <span className="gl-om-id" title="id трекинг-ссылки в OnlyMonster — по нему сверяется ночной сбор">
+              OM {link.of_tracking_link_id}
+            </span>
+          )}
+        </div>
       </td>
       <td className="muted">{link.source ?? "—"}</td>
       <td className="num gl-cpf-cell">
