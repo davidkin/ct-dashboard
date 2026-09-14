@@ -475,6 +475,7 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
       cpf_free?: number | null;
       cpf_paid?: number | null;
       note?: string | null;
+      om_report_url?: string | null;
       archived?: boolean | number | null;
       active?: boolean | number | null;
     };
@@ -483,7 +484,7 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
     const id = Number(req.params.id);
     const fields: string[] = [];
     const values: (string | number | null)[] = [];
-    for (const key of ["monthly_fee", "notes", "display_name", "telegram", "source", "wallet", "network", "cpf_free", "cpf_paid", "note"] as const) {
+    for (const key of ["monthly_fee", "notes", "display_name", "telegram", "source", "wallet", "network", "cpf_free", "cpf_paid", "note", "om_report_url"] as const) {
       if (req.body[key] !== undefined) {
         fields.push(`${key} = ?`);
         values.push(req.body[key] ?? null);

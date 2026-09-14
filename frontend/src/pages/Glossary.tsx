@@ -268,20 +268,21 @@ export default function Glossary() {
                 <th>Источник</th>
                 <th className="num">Ссылок</th>
                 <th>Проблемы</th>
+                <th>Отчёт OM</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr className="gl-norow">
-                  <td colSpan={6} className="muted">
+                  <td colSpan={7} className="muted">
                     Загружаю…
                   </td>
                 </tr>
               )}
               {!loading && filtered.length === 0 && (
                 <tr className="gl-norow">
-                  <td colSpan={6} className="muted">
+                  <td colSpan={7} className="muted">
                     Ничего не найдено.
                   </td>
                 </tr>
@@ -308,6 +309,9 @@ export default function Glossary() {
                       <td className="muted">{p.source ?? "—"}</td>
                       <td className="num">{p.links.length}</td>
                       <td>{problems > 0 ? <span className="gl-chip-warn">{problems}</span> : <span className="faint">—</span>}</td>
+                      <td className="gl-om-cell">
+                        <OmReportCell partner={p} onChanged={() => void load()} />
+                      </td>
                       <td className="gl-actions">
                         <button
                           type="button"
@@ -326,7 +330,7 @@ export default function Glossary() {
                         ? [
                             <tr key={`${p.id}-empty`} className="gl-link-row gl-norow">
                               <td />
-                              <td colSpan={5} className="muted">
+                              <td colSpan={6} className="muted">
                                 Ссылок нет.
                               </td>
                             </tr>,
@@ -361,6 +365,92 @@ export default function Glossary() {
         />
       )}
     </div>
+  );
+}
+
+/** Ссылка на shared-отчёт партнёра в OnlyMonster: открыть или вписать/заменить. */
+function OmReportCell({ partner, onChanged }: { partner: GlossaryPartner; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [url, setUrl] = useState(partner.om_report_url ?? "");
+  const [busy, setBusy] = useState(false);
+
+  async function save(e: React.SyntheticEvent) {
+    e.stopPropagation();
+    const value = url.trim();
+    if (value === (partner.om_report_url ?? "")) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await patchPartner(partner.id, { om_report_url: value || null });
+      setEditing(false);
+      onChanged();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        className="input gl-om-input"
+        autoFocus
+        value={url}
+        disabled={busy}
+        placeholder="https://dashboard.onlymonster.ai/shared-report/…"
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setUrl(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void save(e);
+          if (e.key === "Escape") {
+            setUrl(partner.om_report_url ?? "");
+            setEditing(false);
+          }
+        }}
+      />
+    );
+  }
+
+  return partner.om_report_url ? (
+    <span className="gl-om-wrap">
+      <a
+        className="gl-om-link"
+        href={partner.om_report_url}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        title="Открыть отчёт партнёра в OnlyMonster"
+      >
+        отчёт
+      </a>
+      <button
+        type="button"
+        className="gl-om-edit"
+        title="Изменить ссылку"
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditing(true);
+        }}
+      >
+        ✎
+      </button>
+    </span>
+  ) : (
+    <button
+      type="button"
+      className="gl-om-add"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Вставить ссылку на shared-отчёт партнёра из OnlyMonster"
+    >
+      + отчёт
+    </button>
   );
 }
 
@@ -482,6 +572,7 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
           <span className="faint">—</span>
         )}
       </td>
+      <td />
       <td className="gl-actions">
         <button
           type="button"

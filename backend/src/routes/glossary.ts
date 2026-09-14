@@ -42,6 +42,7 @@ interface PartnerRow {
   cpf_paid: number | null;
   archived: number;
   active: number;
+  om_report_url: string | null;
 }
 
 interface NewLinkInput {
@@ -83,7 +84,7 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
     const partners = db
       .prepare(
         `SELECT id, glossary_name, display_name, telegram, type, source, cpf_free, cpf_paid,
-                COALESCE(archived, 0) AS archived, COALESCE(active, 1) AS active
+                COALESCE(archived, 0) AS archived, COALESCE(active, 1) AS active, om_report_url
          FROM partners ORDER BY display_name COLLATE NOCASE`,
       )
       .all() as PartnerRow[];
@@ -150,6 +151,8 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
         archived: !!p.archived,
         /* Тег партнёра: active — работает, lost — отвалился. Правится из глоссария. */
         status: p.active ? "active" : "lost",
+        /* Ссылка на shared-отчёт партнёра в кабинете OnlyMonster. */
+        om_report_url: p.om_report_url,
         links: own.map((l) => {
           const paid = isPaidCode(l.campaign_code);
           const cpf = paid ? (l.cpf_paid ?? l.cpf_free) : l.cpf_free;

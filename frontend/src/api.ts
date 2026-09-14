@@ -784,6 +784,8 @@ export interface GlossaryPartner {
   archived: boolean;
   /** Тег партнёра: active — работает, lost — отвалился. */
   status: "active" | "lost";
+  /** Shared-отчёт партнёра в кабинете OnlyMonster (для сверки цифр). */
+  om_report_url: string | null;
   links: GlossaryLink[];
 }
 

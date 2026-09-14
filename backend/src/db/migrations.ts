@@ -194,6 +194,13 @@ const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
     `,
   },
+  {
+    id: "004_partner_om_report",
+    sql: `
+    /* Ссылка на shared-отчёт партнёра в кабинете OnlyMonster — для сверки цифр глазами. */
+    ALTER TABLE partners ADD COLUMN om_report_url TEXT;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
