@@ -1728,12 +1728,12 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'><path d='M0 0h8L4 5z' fill='%238A9099'/></svg>");
 }
 .gl-type-select.in-house {
-  color: #5DD39E; border-color: rgba(93,211,158,.4); background-color: rgba(93,211,158,.08);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'><path d='M0 0h8L4 5z' fill='%235DD39E'/></svg>");
+  color: #E48ABF; border-color: rgba(228,138,191,.42); background-color: rgba(228,138,191,.10);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'><path d='M0 0h8L4 5z' fill='%23E48ABF'/></svg>");
 }
 .gl-type-select.external {
-  color: #FF9F89; border-color: rgba(255,159,137,.4); background-color: rgba(255,159,137,.08);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'><path d='M0 0h8L4 5z' fill='%23FF9F89'/></svg>");
+  color: #5AA9E6; border-color: rgba(90,169,230,.42); background-color: rgba(90,169,230,.10);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'><path d='M0 0h8L4 5z' fill='%235AA9E6'/></svg>");
 }
 .gl-type-select:disabled { opacity: .6; cursor: default; }
 .gl-type-select option { background: var(--surface); color: var(--text); }
