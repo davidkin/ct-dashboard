@@ -788,6 +788,8 @@ export interface GlossaryPartner {
 export interface GlossaryMeta {
   partners: number;
   links: number;
+  /** Сколько ссылок скрыто (модели, выключенные в конфиге) — данные в базе остаются. */
+  hidden_links: number;
   untracked: number;
   no_cpf: number;
   orphans: Array<{ id: number; campaign_code: string; creator: string; partner_id: number }>;

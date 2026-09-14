@@ -25,6 +25,22 @@ function initials(name: string): string {
   return letters.toUpperCase();
 }
 
+type ProblemFilter = "all" | "no_cpf" | "untracked" | "not_in_om" | "any";
+
+/** Что именно не так со ссылкой. null — всё в порядке. */
+function problemKind(l: GlossaryLink): Exclude<ProblemFilter, "all" | "any"> | null {
+  if (!l.cpf) return "no_cpf";
+  if (!l.tracked) return "untracked";
+  if (l.in_om === false) return "not_in_om";
+  return null;
+}
+
+const PROBLEM_LABEL: Record<Exclude<ProblemFilter, "all" | "any">, string> = {
+  no_cpf: "нет CPF",
+  untracked: "нет привязки к OM",
+  not_in_om: "нет в OnlyMonster",
+};
+
 const SOURCES = ["Instagram", "Facebook", "TikTok", "Telegram", "X", "Reddit", "Other"];
 
 export default function Glossary() {
@@ -36,7 +52,9 @@ export default function Glossary() {
 
   const [search, setSearch] = useState("");
   const [model, setModel] = useState("all");
-  const [onlyProblems, setOnlyProblems] = useState(false);
+  const [source, setSource] = useState("all");
+  const [tier, setTier] = useState<"all" | "free" | "paid">("all");
+  const [problemFilter, setProblemFilter] = useState<ProblemFilter>("all");
   const [open, setOpen] = useState<Set<number>>(new Set());
 
   const [addFor, setAddFor] = useState<GlossaryPartner | null>(null);
@@ -61,12 +79,12 @@ export default function Glossary() {
     else setLoading(false);
   }, []);
 
-  const problem = (l: GlossaryLink): string | null => {
-    if (!l.cpf) return "нет CPF";
-    if (!l.tracked && !l.retired) return "нет привязки к OM";
-    if (l.in_om === false && !l.retired) return "нет в OnlyMonster";
-    return null;
-  };
+  /** Источники, которые реально встречаются в данных — их и предлагаем в фильтре. */
+  const sources = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of partners) for (const l of p.links) if (l.source) set.add(l.source);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [partners]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -74,7 +92,10 @@ export default function Glossary() {
       .map((p) => {
         const links = p.links.filter((l) => {
           if (model !== "all" && l.model !== model) return false;
-          if (onlyProblems && !problem(l)) return false;
+          if (source !== "all" && (l.source ?? "") !== source) return false;
+          if (tier !== "all" && l.tier !== tier) return false;
+          if (problemFilter === "any" && !problemKind(l)) return false;
+          if (problemFilter !== "all" && problemFilter !== "any" && problemKind(l) !== problemFilter) return false;
           if (!q) return true;
           return (
             l.campaign_code.toLowerCase().includes(q) ||
@@ -86,11 +107,11 @@ export default function Glossary() {
       })
       .filter((p) => {
         if (p.links.length > 0) return true;
-        if (onlyProblems || model !== "all") return false;
+        if (problemFilter !== "all" || model !== "all" || source !== "all" || tier !== "all") return false;
         if (!q) return true;
         return p.display_name.toLowerCase().includes(q) || (p.telegram ?? "").toLowerCase().includes(q);
       });
-  }, [partners, search, model, onlyProblems]);
+  }, [partners, search, model, source, tier, problemFilter]);
 
   const toggleOpen = (id: number) =>
     setOpen((s) => {
@@ -136,14 +157,37 @@ export default function Glossary() {
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          className={`seg-btn${onlyProblems ? " active" : ""}`}
-          onClick={() => setOnlyProblems((v) => !v)}
-          title="Показать только ссылки без CPF или без привязки к OnlyMonster"
+        <div className="seg">
+          {(["all", "free", "paid"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`seg-btn${tier === t ? " active" : ""}`}
+              onClick={() => setTier(t)}
+            >
+              {t === "all" ? "Все типы" : t === "free" ? "Free" : "Paid"}
+            </button>
+          ))}
+        </div>
+        <select className="input gl-filter" value={source} onChange={(e) => setSource(e.target.value)}>
+          <option value="all">Все источники</option>
+          {sources.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <select
+          className="input gl-filter"
+          value={problemFilter}
+          onChange={(e) => setProblemFilter(e.target.value as ProblemFilter)}
         >
-          Только проблемные
-        </button>
+          <option value="all">Все ссылки</option>
+          <option value="any">Только проблемные</option>
+          <option value="no_cpf">Без CPF</option>
+          <option value="untracked">Без привязки к OM</option>
+          <option value="not_in_om">Нет в OnlyMonster</option>
+        </select>
         <div className="input-with-icon an-search gl-search">
           <span className="input-icon">⌕</span>
           <input
@@ -188,6 +232,11 @@ export default function Glossary() {
           {meta && (
             <div className="an-card-head-actions gl-counters">
               <span className="gl-count">{meta.links} ссылок</span>
+              {meta.hidden_links > 0 && (
+                <span className="gl-count" title="Ссылки отключённых моделей остаются в базе, но в глоссарии не показываются">
+                  скрыто {meta.hidden_links}
+                </span>
+              )}
               {meta.no_cpf > 0 && <span className="gl-chip-warn">{meta.no_cpf} без CPF</span>}
               {meta.untracked > 0 && <span className="gl-chip-warn">{meta.untracked} без привязки к OM</span>}
               {meta.orphans.length > 0 && <span className="gl-chip-warn">{meta.orphans.length} без партнёра</span>}
@@ -225,7 +274,7 @@ export default function Glossary() {
               {!loading &&
                 filtered.map((p) => {
                   const isOpen = open.has(p.id);
-                  const problems = p.links.filter((l) => problem(l)).length;
+                  const problems = p.links.filter((l) => problemKind(l)).length;
                   return [
                     <tr key={p.id} className={isOpen ? "gl-open" : undefined} onClick={() => toggleOpen(p.id)}>
                       <td className="an-rownum gl-caret">{isOpen ? "▾" : "▸"}</td>
@@ -276,7 +325,7 @@ export default function Glossary() {
                               </thead>
                               <tbody>
                                 {p.links.map((l) => (
-                                  <LinkRow key={l.id} link={l} problem={problem(l)} onChanged={() => void load()} />
+                                  <LinkRow key={l.id} link={l} onChanged={() => void load()} />
                                 ))}
                               </tbody>
                             </table>
@@ -316,15 +365,8 @@ export default function Glossary() {
   );
 }
 
-function LinkRow({
-  link,
-  problem,
-  onChanged,
-}: {
-  link: GlossaryLink;
-  problem: string | null;
-  onChanged: () => void;
-}) {
+function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => void }) {
+  const kind = problemKind(link);
   const [cpf, setCpf] = useState(link.cpf === null ? "" : String(link.cpf));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -363,7 +405,7 @@ function LinkRow({
   }
 
   return (
-    <tr className={problem ? "gl-row-warn" : undefined}>
+    <tr>
       <td className="gl-code">{link.campaign_code}</td>
       <td>{link.model ?? link.creator}</td>
       <td>
@@ -391,11 +433,7 @@ function LinkRow({
         </a>
       </td>
       <td className="gl-status">
-        {problem ? (
-          <span className="gl-chip-warn">{problem}</span>
-        ) : (
-          <span className="gl-chip-ok">ок</span>
-        )}
+        {kind ? <span className="gl-chip-warn">{PROBLEM_LABEL[kind]}</span> : <span className="gl-chip-ok">ок</span>}
       </td>
       <td className="gl-actions">
         <button

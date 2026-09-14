@@ -1626,7 +1626,8 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 
 /* === Глоссарий: словарь партнёр → ссылки === */
 .gl-toolbar-right { display: flex; gap: 8px; margin-left: auto; }
-.gl-search { flex: 1 1 260px; min-width: 200px; max-width: 420px; }
+.gl-search { flex: 1 1 220px; min-width: 180px; max-width: 360px; }
+.gl-filter { padding: 7px 10px; font-size: 13px; }
 .btn.ghost.active { border-color: var(--accent); color: var(--accent); }
 .btn-sm { padding: 4px 10px; font-size: 12px; }
 

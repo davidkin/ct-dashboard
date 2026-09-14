@@ -78,7 +78,7 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
    * ?verify=1 — дополнительно сверить каждую ссылку с OnlyMonster (медленнее:
    * ходит в OM по одному разу на каждую живую модель).
    */
-  app.get<{ Querystring: { verify?: string } }>("/api/glossary", async (req) => {
+  app.get<{ Querystring: { verify?: string; all?: string } }>("/api/glossary", async (req) => {
     const partners = db
       .prepare(
         `SELECT id, glossary_name, display_name, telegram, type, source, cpf_free, cpf_paid, archived
@@ -86,13 +86,25 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
       )
       .all() as PartnerRow[];
 
-    const links = db
+    const allLinks = db
       .prepare(
         `SELECT id, partner_id, campaign_code, creator, of_url, cpf_free, cpf_paid,
                 revshare_pct, source, of_tracking_link_id, created_at
          FROM links ORDER BY campaign_code COLLATE NOCASE`,
       )
       .all() as LinkRow[];
+
+    /* Скрытые модели (Nekoletta) из глоссария убираем: данные остаются в базе,
+       но в интерфейсе их нет. ?all=1 — служебный обход для разбора старых данных. */
+    const visibleGroups = new Set(listModels().map((m) => m.group));
+    const links =
+      req.query.all === "1"
+        ? allLinks
+        : allLinks.filter((l) => {
+            const group = getModelGroup(l.creator);
+            return group !== null && visibleGroups.has(group);
+          });
+    const hiddenLinks = allLinks.length - links.length;
 
     /* Сверка с OM опциональна: без неё страница открывается мгновенно. */
     let omByCreator: Map<string, Set<string>> | null = null;
@@ -170,6 +182,7 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
       meta: {
         partners: data.length,
         links: links.length,
+        hidden_links: hiddenLinks,
         untracked: links.filter((l) => l.of_tracking_link_id === null).length,
         no_cpf: links.filter((l) => !l.cpf_free && !l.cpf_paid).length,
         orphans,
