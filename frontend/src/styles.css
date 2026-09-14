@@ -1674,6 +1674,8 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
   color: var(--text); font-variant-numeric: tabular-nums;
 }
+.gl-cpf-wrap.warn .gl-cpf { border-color: var(--warn); color: var(--warn); }
+.gl-cpf-wrap.warn .gl-cpf-cur { color: var(--warn); }
 .gl-cpf:hover { border-color: var(--muted); }
 .gl-cpf:focus { border-color: var(--accent); outline: none; }
 .gl-inline-err { font-size: 11px; margin-top: 3px; }

@@ -409,10 +409,11 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
       </td>
       <td className="muted">{link.source ?? "—"}</td>
       <td className="num gl-cpf-cell">
-        <span className="gl-cpf-wrap">
+        <span className={`gl-cpf-wrap${kind === "no_cpf" || err ? " warn" : ""}`}>
           <span className="gl-cpf-cur">$</span>
           <input
             className="gl-cpf"
+            title={kind === "no_cpf" ? "CPF не задан — выплата по этой ссылке считается нулём" : undefined}
             value={cpf}
             disabled={busy}
             onChange={(e) => setCpf(e.target.value)}
@@ -423,7 +424,13 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
         </span>
         {err && <div className="pm-err gl-inline-err">{err}</div>}
       </td>
-      <td>{kind ? <span className="gl-chip-warn">{PROBLEM_LABEL[kind]}</span> : <span className="faint">—</span>}</td>
+      <td>
+        {kind && kind !== "no_cpf" ? (
+          <span className="gl-chip-warn">{PROBLEM_LABEL[kind]}</span>
+        ) : (
+          <span className="faint">—</span>
+        )}
+      </td>
       <td className="gl-actions">
         <button
           type="button"
