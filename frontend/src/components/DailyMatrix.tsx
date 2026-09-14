@@ -30,15 +30,21 @@ function DateCell({ day, className, style }: { day: string; className: string; s
 }
 
 /* data-атрибуты для выделяемой ячейки (пусто, если значения нет — не выделяется) */
+/* data-free / data-paid — вклад ячейки в каждый тир. У ячейки кампании это всё
+   значение целиком, у ячейки Total — её free- и vip-части за этот день. */
 const dsel = (
   key: string,
   value: number | null | undefined,
   kind: "int" | "money",
-  tier?: "free" | "paid",
-): Record<string, string> =>
-  value != null
-    ? { "data-k": key, "data-v": String(value), "data-kind": kind, ...(tier ? { "data-tier": tier } : {}) }
-    : {};
+  parts?: { free: number; paid: number } | "free" | "paid",
+): Record<string, string> => {
+  if (value == null) return {};
+  const base = { "data-k": key, "data-v": String(value), "data-kind": kind };
+  if (parts === "free") return { ...base, "data-free": String(value), "data-paid": "0" };
+  if (parts === "paid") return { ...base, "data-free": "0", "data-paid": String(value) };
+  if (parts) return { ...base, "data-free": String(parts.free), "data-paid": String(parts.paid) };
+  return base;
+};
 
 type Campaigns = DailyReport["campaigns"];
 type Rows = DailyReport["rows"];
@@ -69,7 +75,10 @@ interface SelStats {
    data-kind. Класс подсветки вешаем на DOM напрямую — без ре-рендера тысяч ячеек. */
 function useCellSelection(resetDeps: unknown[]) {
   const selRef = useRef(
-    new Map<string, { value: number; kind: string; tier: "free" | "paid" | null; el: HTMLElement }>(),
+    new Map<
+      string,
+      { value: number; kind: string; free: number | null; paid: number | null; el: HTMLElement }
+    >(),
   );
   const draggingRef = useRef(false);
   const [stats, setStats] = useState<SelStats | null>(null);
@@ -77,16 +86,15 @@ function useCellSelection(resetDeps: unknown[]) {
   const recompute = () => {
     const items = [...selRef.current.values()];
     if (!items.length) return setStats(null);
-    const byTier = (t: "free" | "paid") =>
-      items.filter((i) => i.tier === t).reduce((s, i) => s + i.value, 0);
-    const has = (t: "free" | "paid") => items.some((i) => i.tier === t);
+    /* Разбивку показываем, только если её несут все выделенные ячейки:
+       иначе сумма частей не сойдётся с общей и собьёт с толку. */
+    const split = items.every((i) => i.free !== null && i.paid !== null);
     setStats({
       count: items.length,
       sum: items.reduce((s, i) => s + i.value, 0),
       money: items.every((i) => i.kind === "money"),
-      /* Разбивка показывается только если в выделении есть ячейки кампаний. */
-      free: has("free") ? byTier("free") : null,
-      paid: has("paid") ? byTier("paid") : null,
+      free: split ? items.reduce((s, i) => s + (i.free ?? 0), 0) : null,
+      paid: split ? items.reduce((s, i) => s + (i.paid ?? 0), 0) : null,
     });
   };
   const clear = () => {
@@ -99,10 +107,12 @@ function useCellSelection(resetDeps: unknown[]) {
     if (!k || selRef.current.has(k)) return;
     const value = parseFloat(td.dataset.v ?? "");
     if (Number.isNaN(value)) return;
+    const part = (raw: string | undefined) => (raw == null ? null : Number(raw));
     selRef.current.set(k, {
       value,
       kind: td.dataset.kind ?? "int",
-      tier: (td.dataset.tier as "free" | "paid" | undefined) ?? null,
+      free: part(td.dataset.free),
+      paid: part(td.dataset.paid),
       el: td,
     });
     td.classList.add("dm-sel");
@@ -390,6 +400,31 @@ function TotalMatrix({
   rows: Rows;
   totalTier: "all" | "free" | "paid";
 }) {
+  /* Вклад free- и vip-кампаний в каждый день: нужен и для переключателя Total,
+     и для разбивки в окне выделения. */
+  const dayParts = useMemo(() => {
+    const map = new Map<
+      string,
+      { free: { clicks: number; subs: number; payout: number }; paid: { clicks: number; subs: number; payout: number } }
+    >();
+    for (const r of rows) {
+      const acc = {
+        free: { clicks: 0, subs: 0, payout: 0 },
+        paid: { clicks: 0, subs: 0, payout: 0 },
+      };
+      for (const c of campaigns) {
+        const cell = r.cells[String(c.link_id)];
+        if (!cell) continue;
+        const side = c.tier === "paid" ? acc.paid : acc.free;
+        side.clicks += cell.clicks ?? 0;
+        side.subs += cell.subs;
+        side.payout += cell.payout;
+      }
+      map.set(r.date, acc);
+    }
+    return map;
+  }, [campaigns, rows]);
+
   /* Дневной Total по выбранному тиру: сервер считает только общий, поэтому для
      free/vip складываем ячейки нужных кампаний прямо здесь. */
   const dayTotals = useMemo(() => {
@@ -491,14 +526,32 @@ function TotalMatrix({
           {rows.map((r) => (
             <tr key={r.date} className={`${isMonday(r.date) ? "dm-week-start" : ""}${isWeekend(r.date) ? " dm-weekend" : ""}`}>
               <DateCell day={r.date} className="dm-frz dm-date-col dm-date" style={{ left: 0, width: DATE_W, minWidth: DATE_W }} />
-              <td {...frz(0)} {...dsel(`tc-${r.date}`, dayTotals.get(r.date)?.clicks, "int")}>
+              <td
+                {...frz(0)}
+                {...dsel(`tc-${r.date}`, dayTotals.get(r.date)?.clicks, "int", {
+                  free: dayParts.get(r.date)?.free.clicks ?? 0,
+                  paid: dayParts.get(r.date)?.paid.clicks ?? 0,
+                })}
+              >
                 {intFmt(dayTotals.get(r.date)?.clicks ?? null)}
               </td>
-              <td {...frz(1, "dm-b")} {...dsel(`tf-${r.date}`, dayTotals.get(r.date)?.subs, "int")}>
+              <td
+                {...frz(1, "dm-b")}
+                {...dsel(`tf-${r.date}`, dayTotals.get(r.date)?.subs, "int", {
+                  free: dayParts.get(r.date)?.free.subs ?? 0,
+                  paid: dayParts.get(r.date)?.paid.subs ?? 0,
+                })}
+              >
                 {intFmt(dayTotals.get(r.date)?.subs ?? null)}
               </td>
               <td {...frz(2, "muted")}>{pct(dayTotals.get(r.date)?.cr ?? null)}</td>
-              <td {...frz(3, "accent")} {...dsel(`tp-${r.date}`, dayTotals.get(r.date)?.payout, "money")}>
+              <td
+                {...frz(3, "accent")}
+                {...dsel(`tp-${r.date}`, dayTotals.get(r.date)?.payout, "money", {
+                  free: dayParts.get(r.date)?.free.payout ?? 0,
+                  paid: dayParts.get(r.date)?.paid.payout ?? 0,
+                })}
+              >
                 {dayTotals.get(r.date)?.payout != null ? money(dayTotals.get(r.date)!.payout!) : ""}
               </td>
               {campaigns.map((c) => {
@@ -572,8 +625,8 @@ function RawMatrix({ campaigns, rows }: { campaigns: Campaigns; rows: Rows }) {
                 const cell = r.cells[String(c.link_id)];
                 return (
                   <Fragment key={c.link_id}>
-                    <td className="num dm-grp-sep" {...dsel(`rc${c.link_id}cl-${r.date}`, cell?.clicks, "int")}>{intFmt(cell?.clicks ?? null)}</td>
-                    <td className="num" {...dsel(`rc${c.link_id}f-${r.date}`, cell ? cell.subs : null, "int")}>{cell?.subs ? cell.subs : cell ? 0 : ""}</td>
+                    <td className="num dm-grp-sep" {...dsel(`rc${c.link_id}cl-${r.date}`, cell?.clicks, "int", c.tier)}>{intFmt(cell?.clicks ?? null)}</td>
+                    <td className="num" {...dsel(`rc${c.link_id}f-${r.date}`, cell ? cell.subs : null, "int", c.tier)}>{cell?.subs ? cell.subs : cell ? 0 : ""}</td>
                   </Fragment>
                 );
               })}
