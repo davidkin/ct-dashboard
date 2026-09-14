@@ -270,8 +270,8 @@ export default function Glossary() {
                                   <th>CPF</th>
                                   <th>Источник</th>
                                   <th>Ссылка</th>
-                                  <th>Статус</th>
-                                  <th />
+                                  <th className="gl-status-h">Статус</th>
+                                  <th className="gl-actions-h" />
                                 </tr>
                               </thead>
                               <tbody>
