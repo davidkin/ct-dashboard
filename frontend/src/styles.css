@@ -1647,6 +1647,7 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .an-table tbody tr.gl-open { background: var(--surface2); }
 .an-table tbody tr.gl-norow, .an-table tbody tr.gl-norow:hover { background: none; cursor: default; }
 .an-table td.gl-actions { text-align: right; white-space: nowrap; }
+.an-table td.gl-actions > button + button { margin-left: 6px; }
 .gl-empty { color: var(--muted); font-size: 13px; padding: 14px 20px; margin: 0; }
 
 /* строки ссылок внутри таблицы партнёров — колонки те же, поэтому всё сходится */
@@ -1712,16 +1713,22 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
   vertical-align: middle;
 }
 
+/* Строка фильтров — та же сетка колонок, что у заголовка, поэтому каждый
+   контрол растягивается на всю свою ячейку (width:100%) и высота у всех
+   одинаковая: иначе при разных max-width колонки выглядят "лесенкой". */
 .gl-filter-row th {
   background: var(--surface); border-top: 1px solid var(--lineSoft);
-  padding: 8px 14px; font-weight: 400; text-transform: none; letter-spacing: 0;
+  padding: 8px 12px; font-weight: 400; text-transform: none; letter-spacing: 0;
+  vertical-align: middle;
 }
 .gl-filter-cell { display: flex; align-items: center; gap: 8px; }
-.gl-head-search { flex: 1 1 200px; max-width: 280px; }
-.gl-head-search .input { padding: 5px 10px 5px 30px; font-size: 12.5px; }
+.gl-head-search { flex: 1 1 auto; min-width: 0; }
+/* Селект типа партнёра сидит в одной ячейке с поиском — своя ширина, не 100% (иначе спорит с поиском за место). */
+.gl-filter-cell .gl-head-filter { flex: 0 0 168px; width: 168px; }
+.gl-head-search .input { width: 100%; box-sizing: border-box; padding: 6px 10px 6px 30px; font-size: 12.5px; height: 30px; }
 .gl-head-search .input-icon { font-size: 13px; }
-.gl-head-filter { padding: 5px 8px; font-size: 12.5px; width: 100%; max-width: 190px; }
-.gl-filter-row th.num .gl-head-filter { margin-left: auto; display: block; max-width: 130px; }
+.gl-head-filter { padding: 6px 8px; font-size: 12.5px; width: 100%; height: 30px; box-sizing: border-box; }
+.gl-filter-row th.num .gl-head-filter { text-align: right; }
 
 .dm-sum-tiers {
   display: flex; gap: 14px; font-size: 12px; color: var(--muted);
@@ -1807,12 +1814,7 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .cabinet-shell { min-height: 100vh; background: var(--bg); }
 .cabinet-title { font-size: 15px; font-weight: 700; margin-right: 4px; }
 
-/* === Кнопка "Кабинет" в глоссарии === */
-.gl-share-wrap { position: relative; display: inline-block; margin-right: 6px; }
-.gl-share-pop {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
-  display: flex; align-items: center; gap: 6px; padding: 10px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.35); white-space: nowrap;
-}
-.gl-share-input { width: 260px; font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* === Модалка "Кабинет" в глоссарии === */
+.gl-share-modal { max-width: 480px; }
+.gl-share-row { display: flex; gap: 8px; margin: 14px 0; }
+.gl-share-input { flex: 1; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

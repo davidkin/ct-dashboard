@@ -372,7 +372,7 @@ export default function Glossary() {
                         <OmReportCell partner={p} onChanged={() => void load()} />
                       </td>
                       <td className="gl-actions">
-                        <ShareLinkButton partnerId={p.id} />
+                        <ShareLinkButton partnerId={p.id} partnerName={p.display_name} />
                         <button
                           type="button"
                           className="btn ghost btn-sm"
@@ -431,41 +431,69 @@ export default function Glossary() {
 /** Личный кабинет траффера: секретная ссылка на его же карточку, без логина —
     ровно как shared report в OnlyMonster. Генерируется по клику, копируется,
     и отзывается (старая ссылка перестаёт открываться). */
-function ShareLinkButton({ partnerId }: { partnerId: number }) {
+/**
+ * Кнопка + модалка вместо popover: таблица партнёров прокручивается по
+ * горизонтали (overflow-x: auto), а это в CSS заодно клипает и вертикальный
+ * оverflow — всплывающее окно у самой кнопки было бы невидимым. Модалка живёт
+ * поверх всего экрана и от этого не зависит.
+ */
+function ShareLinkButton({ partnerId, partnerName }: { partnerId: number; partnerName: string }) {
   const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="btn ghost btn-sm"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        title="Ссылка на личный кабинет"
+      >
+        Кабинет
+      </button>
+      {open && <ShareLinkModal partnerId={partnerId} partnerName={partnerName} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function ShareLinkModal({
+  partnerId,
+  partnerName,
+  onClose,
+}: {
+  partnerId: number;
+  partnerName: string;
+  onClose: () => void;
+}) {
   const [link, setLink] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function reveal(e: React.MouseEvent) {
-    e.stopPropagation();
-    setOpen((v) => !v);
-    if (link || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const token = await getShareLink(partnerId);
-      setLink(`${window.location.origin}/cabinet/${token}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
+  useEffect(() => {
+    let alive = true;
+    getShareLink(partnerId)
+      .then((token) => alive && setLink(`${window.location.origin}/cabinet/${token}`))
+      .catch((err) => alive && setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => alive && setBusy(false));
+    return () => {
+      alive = false;
+    };
+  }, [partnerId]);
 
-  async function copy(e: React.MouseEvent) {
-    e.stopPropagation();
+  async function copy() {
     if (!link) return;
     await navigator.clipboard.writeText(link).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
-  async function revoke(e: React.MouseEvent) {
-    e.stopPropagation();
+  async function revoke() {
     if (!confirm("Отозвать ссылку кабинета? Старая перестанет открываться.")) return;
     setBusy(true);
+    setError(null);
     try {
       await revokeShareLink(partnerId);
       setLink(null);
@@ -477,28 +505,55 @@ function ShareLinkButton({ partnerId }: { partnerId: number }) {
   }
 
   return (
-    <span className="gl-share-wrap">
-      <button type="button" className="btn ghost btn-sm" onClick={reveal} title="Ссылка на личный кабинет">
-        Кабинет
-      </button>
-      {open && (
-        <div className="gl-share-pop" onClick={(e) => e.stopPropagation()}>
-          {busy && !link && <span className="muted">Готовлю ссылку…</span>}
-          {error && <span className="pm-err">{error}</span>}
-          {link && (
-            <>
-              <input className="input gl-share-input" readOnly value={link} onFocus={(e) => e.target.select()} />
-              <button type="button" className="btn ghost btn-sm" onClick={copy}>
-                {copied ? "Скопировано" : "Копировать"}
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal pm-wrap gl-share-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose} title="закрыть">
+          ✕
+        </button>
+        <h2>Кабинет «{partnerName}»</h2>
+        <p className="muted">
+          Ссылка открывает read-only таблицу трафика этого партнёра без логина — ровно как shared report в
+          OnlyMonster.
+        </p>
+
+        {busy && !link && <p className="muted">Готовлю ссылку…</p>}
+        {error && <p className="pm-err">{error}</p>}
+
+        {link && (
+          <div className="gl-share-row">
+            <input className="input gl-share-input" readOnly value={link} onFocus={(e) => e.target.select()} />
+            <button type="button" className="btn" onClick={copy}>
+              {copied ? "Скопировано" : "Копировать"}
+            </button>
+          </div>
+        )}
+
+        {!busy && (
+          <div className="pm-actions">
+            {link ? (
+              <button type="button" className="btn ghost" onClick={revoke}>
+                Отозвать ссылку
               </button>
-              <button type="button" className="btn ghost btn-sm" onClick={revoke} disabled={busy}>
-                Отозвать
+            ) : (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setBusy(true);
+                  setError(null);
+                  getShareLink(partnerId)
+                    .then((token) => setLink(`${window.location.origin}/cabinet/${token}`))
+                    .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+                    .finally(() => setBusy(false));
+                }}
+              >
+                Создать заново
               </button>
-            </>
-          )}
-        </div>
-      )}
-    </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
