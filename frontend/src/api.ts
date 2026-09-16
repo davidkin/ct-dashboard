@@ -328,6 +328,7 @@ export interface DailyCampaign {
   revshare: number | null;
   partner_id: number | null;
   partner_name: string | null;
+  of_url: string;
 }
 export interface DailyTierTotals {
   free: { clicks: number; fans: number };

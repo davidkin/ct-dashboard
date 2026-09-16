@@ -26,6 +26,7 @@ export interface DailyCampaign {
   revshare: number | null;
   partner_id: number | null;
   partner_name: string | null;
+  of_url: string;
 }
 
 /** Итог по клики+фаны (для скоркардов и снапшот-блока). */
@@ -131,7 +132,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
   /* === компании (ссылки) + их CPF + партнёр-владелец === */
   const linkRows = db
     .prepare(
-      `SELECT l.id AS link_id, l.campaign_code, l.creator, l.cpf_free, l.cpf_paid,
+      `SELECT l.id AS link_id, l.campaign_code, l.creator, l.of_url, l.cpf_free, l.cpf_paid,
               l.revshare_pct, l.partner_id, p.display_name AS partner_name,
               p.cpf_free AS p_cpf_free, p.cpf_paid AS p_cpf_paid
        FROM links l
@@ -144,6 +145,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       link_id: number;
       campaign_code: string;
       creator: string;
+      of_url: string;
       cpf_free: number | null;
       cpf_paid: number | null;
       revshare_pct: number | null;
@@ -167,6 +169,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       revshare: r.revshare_pct,
       partner_id: r.partner_id,
       partner_name: r.partner_name,
+      of_url: r.of_url,
     });
   }
 

@@ -14,6 +14,7 @@ import { useModel } from "../hooks/useModel";
 import DailyMatrix from "../components/DailyMatrix";
 import DateRangePicker from "../components/DateRangePicker";
 import OmReconcile from "../components/OmReconcile";
+import { aggregateCampaigns, campaignTotals, CampSort, DEFAULT_CAMP_SORT } from "../lib/campaignAgg";
 
 /* Профиль партнёра (дизайн, экран 5). Данные — через export-токен (combined),
    поэтому работает на проде. Заметка/статус/архив — write через админ-креды. */
@@ -32,10 +33,8 @@ function addDays(day: string, delta: number): string {
 }
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-type CampSortKey = "code" | "clicks" | "fans" | "cr" | "payout";
-
 /** Заголовок-сортировщик: клик меняет колонку, повторный — направление. */
-function SortTh({
+export function SortTh({
   label,
   col,
   sort,
@@ -43,9 +42,9 @@ function SortTh({
   num,
 }: {
   label: string;
-  col: CampSortKey;
-  sort: { key: CampSortKey; dir: "asc" | "desc" };
-  onSort: (s: { key: CampSortKey; dir: "asc" | "desc" }) => void;
+  col: CampSort["key"];
+  sort: CampSort;
+  onSort: (s: CampSort) => void;
   num?: boolean;
 }) {
   const active = sort.key === col;
@@ -59,15 +58,6 @@ function SortTh({
       <span className="pd-sort-caret">{active ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}</span>
     </th>
   );
-}
-
-interface CampAgg {
-  link_id: number;
-  code: string;
-  tier: "free" | "paid";
-  clicks: number;
-  fans: number;
-  payout: number;
 }
 
 export default function PartnerDetail() {
@@ -109,60 +99,9 @@ export default function PartnerDetail() {
   }, [pid, from, to, reloadNonce, model]);
 
   /* Сортировка таблицы кампаний: по умолчанию по номеру кампании, free перед paid. */
-  const [campSort, setCampSort] = useState<{ key: CampSortKey; dir: "asc" | "desc" }>({
-    key: "code",
-    dir: "asc",
-  });
-
-  const campaigns = useMemo<CampAgg[]>(() => {
-    if (!rep) return [];
-    const agg = new Map<number, CampAgg>();
-    for (const c of rep.campaigns) {
-      agg.set(c.link_id, { link_id: c.link_id, code: c.campaign_code, tier: c.tier, clicks: 0, fans: 0, payout: 0 });
-    }
-    for (const row of rep.rows) {
-      for (const c of rep.campaigns) {
-        const cell = row.cells[String(c.link_id)];
-        if (!cell) continue;
-        const a = agg.get(c.link_id)!;
-        a.clicks += cell.clicks ?? 0;
-        a.fans += cell.subs;
-        a.payout += cell.payout;
-      }
-    }
-    const list = [...agg.values()];
-    const sign = campSort.dir === "asc" ? 1 : -1;
-    const cr = (c: CampAgg) => (c.clicks > 0 ? c.fans / c.clicks : 0);
-    list.sort((a, b) => {
-      switch (campSort.key) {
-        case "clicks":
-          return sign * (a.clicks - b.clicks);
-        case "fans":
-          return sign * (a.fans - b.fans);
-        case "cr":
-          return sign * (cr(a) - cr(b));
-        case "payout":
-          return sign * (a.payout - b.payout);
-        default: {
-          /* free перед paid, внутри группы — по номеру, а не по алфавиту. */
-          const paidA = a.tier === "paid" ? 1 : 0;
-          const paidB = b.tier === "paid" ? 1 : 0;
-          if (paidA !== paidB) return sign * (paidA - paidB);
-          return sign * a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: "base" });
-        }
-      }
-    });
-    return list;
-  }, [rep, campSort]);
-
-  const totals = useMemo(() => {
-    const t = campaigns.reduce((s, c) => ({ clicks: s.clicks + c.clicks, fans: s.fans + c.fans, payout: s.payout + c.payout }), {
-      clicks: 0,
-      fans: 0,
-      payout: 0,
-    });
-    return { ...t, cr: t.clicks > 0 ? t.fans / t.clicks : null };
-  }, [campaigns]);
+  const [campSort, setCampSort] = useState<CampSort>(DEFAULT_CAMP_SORT);
+  const campaigns = useMemo(() => aggregateCampaigns(rep, campSort), [rep, campSort]);
+  const totals = useMemo(() => campaignTotals(campaigns), [campaigns]);
 
   const status = statusOv ?? meta?.payout_status ?? "pending";
   const archived = archOv ?? meta?.archived ?? false;
@@ -324,6 +263,7 @@ export default function PartnerDetail() {
                 <tr>
                   <SortTh label="Кампания" col="code" sort={campSort} onSort={setCampSort} />
                   <th>Тир</th>
+                  <th>Ссылка</th>
                   <SortTh label="Клики" col="clicks" sort={campSort} onSort={setCampSort} num />
                   <SortTh label="Фаны" col="fans" sort={campSort} onSort={setCampSort} num />
                   <SortTh label="Конверт" col="cr" sort={campSort} onSort={setCampSort} num />
@@ -337,6 +277,11 @@ export default function PartnerDetail() {
                     <td>
                       <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
                     </td>
+                    <td className="pd-camp-url">
+                      <a href={c.of_url} target="_blank" rel="noreferrer">
+                        {c.of_url}
+                      </a>
+                    </td>
                     <td className="num">{fmt(c.clicks)}</td>
                     <td className="num">{fmt(c.fans)}</td>
                     <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
@@ -345,12 +290,25 @@ export default function PartnerDetail() {
                 ))}
                 {!campaigns.length && (
                   <tr>
-                    <td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>
+                    <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>
                       Нет кампаний за период.
                     </td>
                   </tr>
                 )}
               </tbody>
+              {campaigns.length > 0 && (
+                <tfoot>
+                  <tr className="dm-total-row">
+                    <td>Total</td>
+                    <td />
+                    <td />
+                    <td className="num">{fmt(totals.clicks)}</td>
+                    <td className="num">{fmt(totals.fans)}</td>
+                    <td className="num">{pct(totals.cr)}</td>
+                    <td className="num accent">{money(totals.payout)}</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         )}

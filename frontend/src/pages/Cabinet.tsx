@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CabinetData, DailyReport, fetchCabinet } from "../api";
 import { useTheme } from "../hooks/useTheme";
 import DailyMatrix from "../components/DailyMatrix";
 import DateRangePicker from "../components/DateRangePicker";
+import { SortTh } from "./PartnerDetail";
+import { aggregateCampaigns, campaignTotals, CampSort, DEFAULT_CAMP_SORT } from "../lib/campaignAgg";
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 const fmt = (n: number) => n.toLocaleString("en-US");
+const pct = (n: number | null) => (n == null ? "—" : (n * 100).toFixed(1) + "%");
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -65,6 +68,10 @@ export default function Cabinet() {
 
   const t = data ? totals(data.report) : null;
 
+  const [campSort, setCampSort] = useState<CampSort>(DEFAULT_CAMP_SORT);
+  const campaigns = useMemo(() => aggregateCampaigns(data?.report ?? null, campSort), [data, campSort]);
+  const campTotals = useMemo(() => campaignTotals(campaigns), [campaigns]);
+
   return (
     <div className="cabinet-shell">
       <header className="app-header">
@@ -113,6 +120,63 @@ export default function Cabinet() {
             rows={data.report.rows}
             partnerId={data.partner.id}
           />
+        )}
+
+        {/* Полные ссылки по кампаниям + итог по каждой — тот же список, что видит
+            админ на карточке партнёра, продублирован здесь снизу для траффера. */}
+        {data && campaigns.length > 0 && (
+          <div className="an-card">
+            <div className="an-card-head">
+              <h3>
+                Кампании <span className="faint">· {campaigns.length}</span>
+              </h3>
+            </div>
+            <div className="an-table-wrap">
+              <table className="an-table">
+                <thead>
+                  <tr>
+                    <SortTh label="Кампания" col="code" sort={campSort} onSort={setCampSort} />
+                    <th>Тир</th>
+                    <th>Ссылка</th>
+                    <SortTh label="Клики" col="clicks" sort={campSort} onSort={setCampSort} num />
+                    <SortTh label="Фаны" col="fans" sort={campSort} onSort={setCampSort} num />
+                    <SortTh label="Конверт" col="cr" sort={campSort} onSort={setCampSort} num />
+                    <SortTh label="Выплата" col="payout" sort={campSort} onSort={setCampSort} num />
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((c) => (
+                    <tr key={c.link_id} style={{ cursor: "default" }}>
+                      <td>{c.code}</td>
+                      <td>
+                        <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
+                      </td>
+                      <td className="pd-camp-url">
+                        <a href={c.of_url} target="_blank" rel="noreferrer">
+                          {c.of_url}
+                        </a>
+                      </td>
+                      <td className="num">{fmt(c.clicks)}</td>
+                      <td className="num">{fmt(c.fans)}</td>
+                      <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
+                      <td className="num accent">{money(c.payout)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="dm-total-row">
+                    <td>Total</td>
+                    <td />
+                    <td />
+                    <td className="num">{fmt(campTotals.clicks)}</td>
+                    <td className="num">{fmt(campTotals.fans)}</td>
+                    <td className="num">{pct(campTotals.cr)}</td>
+                    <td className="num accent">{money(campTotals.payout)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
         )}
       </main>
     </div>
