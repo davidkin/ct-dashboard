@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { DailyReport, isAdminConfigured, patchPartner } from "../api";
+import { addCpfHistory, CpfHistoryEntry, DailyReport, fetchCpfHistory, isAdminConfigured } from "../api";
 
 /* Дневная матрица трафика (день × кампания) в дизайн-системе профиля (an-/dm-),
    тема-адаптивная, без Google-Sheets грида. Колонки Дата + Total зафиксированы
@@ -254,11 +254,6 @@ export default function DailyMatrix({
   const hasPaid = campaigns.some((c) => c.tier === "paid");
   const canEdit = isAdminConfigured();
 
-  async function saveCpf(field: "cpf_free" | "cpf_paid", value: number | null) {
-    await patchPartner(partnerId, { [field]: value });
-    onChanged?.();
-  }
-
   const sel = useCellSelection([tab, rows, totalTier]);
 
   return (
@@ -295,10 +290,10 @@ export default function DailyMatrix({
       <div className="dm-notes">
         <span className="dm-notes-lbl">Notes &amp; Conditions</span>
         {hasFree && (
-          <CpfNote label="СPF Free" value={freeCpf} editable={canEdit} onSave={(v) => saveCpf("cpf_free", v)} />
+          <CpfNote label="СPF Free" tier="free" value={freeCpf} editable={canEdit} partnerId={partnerId} onChanged={onChanged} />
         )}
         {hasPaid && (
-          <CpfNote label="СPF Paid" value={paidCpf} editable={canEdit} onSave={(v) => saveCpf("cpf_paid", v)} />
+          <CpfNote label="СPF Paid" tier="paid" value={paidCpf} editable={canEdit} partnerId={partnerId} onChanged={onChanged} />
         )}
         <span className="dm-note">
           Revshare <b>{revshare != null ? pct(revshare) : "—"}</b>
@@ -324,70 +319,176 @@ export default function DailyMatrix({
   );
 }
 
-/* Редактируемый CPF-чип: клик (у админа) → инпут, Enter/blur сохраняет. */
+/* CPF-чип: у читателя просто значение, у админа/менеджера клик открывает
+   модалку "новая ставка с такого-то числа" + историю прошлых ставок ниже. */
 function CpfNote({
   label,
+  tier,
   value,
   editable,
-  onSave,
+  partnerId,
+  onChanged,
 }: {
   label: string;
+  tier: "free" | "paid";
   value: number | null;
   editable: boolean;
-  onSave: (v: number | null) => Promise<void>;
+  partnerId: number;
+  onChanged?: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <span
+        className={`dm-note${editable ? " dm-note-btn" : ""}`}
+        onClick={() => editable && setOpen(true)}
+        title={editable ? "Ставка и история изменений" : undefined}
+      >
+        {label} <b>{value != null ? money(value) : "—"}</b>
+        {editable && <span className="dm-note-pen">✎</span>}
+      </span>
+      {open && (
+        <CpfHistoryModal
+          label={label}
+          tier={tier}
+          current={value}
+          partnerId={partnerId}
+          onClose={() => setOpen(false)}
+          onChanged={() => onChanged?.()}
+        />
+      )}
+    </>
+  );
+}
 
-  function begin() {
-    if (!editable) return;
-    setDraft(value != null ? String(value) : "");
-    setEditing(true);
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/* Модалка ставки CPF: форма "новое значение + дата, с которой действует" сверху,
+   история прошлых ставок снизу. Прошлые дни отчёта после сохранения не трогаются —
+   пересчитывается только то, что было НА и ПОСЛЕ указанной даты. */
+function CpfHistoryModal({
+  label,
+  tier,
+  current,
+  partnerId,
+  onClose,
+  onChanged,
+}: {
+  label: string;
+  tier: "free" | "paid";
+  current: number | null;
+  partnerId: number;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [history, setHistory] = useState<CpfHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [value, setValue] = useState(current != null ? String(current) : "");
+  const [date, setDate] = useState(todayISO());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function load() {
+    setLoading(true);
+    fetchCpfHistory(partnerId)
+      .then((rows) => setHistory(rows.filter((r) => r.tier === tier)))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
   }
-  async function commit() {
-    const trimmed = draft.trim();
-    const next = trimmed === "" ? null : Number(trimmed);
-    setEditing(false);
-    if (next != null && Number.isNaN(next)) return;
-    if (next === value) return;
-    setSaving(true);
+  useEffect(load, [partnerId, tier]);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const num = Number(value.replace(",", "."));
+    if (!Number.isFinite(num) || num <= 0) {
+      setError("Ставка должна быть больше нуля");
+      return;
+    }
+    if (!date) {
+      setError("Укажи дату");
+      return;
+    }
+    setBusy(true);
+    setError(null);
     try {
-      await onSave(next);
+      await addCpfHistory(partnerId, tier, num, date);
+      onChanged();
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
 
-  if (editing) {
-    return (
-      <span className="dm-note dm-note-edit">
-        {label}{" "}
-        <input
-          autoFocus
-          type="number"
-          step="0.01"
-          min="0"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-            if (e.key === "Escape") setEditing(false);
-          }}
-        />
-      </span>
-    );
-  }
   return (
-    <span
-      className={`dm-note${editable ? " dm-note-btn" : ""}${saving ? " dm-note-saving" : ""}`}
-      onClick={begin}
-      title={editable ? "Редактировать CPF" : undefined}
-    >
-      {label} <b>{value != null ? money(value) : "—"}</b>
-      {editable && <span className="dm-note-pen">✎</span>}
-    </span>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal pm-wrap" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose} title="закрыть">
+          ✕
+        </button>
+        <h2>{label}</h2>
+        <p className="muted">
+          Ставка действует с указанной даты и позже. Дни до неё считаются по тому, что было — прошлое не
+          пересчитывается.
+        </p>
+
+        <form className="pm-section" onSubmit={save}>
+          <div className="pm-grid">
+            <label>
+              Новая ставка
+              <input
+                className="input"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="1.50"
+                autoFocus
+              />
+            </label>
+            <label>
+              Действует с
+              <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+          </div>
+          {error && <p className="pm-err">{error}</p>}
+          <div className="pm-actions">
+            <button type="submit" className="btn" disabled={busy}>
+              {busy ? "Сохраняю…" : "Сохранить"}
+            </button>
+          </div>
+        </form>
+
+        <section className="pm-section">
+          <h3>История</h3>
+          {loading && <p className="muted">Загружаю…</p>}
+          {!loading && history.length === 0 && (
+            <p className="muted">Пока нет ни одной дата-привязанной записи — действует текущее значение партнёра.</p>
+          )}
+          {!loading && history.length > 0 && (
+            <table className="an-table cpf-hist-table">
+              <thead>
+                <tr>
+                  <th>Действует с</th>
+                  <th className="num">Ставка</th>
+                  <th>Кто указал</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id}>
+                    <td>{h.effective_from}</td>
+                    <td className="num">{money(h.cpf)}</td>
+                    <td className="muted">{h.created_by ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 

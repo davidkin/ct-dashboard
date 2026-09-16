@@ -220,6 +220,28 @@ const MIGRATIONS: Migration[] = [
       ON partners(share_token) WHERE share_token IS NOT NULL;
     `,
   },
+  {
+    id: "006_cpf_history",
+    sql: `
+    /* История ставок CPF по партнёру и тиру (free/paid), с датой, с которой
+       ставка начала действовать. Пока для партнёра нет ни одной строки здесь —
+       выплата считается по partners.cpf_free/cpf_paid как раньше, без изменений.
+       Как только появляется первая запись — day-by-day расчёт в buildDailyReport
+       переходит на неё: каждый день считается по ставке, действовавшей именно
+       в этот день, а не по текущей. */
+    CREATE TABLE IF NOT EXISTS cpf_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      partner_id INTEGER NOT NULL REFERENCES partners(id) ON DELETE CASCADE,
+      tier TEXT NOT NULL CHECK (tier IN ('free','paid')),
+      cpf REAL NOT NULL,
+      effective_from TEXT NOT NULL,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_cpf_history_lookup
+      ON cpf_history(partner_id, tier, effective_from);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

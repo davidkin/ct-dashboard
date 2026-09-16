@@ -727,6 +727,41 @@ export async function revokeShareLink(partnerId: number): Promise<void> {
   if (!res.ok) throw new Error(`${res.status}`);
 }
 
+/** История ставок CPF: когда менялась и с какого числа действует новая. */
+export interface CpfHistoryEntry {
+  id: number;
+  tier: "free" | "paid";
+  cpf: number;
+  effective_from: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+export async function fetchCpfHistory(partnerId: number): Promise<CpfHistoryEntry[]> {
+  const res = await fetch(manageUrl(`/partners/${partnerId}/cpf-history`), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as CpfHistoryEntry[];
+}
+
+/** Новая ставка с конкретной даты — не трогает уже посчитанные дни до неё. */
+export async function addCpfHistory(
+  partnerId: number,
+  tier: "free" | "paid",
+  cpf: number,
+  effective_from: string,
+): Promise<CpfHistoryEntry[]> {
+  const res = await fetch(manageUrl(`/partners/${partnerId}/cpf-history`), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ tier, cpf, effective_from }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as CpfHistoryEntry[];
+}
+
 export interface CabinetData {
   partner: { id: number; display_name: string; telegram: string | null };
   report: DailyReport;

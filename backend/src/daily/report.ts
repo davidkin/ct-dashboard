@@ -5,7 +5,8 @@
  *   subs   = COUNT(om_subscribed_at → киевский день = D)   — точно, из реальных дат
  *   clicks = clicks_cumulative[D] − clicks_cumulative[D−1]  — дельта снэпшота
  *   cr     = subs / clicks
- *   payout = subs × cpf
+ *   payout = subs × cpf(D)  — ставка на ДЕНЬ D из cpf_history, если она у партнёра
+ *            есть; иначе фолбэк на текущий cpf_free/cpf_paid (как было раньше).
  * Плюс Total-строка за день (горизонтальная сумма компаний) и дельта сабов к
  * предыдущему дню.
  *
@@ -105,7 +106,7 @@ interface BuildOpts {
    (для paid-рядов там одно значение, напр. 3.5), поэтому в фолбэках paid
    доходим до link.cpf_free. Приоритет отдаём непустому (>0) значению —
    partner.cpf_paid=0.0 это плейсхолдер, а не реальный $0. */
-function pickCpf(
+export function pickCpf(
   tier: "free" | "paid",
   pFree: number | null,
   pPaid: number | null,
@@ -336,6 +337,44 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
       return naturalCmp(a.campaign_code, b.campaign_code);
     });
 
+  /* === история CPF: ставка на конкретный день, если у партнёра она ведётся ===
+     Партнёров без единой строки в cpf_history большинство — для них resolveCpf
+     просто возвращает фолбэк (campaign.cpf), т.е. поведение не меняется. */
+  const involvedPartnerIds = [...new Set(campaigns.map((c) => c.partner_id).filter((id): id is number => id != null))];
+  const historyByKey = new Map<string, Array<{ effective_from: string; cpf: number }>>();
+  if (involvedPartnerIds.length) {
+    const placeholders = involvedPartnerIds.map(() => "?").join(",");
+    const historyRows = db
+      .prepare(
+        `SELECT partner_id, tier, cpf, effective_from FROM cpf_history
+         WHERE partner_id IN (${placeholders}) ORDER BY partner_id, tier, effective_from ASC`,
+      )
+      .all(...involvedPartnerIds) as Array<{ partner_id: number; tier: string; cpf: number; effective_from: string }>;
+    for (const h of historyRows) {
+      const key = `${h.partner_id}::${h.tier}`;
+      const list = historyByKey.get(key);
+      if (list) list.push({ effective_from: h.effective_from, cpf: h.cpf });
+      else historyByKey.set(key, [{ effective_from: h.effective_from, cpf: h.cpf }]);
+    }
+  }
+  /* Списки короткие (единицы записей на партнёра) — линейный проход дешевле индекса. */
+  function resolveCpf(partnerId: number | null, tier: "free" | "paid", day: string, fallback: number): number {
+    if (partnerId == null) return fallback;
+    const list = historyByKey.get(`${partnerId}::${tier}`);
+    if (!list || !list.length) return fallback;
+    let result: number | null = null;
+    for (const h of list) {
+      if (h.effective_from > day) break;
+      result = h.cpf;
+    }
+    return result ?? fallback;
+  }
+  /* CPF в самой кампании (для чипа "CPF Free/Paid" в интерфейсе) — тоже должен
+     быть СЕГОДНЯШНЕЙ ставкой из истории, а не застывшим фолбэком, иначе чип
+     и построчная выплата ниже разойдутся. */
+  const today = todayLocal();
+  for (const c of campaigns) c.cpf = resolveCpf(c.partner_id, c.tier, today, c.cpf);
+
   /* === строки по дням === */
   const rows: DailyRow[] = [];
   let prevTotalSubs: number | null = null;
@@ -387,7 +426,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
         clicks = dm && dm.has(date) ? dm.get(date)! : null;
       }
       const cr = clicks != null && clicks > 0 ? subs / clicks : null;
-      const payout = subs * camp.cpf;
+      const payout = subs * resolveCpf(camp.partner_id, camp.tier, date, camp.cpf);
       cells[String(camp.link_id)] = { clicks, subs, cr, payout };
       if (clicks != null) {
         tClicks += clicks;

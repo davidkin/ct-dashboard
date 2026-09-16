@@ -16,7 +16,8 @@ import {
   isRetiredCreator,
   listModels,
 } from "../config/creators";
-import { lastCompletedWeekStart } from "../lib/tz";
+import { lastCompletedWeekStart, todayLocal } from "../lib/tz";
+import { pickCpf } from "../daily/report";
 
 interface NewLink {
   campaign_code: string;
@@ -291,4 +292,129 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
     db.prepare(`UPDATE partners SET share_token = NULL WHERE id = ?`).run(id);
     return { data: { partner_id: id } };
   });
+
+  /**
+   * GET /api/partners/:id/cpf-history — вся история ставок партнёра (оба тира),
+   * свежие сверху. Для чипа-иконки "история" рядом с CPF в интерфейсе.
+   */
+  app.get<{ Params: { id: string } }>("/api/partners/:id/cpf-history", async (req) => {
+    const id = Number(req.params.id);
+    const rows = db
+      .prepare(
+        `SELECT id, tier, cpf, effective_from, created_by, created_at
+         FROM cpf_history WHERE partner_id = ?
+         ORDER BY effective_from DESC, id DESC`,
+      )
+      .all(id);
+    return { data: rows };
+  });
+
+  /**
+   * POST /api/partners/:id/cpf-history — новая ставка с конкретной даты.
+   * Body: { tier: "free"|"paid", cpf: number, effective_from: "YYYY-MM-DD" }.
+   *
+   * Это НЕ то же самое, что правка partners.cpf_free/cpf_paid: та правка меняла
+   * ставку "всегда была такой" (задним числом пересчитывала прошлые дни при
+   * каждом чтении отчёта — то, от чего David и просил уйти). Здесь ставка
+   * действует СТРОГО с указанной даты; дни до неё продолжают считаться по
+   * тому, что было. Если для партнёра+тира это первая запись в истории —
+   * сначала кладём "базовую" запись текущим значением с датой создания
+   * партнёра (иначе дни до этой правки откатились бы на фолбэк, который сам
+   * может незаметно измениться при следующей правке partners.cpf_free).
+   * Доступно admin и affiliate_manager — как и остальная правка CPF.
+   */
+  app.post<{ Params: { id: string }; Body: { tier?: "free" | "paid"; cpf?: number; effective_from?: string } }>(
+    "/api/partners/:id/cpf-history",
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const tier = req.body?.tier;
+      const cpf = Number(req.body?.cpf);
+      const effectiveFrom = (req.body?.effective_from ?? "").trim();
+
+      if (tier !== "free" && tier !== "paid") {
+        reply.code(400);
+        return { error: "tier должен быть free или paid" };
+      }
+      if (!Number.isFinite(cpf) || cpf <= 0) {
+        reply.code(400);
+        return { error: "CPF должен быть больше нуля" };
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) {
+        reply.code(400);
+        return { error: "Дата должна быть в формате ГГГГ-ММ-ДД" };
+      }
+
+      const partnerRow = db
+        .prepare(`SELECT id, cpf_free, cpf_paid, created_at FROM partners WHERE id = ?`)
+        .get(id) as { id: number; cpf_free: number | null; cpf_paid: number | null; created_at: string } | undefined;
+      if (!partnerRow) {
+        reply.code(404);
+        return { error: "Партнёр не найден" };
+      }
+
+      const user = req.user;
+      const insert = db.prepare(
+        `INSERT INTO cpf_history (partner_id, tier, cpf, effective_from, created_by) VALUES (?, ?, ?, ?, ?)`,
+      );
+
+      const tx = db.transaction(() => {
+        const existing = db
+          .prepare(`SELECT COUNT(*) AS n FROM cpf_history WHERE partner_id = ? AND tier = ?`)
+          .get(id, tier) as { n: number };
+        if (existing.n === 0) {
+          /* Фолбэк без истории читает partner.cpf_* ИЛИ link.cpf_* (см. pickCpf в
+             report.ts) — если бы бралось только partner.cpf_free, тут был реальный
+             баг: у Media Cloud (free) партнёрская ставка была NULL, реальная 1.2
+             жила на ссылках, и без этой строки старые дни задним числом уехали
+             бы на новую ставку в момент первого же сохранения. */
+          const link = db
+            .prepare(
+              `SELECT cpf_free, cpf_paid FROM links
+               WHERE partner_id = ? AND campaign_code ${tier === "paid" ? "LIKE 'camp\\_paid\\_%' ESCAPE '\\'" : "NOT LIKE 'camp\\_paid\\_%' ESCAPE '\\'"}
+               LIMIT 1`,
+            )
+            .get(id) as { cpf_free: number | null; cpf_paid: number | null } | undefined;
+          const currentValue = pickCpf(
+            tier,
+            partnerRow.cpf_free,
+            partnerRow.cpf_paid,
+            link?.cpf_free ?? null,
+            link?.cpf_paid ?? null,
+          );
+          if (currentValue > 0) {
+            const baselineDate = partnerRow.created_at.slice(0, 10);
+            insert.run(id, tier, currentValue, baselineDate, "system: baseline");
+          }
+        }
+        insert.run(id, tier, cpf, effectiveFrom, user?.email ?? null);
+
+        /* Кэш на партнёре — то, что действует СЕГОДНЯ, чтобы места, не знающие
+           про историю (Глоссарий, экспорт), продолжали показывать разумное значение. */
+        const today = todayLocal();
+        const currentRows = db
+          .prepare(
+            `SELECT cpf FROM cpf_history WHERE partner_id = ? AND tier = ? AND effective_from <= ?
+             ORDER BY effective_from DESC, id DESC LIMIT 1`,
+          )
+          .get(id, tier, today) as { cpf: number } | undefined;
+        if (currentRows) {
+          const col = tier === "paid" ? "cpf_paid" : "cpf_free";
+          db.prepare(`UPDATE partners SET ${col} = ?, updated_at = datetime('now') WHERE id = ?`).run(
+            currentRows.cpf,
+            id,
+          );
+        }
+      });
+      tx();
+
+      return {
+        data: db
+          .prepare(
+            `SELECT id, tier, cpf, effective_from, created_by, created_at
+             FROM cpf_history WHERE partner_id = ? ORDER BY effective_from DESC, id DESC`,
+          )
+          .all(id),
+      };
+    },
+  );
 }
