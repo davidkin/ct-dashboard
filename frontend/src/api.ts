@@ -592,21 +592,154 @@ export async function fetchIntegrity(refresh = false): Promise<IntegrityReport> 
   return json.data as IntegrityReport;
 }
 
-/* === Write-операции (создание/правка партнёра) — Basic-auth админа ===
-   Хост тот же (EXPORT_BASE). Креды в .env.local: VITE_ADMIN_USER + VITE_ADMIN_PASS. */
-const ADMIN_USER = import.meta.env.VITE_ADMIN_USER as string | undefined;
-const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASS as string | undefined;
-
-export function isAdminConfigured(): boolean {
-  return !!(EXPORT_BASE && ADMIN_USER && ADMIN_PASS);
+/* === Write-операции (создание/правка партнёра) — сессия из логин-окна ===
+   Хост тот же (EXPORT_BASE). Авторизация — httpOnly cookie, выставленная
+   /api/auth/session; здесь просто шлём credentials на каждый запрос. */
+export type Role = "admin" | "affiliate_manager";
+export interface SessionUser {
+  email: string;
+  role: Role;
 }
-function adminHeaders(): Record<string, string> {
-  if (!ADMIN_USER || !ADMIN_PASS) throw new Error("VITE_ADMIN_USER / VITE_ADMIN_PASS не заданы в .env.local");
-  return { Authorization: "Basic " + btoa(`${ADMIN_USER}:${ADMIN_PASS}`), "Content-Type": "application/json" };
+
+/* Текущий пользователь держим в модуле, а не только в React-состоянии:
+   так isAdminConfigured/isAdmin остаются синхронными и не тянут за собой
+   переписывание всех вызовов из компонентов, которые их уже используют. */
+let session: SessionUser | null = null;
+const listeners = new Set<(u: SessionUser | null) => void>();
+
+export function setSession(u: SessionUser | null): void {
+  session = u;
+  for (const l of listeners) l(u);
+}
+export function getSession(): SessionUser | null {
+  return session;
+}
+export function onSessionChange(fn: (u: SessionUser | null) => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+/** Залогинен ли вообще (admin или affiliate_manager) — обе роли пишут в глоссарий/CPF. */
+export function isAdminConfigured(): boolean {
+  return session !== null;
+}
+/** Именно admin — удаление ссылок, выплаты, вайт-лист. */
+export function isAdmin(): boolean {
+  return session?.role === "admin";
+}
+
+function authHeaders(): Record<string, string> {
+  return { "Content-Type": "application/json" };
 }
 function manageUrl(path: string): string {
   if (!EXPORT_BASE) throw new Error("VITE_API_BASE не задан");
   return `${EXPORT_BASE.replace(/\/$/, "")}${path}`;
+}
+
+export async function fetchSession(): Promise<SessionUser | null> {
+  const res = await fetch(manageUrl("/auth/me"), { credentials: "include" });
+  const json = await res.json().catch(() => ({ data: null }));
+  const user = (json.data as SessionUser | null) ?? null;
+  setSession(user);
+  return user;
+}
+
+export async function login(email: string, password: string): Promise<SessionUser> {
+  const res = await fetch(manageUrl("/auth/session"), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ email, password }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  setSession(json.data as SessionUser);
+  return json.data;
+}
+
+export async function logout(): Promise<void> {
+  await fetch(manageUrl("/auth/logout"), { method: "POST", credentials: "include" });
+  setSession(null);
+}
+
+export interface WhitelistEntry {
+  email: string;
+  role: Role;
+  added_by: string | null;
+  created_at: string;
+  registered: 0 | 1;
+  user_active: 0 | 1 | null;
+}
+
+export async function fetchWhitelist(): Promise<WhitelistEntry[]> {
+  const res = await fetch(manageUrl("/admin/whitelist"), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as WhitelistEntry[];
+}
+
+export async function addToWhitelist(email: string, role: Role): Promise<void> {
+  const res = await fetch(manageUrl("/admin/whitelist"), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ email, role }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+}
+
+export async function removeFromWhitelist(email: string): Promise<void> {
+  const res = await fetch(manageUrl(`/admin/whitelist/${encodeURIComponent(email)}`), {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+}
+
+export async function setUserActive(id: number, active: boolean): Promise<void> {
+  const res = await fetch(manageUrl(`/admin/users/${id}`), {
+    method: "PATCH",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ active }),
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+}
+
+/** Ссылка на личный кабинет траффера (без логина) — создаётся/читается по партнёру. */
+export async function getShareLink(partnerId: number): Promise<string> {
+  const res = await fetch(manageUrl(`/partners/${partnerId}/share-token`), {
+    method: "POST",
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return (json.data as { token: string }).token;
+}
+
+export async function revokeShareLink(partnerId: number): Promise<void> {
+  const res = await fetch(manageUrl(`/partners/${partnerId}/share-token`), {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+}
+
+export interface CabinetData {
+  partner: { id: number; display_name: string; telegram: string | null };
+  report: DailyReport;
+}
+
+/** Личный кабинет траффера — без сессии, токен в адресе и есть авторизация. */
+export async function fetchCabinet(token: string, from?: string, to?: string): Promise<CabinetData> {
+  const u = new URL(manageUrl(`/cabinet/${token}`));
+  if (from) u.searchParams.set("from", from);
+  if (to) u.searchParams.set("to", to);
+  const res = await fetch(u.toString());
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as CabinetData;
 }
 
 export interface NewPartnerLink {
@@ -633,7 +766,7 @@ export interface OmLink {
 }
 
 export async function fetchOmLinks(): Promise<OmLink[]> {
-  const res = await fetch(manageUrl("/om/tracking-links"), { headers: adminHeaders() });
+  const res = await fetch(manageUrl("/om/tracking-links"), { credentials: "include" });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data as OmLink[];
@@ -655,7 +788,8 @@ export async function createPartner(body: {
 }): Promise<{ partner_id: number; links_created: number; unmatched_om: string[]; mode: string }> {
   const res = await fetch(manageUrl("/partners"), {
     method: "POST",
-    headers: adminHeaders(),
+    credentials: "include",
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
@@ -669,7 +803,8 @@ export async function patchLink(
 ): Promise<unknown> {
   const res = await fetch(manageUrl(`/links/${id}`), {
     method: "PATCH",
-    headers: adminHeaders(),
+    credentials: "include",
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
@@ -680,7 +815,8 @@ export async function patchLink(
 export async function patchPartner(id: number, body: Record<string, unknown>): Promise<unknown> {
   const res = await fetch(manageUrl(`/partners/${id}`), {
     method: "PATCH",
-    headers: adminHeaders(),
+    credentials: "include",
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
@@ -696,7 +832,8 @@ export async function setPayoutStatus(
 ): Promise<{ partner_id: number; week_start: string; status: string }> {
   const res = await fetch(manageUrl("/payout-status"), {
     method: "PUT",
-    headers: adminHeaders(),
+    credentials: "include",
+    headers: authHeaders(),
     body: JSON.stringify({ partner_id, status, week_start }),
   });
   const json = await res.json().catch(() => ({}));
@@ -803,7 +940,7 @@ export interface GlossaryMeta {
 }
 
 export async function fetchGlossary(verify = false): Promise<{ data: GlossaryPartner[]; meta: GlossaryMeta }> {
-  const res = await fetch(manageUrl(`/glossary${verify ? "?verify=1" : ""}`), { headers: adminHeaders() });
+  const res = await fetch(manageUrl(`/glossary${verify ? "?verify=1" : ""}`), { credentials: "include" });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json as { data: GlossaryPartner[]; meta: GlossaryMeta };
@@ -834,7 +971,8 @@ export async function addGlossaryLinks(
 ): Promise<{ partner_id: number; created: number }> {
   const res = await fetch(manageUrl("/glossary/links"), {
     method: "POST",
-    headers: adminHeaders(),
+    credentials: "include",
+    headers: authHeaders(),
     body: JSON.stringify({ partner_id, links }),
   });
   const json = await res.json().catch(() => ({}));
@@ -853,7 +991,8 @@ export async function createGlossaryPartner(body: {
 }): Promise<GlossaryPartner> {
   const res = await fetch(manageUrl("/glossary/partners"), {
     method: "POST",
-    headers: adminHeaders(),
+    credentials: "include",
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
   const json = await res.json().catch(() => ({}));
@@ -864,7 +1003,8 @@ export async function createGlossaryPartner(body: {
 export async function deleteGlossaryLink(id: number): Promise<void> {
   const res = await fetch(manageUrl(`/glossary/links/${id}`), {
     method: "DELETE",
-    headers: adminHeaders(),
+    credentials: "include",
+    headers: authHeaders(),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);

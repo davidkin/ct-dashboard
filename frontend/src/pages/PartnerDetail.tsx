@@ -5,6 +5,7 @@ import {
   DailyReport,
   fetchAnalytics,
   fetchExportReport,
+  isAdmin,
   isAdminConfigured,
   patchPartner,
   setPayoutStatus,
@@ -263,11 +264,17 @@ export default function PartnerDetail() {
           <button
             className={`status-badge ${status === "done" ? "done" : "pending"}`}
             onClick={toggleStatus}
-            disabled={!isAdminConfigured()}
+            disabled={!isAdmin()}
+            title={isAdmin() ? undefined : "Выплаты переключает только админ"}
           >
             {status === "done" ? "Выплата: Готов" : "Выплата: Ожидает"}
           </button>
-          <button className="btn ghost" onClick={toggleArchive} disabled={!isAdminConfigured()}>
+          <button
+            className="btn ghost"
+            onClick={toggleArchive}
+            disabled={!isAdmin()}
+            title={isAdmin() ? undefined : "Архивирует только админ"}
+          >
             {archived ? "↩ Восстановить" : "⧉ Архивировать"}
           </button>
         </div>

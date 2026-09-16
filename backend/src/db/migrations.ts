@@ -201,6 +201,25 @@ const MIGRATIONS: Migration[] = [
     ALTER TABLE partners ADD COLUMN om_report_url TEXT;
     `,
   },
+  {
+    id: "005_login_whitelist_and_cabinet",
+    sql: `
+    /* Вайт-лист почт: кого пускать в логин-окно и с какой ролью. Аккаунт в users
+       создаётся сам при первом входе с этой почтой (self-serve — слать письма нечем). */
+    CREATE TABLE IF NOT EXISTS allowed_emails (
+      email TEXT PRIMARY KEY,
+      role TEXT NOT NULL,
+      added_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    /* Личный кабинет траффера: секретная ссылка на его же карточку партнёра,
+       без логина — ровно как shared report в OnlyMonster. */
+    ALTER TABLE partners ADD COLUMN share_token TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_partners_share_token
+      ON partners(share_token) WHERE share_token IS NOT NULL;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

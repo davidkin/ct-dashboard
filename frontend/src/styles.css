@@ -95,7 +95,11 @@ a:hover { text-decoration: underline; }
 .logo-mark:hover { filter: brightness(1.08); text-decoration: none; }
 .app-header-actions { display: flex; align-items: center; gap: 12px; }
 
-.app-user { display: flex; align-items: center; gap: 10px; }
+.app-user {
+  display: flex; align-items: center; gap: 10px;
+  background: transparent; border: none; padding: 4px; border-radius: 10px; cursor: pointer;
+}
+.app-user:hover { background: var(--surface2); }
 .app-user-txt { display: flex; flex-direction: column; line-height: 1.2; text-align: right; }
 .app-user-name { font-size: 12.5px; color: var(--text); font-weight: 600; }
 .app-user-role { font-size: 11px; color: var(--faint); }
@@ -1770,3 +1774,45 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 
 .gl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .gl-errors { margin-top: var(--space-sm); padding-left: 18px; font-size: 13px; color: var(--bad); }
+
+/* === Логин-окно === */
+.auth-loading { min-height: 100vh; background: var(--bg); }
+.login-shell {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: var(--bg); padding: var(--space);
+}
+.login-card {
+  width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 18px; padding: 32px 28px; display: flex; flex-direction: column; gap: 14px;
+  text-align: center;
+}
+.login-logo {
+  width: 44px; height: 44px; margin: 0 auto 4px; border-radius: 12px;
+  background: var(--accent); color: var(--accent-fg); display: flex; align-items: center;
+  justify-content: center; font-size: 19px; font-weight: 700;
+}
+.login-title { margin: 0; font-size: 18px; font-weight: 700; }
+.login-sub { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.login-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); text-align: left; }
+.login-field .input { width: 100%; box-sizing: border-box; }
+.login-err { margin: 0; text-align: left; font-size: 12.5px; }
+.login-submit { width: 100%; margin-top: 6px; padding: 9px; font-size: 13.5px; }
+
+/* === Список доступа (админ) === */
+.au-form { display: flex; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--lineSoft); flex-wrap: wrap; }
+.au-form .input { flex: 1 1 220px; min-width: 180px; }
+.au-form select.input { flex: 0 0 200px; }
+
+/* === Кабинет траффера (публичная страница, без шелла приложения) === */
+.cabinet-shell { min-height: 100vh; background: var(--bg); }
+.cabinet-title { font-size: 15px; font-weight: 700; margin-right: 4px; }
+
+/* === Кнопка "Кабинет" в глоссарии === */
+.gl-share-wrap { position: relative; display: inline-block; margin-right: 6px; }
+.gl-share-pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
+  display: flex; align-items: center; gap: 6px; padding: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35); white-space: nowrap;
+}
+.gl-share-input { width: 260px; font-size: 11.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

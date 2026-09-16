@@ -5,7 +5,9 @@
  * которые она и так читает. Под Basic-auth дашборда (как все /api кроме export/webhooks).
  */
 import { FastifyInstance } from "fastify";
+import { randomBytes } from "node:crypto";
 import { getDb } from "../db/index";
+import { requireAdmin } from "../lib/auth";
 import { listTrackingLinks } from "../om/client";
 import {
   creatorsInModelGroup,
@@ -241,6 +243,7 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
   app.put<{ Body: { partner_id?: number; status?: string; week_start?: string } }>(
     "/api/payout-status",
     async (req, reply) => {
+      if (!requireAdmin(req, reply)) return;
       const partnerId = Number(req.body?.partner_id);
       const status = req.body?.status === "done" ? "done" : "pending";
       const weekStart = req.body?.week_start || lastCompletedWeekStart();
@@ -257,4 +260,35 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
       return { data: { partner_id: partnerId, week_start: weekStart, status } };
     },
   );
+
+  /**
+   * POST /api/partners/:id/share-token — секретная ссылка на личный кабинет
+   * траффера (ровно как shared report в OnlyMonster): без логина, только
+   * по токену. Доступно admin и affiliate_manager — генерация ссылки не
+   * входит в «удаление/выплаты/настройки», это обычная работа с партнёром.
+   * Повторный вызов возвращает уже существующий токен, не плодит новые.
+   */
+  app.post<{ Params: { id: string } }>("/api/partners/:id/share-token", async (req, reply) => {
+    const id = Number(req.params.id);
+    const row = db.prepare(`SELECT id, share_token FROM partners WHERE id = ?`).get(id) as
+      | { id: number; share_token: string | null }
+      | undefined;
+    if (!row) {
+      reply.code(404);
+      return { error: "Партнёр не найден" };
+    }
+    let token = row.share_token;
+    if (!token) {
+      token = randomBytes(20).toString("hex");
+      db.prepare(`UPDATE partners SET share_token = ? WHERE id = ?`).run(token, id);
+    }
+    return { data: { partner_id: id, token } };
+  });
+
+  /** DELETE — отозвать ссылку кабинета (старая перестаёт открываться). */
+  app.delete<{ Params: { id: string } }>("/api/partners/:id/share-token", async (req, reply) => {
+    const id = Number(req.params.id);
+    db.prepare(`UPDATE partners SET share_token = NULL WHERE id = ?`).run(id);
+    return { data: { partner_id: id } };
+  });
 }

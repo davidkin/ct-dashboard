@@ -1,5 +1,5 @@
 import "dotenv/config";
-import Fastify, { FastifyInstance } from "fastify";
+import Fastify, { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import { getDb } from "./db/index";
 import { registerActivityRoutes } from "./routes/activity";
@@ -16,14 +16,24 @@ import { registerDailyRoutes } from "./routes/daily";
 import { registerExportRoutes } from "./routes/export";
 import { registerManageRoutes } from "./routes/manage";
 import { registerGlossaryRoutes } from "./routes/glossary";
+import { registerAuthRoutes } from "./routes/auth";
+import { registerAdminRoutes } from "./routes/admin";
+import { registerCabinetRoutes } from "./routes/cabinet";
+import { currentUser, type SessionUser } from "./lib/auth";
 import { startScheduler } from "./of/scheduler";
 import { startDailyCapture } from "./daily/scheduler";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    user?: SessionUser;
+  }
+}
 
 async function main() {
   const app = Fastify({ logger: true });
 
-  await app.register(cors, { origin: true });
-  registerBasicAuth(app);
+  await app.register(cors, { origin: true, credentials: true });
+  registerSessionAuth(app);
 
   app.get("/api/health", async () => ({
     status: "ok",
@@ -32,6 +42,7 @@ async function main() {
 
   getDb();
 
+  await registerAuthRoutes(app);
   await registerCreatorRoutes(app);
   await registerPartnerRoutes(app);
   await registerLinksRoutes(app);
@@ -46,6 +57,8 @@ async function main() {
   await registerExportRoutes(app);
   await registerManageRoutes(app);
   await registerGlossaryRoutes(app);
+  await registerAdminRoutes(app);
+  await registerCabinetRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
   /* В проде за nginx ставь HOST=127.0.0.1 — тогда 3001 не торчит наружу. */
@@ -62,24 +75,35 @@ main().catch((err) => {
   process.exit(1);
 });
 
-function registerBasicAuth(app: FastifyInstance): void {
-  const password = process.env.DASHBOARD_PASSWORD;
-  if (!password || password === "changeme") return;
+/**
+ * Гейт по сессии (cookie), пришёл на смену общему Basic-auth паролю: у каждого
+ * оператора теперь своя почта/пароль и роль (admin / affiliate_manager).
+ *
+ * Публичные пути (без сессии):
+ *  - /api/webhooks/of — подпись проверяется отдельно через WEBHOOK_SECRET
+ *  - /api/export*     — свой EXPORT_TOKEN в query
+ *  - /api/cabinet/*   — личный кабинет траффера, токен в URL и есть авторизация
+ *  - /api/auth/*      — логин-окно: сюда и приходят без сессии
+ *  - /api/health
+ */
+function registerSessionAuth(app: FastifyInstance): void {
+  app.addHook("onRequest", async (req: FastifyRequest, reply: FastifyReply) => {
+    if (
+      req.url.startsWith("/api/webhooks/of") ||
+      req.url.startsWith("/api/export") ||
+      req.url.startsWith("/api/cabinet") ||
+      req.url.startsWith("/api/auth") ||
+      req.url.startsWith("/api/health")
+    ) {
+      return;
+    }
+    if (!req.url.startsWith("/api/")) return;
 
-  app.addHook("onRequest", async (req, reply) => {
-    /* Webhook должен оставаться публичным — OF API нужен прямой доступ.
-       Подпись проверяется отдельно через WEBHOOK_SECRET. */
-    if (req.url.startsWith("/api/webhooks/of")) return;
-    /* Read-only выгрузка — защищена своим EXPORT_TOKEN (?key=...), не Basic-auth. */
-    if (req.url.startsWith("/api/export")) return;
-
-    const header = req.headers.authorization;
-    const expected = `Basic ${Buffer.from(`admin:${password}`).toString("base64")}`;
-    if (header === expected) return;
-
-    reply
-      .code(401)
-      .header("WWW-Authenticate", 'Basic realm="Couture Dashboard"')
-      .send({ error: "Unauthorized" });
+    const user = currentUser(req);
+    if (!user) {
+      reply.code(401).send({ error: "Не авторизован" });
+      return;
+    }
+    req.user = user;
   });
 }

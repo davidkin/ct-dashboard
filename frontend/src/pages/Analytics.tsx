@@ -5,6 +5,7 @@ import {
   AnalyticsPartner,
   AnalyticsReport,
   fetchAnalytics,
+  isAdmin,
   isAdminConfigured,
   isExportConfigured,
   patchPartner,
@@ -349,7 +350,8 @@ export default function Analytics() {
                         <button
                           className={`status-badge ${statusOf(p) === "done" ? "done" : "pending"}`}
                           onClick={(e) => toggleStatus(p, e)}
-                          disabled={!isAdminConfigured()}
+                          disabled={!isAdmin()}
+                          title={isAdmin() ? undefined : "Выплаты переключает только админ"}
                         >
                           {statusOf(p) === "done" ? "Готов" : "Ожидает"}
                         </button>
@@ -360,9 +362,9 @@ export default function Analytics() {
                       <td>
                         <button
                           className="an-arch-btn"
-                          title="Архивировать"
+                          title={isAdmin() ? "Архивировать" : "Архивирует только админ"}
                           onClick={(e) => toggleArchive(p, e)}
-                          disabled={!isAdminConfigured()}
+                          disabled={!isAdmin()}
                         >
                           ⧉
                         </button>

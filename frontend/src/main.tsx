@@ -7,6 +7,8 @@ import Analytics from "./pages/Analytics";
 import CreatorPage from "./pages/CreatorPage";
 import Glossary from "./pages/Glossary";
 import PartnerDetail from "./pages/PartnerDetail";
+import AdminUsers from "./pages/AdminUsers";
+import Cabinet from "./pages/Cabinet";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
@@ -14,6 +16,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <BrowserRouter>
       <ModelProvider>
         <Routes>
+          {/* Личный кабинет траффера — по ссылке, без логина, вне общего шелла/меню. */}
+          <Route path="cabinet/:token" element={<Cabinet />} />
+
           <Route element={<App />}>
             <Route index element={<Analytics />} />
             {/* Старая страница «Трафик» больше не актуальна: старые ссылки ведём на Аналитику. */}
@@ -21,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
             <Route path="glossary" element={<Glossary />} />
             <Route path="partners/:id" element={<PartnerDetail />} />
             <Route path="creators/:slug" element={<CreatorPage />} />
+            <Route path="admin/users" element={<AdminUsers />} />
           </Route>
         </Routes>
       </ModelProvider>

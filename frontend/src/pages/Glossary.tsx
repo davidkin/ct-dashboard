@@ -7,10 +7,13 @@ import {
   deleteGlossaryLink,
   fetchGlossary,
   fetchOmLinks,
+  getShareLink,
+  revokeShareLink,
   GlossaryLink,
   GlossaryMeta,
   GlossaryPartner,
   GlossaryValidationError,
+  isAdmin,
   isAdminConfigured,
   OmLink,
   patchLink,
@@ -141,9 +144,7 @@ export default function Glossary() {
           <div className="an-card-head">
             <h3>Глоссарий</h3>
           </div>
-          <p className="gl-empty">
-            Не заданы админ-креды (VITE_ADMIN_USER / VITE_ADMIN_PASS) — страница работает под админом.
-          </p>
+          <p className="gl-empty">Нужен вход — эта страница доступна после логина.</p>
         </div>
       </div>
     );
@@ -371,6 +372,7 @@ export default function Glossary() {
                         <OmReportCell partner={p} onChanged={() => void load()} />
                       </td>
                       <td className="gl-actions">
+                        <ShareLinkButton partnerId={p.id} />
                         <button
                           type="button"
                           className="btn ghost btn-sm"
@@ -423,6 +425,80 @@ export default function Glossary() {
         />
       )}
     </div>
+  );
+}
+
+/** Личный кабинет траффера: секретная ссылка на его же карточку, без логина —
+    ровно как shared report в OnlyMonster. Генерируется по клику, копируется,
+    и отзывается (старая ссылка перестаёт открываться). */
+function ShareLinkButton({ partnerId }: { partnerId: number }) {
+  const [open, setOpen] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function reveal(e: React.MouseEvent) {
+    e.stopPropagation();
+    setOpen((v) => !v);
+    if (link || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const token = await getShareLink(partnerId);
+      setLink(`${window.location.origin}/cabinet/${token}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!link) return;
+    await navigator.clipboard.writeText(link).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function revoke(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm("Отозвать ссылку кабинета? Старая перестанет открываться.")) return;
+    setBusy(true);
+    try {
+      await revokeShareLink(partnerId);
+      setLink(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <span className="gl-share-wrap">
+      <button type="button" className="btn ghost btn-sm" onClick={reveal} title="Ссылка на личный кабинет">
+        Кабинет
+      </button>
+      {open && (
+        <div className="gl-share-pop" onClick={(e) => e.stopPropagation()}>
+          {busy && !link && <span className="muted">Готовлю ссылку…</span>}
+          {error && <span className="pm-err">{error}</span>}
+          {link && (
+            <>
+              <input className="input gl-share-input" readOnly value={link} onFocus={(e) => e.target.select()} />
+              <button type="button" className="btn ghost btn-sm" onClick={copy}>
+                {copied ? "Скопировано" : "Копировать"}
+              </button>
+              <button type="button" className="btn ghost btn-sm" onClick={revoke} disabled={busy}>
+                Отозвать
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </span>
   );
 }
 
@@ -706,15 +782,17 @@ function LinkRow({ link, onChanged }: { link: GlossaryLink; onChanged: () => voi
       </td>
       <td />
       <td className="gl-actions">
-        <button
-          type="button"
-          className="gl-del"
-          disabled={busy}
-          onClick={remove}
-          title={`Удалить ${link.campaign_code} из глоссария`}
-        >
-          ✕
-        </button>
+        {isAdmin() && (
+          <button
+            type="button"
+            className="gl-del"
+            disabled={busy}
+            onClick={remove}
+            title={`Удалить ${link.campaign_code} из глоссария`}
+          >
+            ✕
+          </button>
+        )}
       </td>
     </tr>
   );

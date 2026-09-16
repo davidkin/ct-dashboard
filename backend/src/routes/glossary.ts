@@ -8,6 +8,7 @@
  */
 import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
+import { requireAdmin } from "../lib/auth";
 import { listTrackingLinks } from "../om/client";
 import {
   getModelGroup,
@@ -463,6 +464,7 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
    * молча стирает историю выплат.
    */
   app.delete<{ Params: { id: string } }>("/api/glossary/links/:id", async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
     const id = Number(req.params.id);
     const link = db.prepare("SELECT id, campaign_code FROM links WHERE id = ?").get(id) as
       | { id: number; campaign_code: string }
