@@ -1467,15 +1467,22 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 }
 .pd-camp-url {
   max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 12px; color: var(--muted);
+  font-size: 12px;
 }
-.pd-camp-url a { color: inherit; }
-.pd-camp-url a:hover { color: var(--accent); }
+.pd-camp-url a { color: var(--text); opacity: .75; }
+.pd-camp-url a:hover { color: var(--accent); opacity: 1; }
 
 .dm-table tfoot .dm-total-row td {
   position: sticky; bottom: 0; z-index: 1; background: var(--surface2);
   font-weight: 700; border-top: 1px solid var(--line);
 }
+/* Эта же td одновременно .dm-frz (залипает слева) — специфичность правила выше
+   ($.dm-total-row td$ бьёт $.dm-frz$: 0,2,2 против 0,2,1), поэтому z-index здесь
+   молча падал обратно на 1, и соседняя нефрозен-колонка (тот же z-index, но позже
+   в DOM) рисовалась поверх — например, "$1,942.80" обрезалось до "$19", а "595"
+   следующей группы наезжало вплотную. Явный селектор возвращает залипшим ячейкам
+   Total-строки их z-index:3. */
+.dm-table tfoot .dm-total-row td.dm-frz { z-index: 3; }
 
 /* ── Плавающий попап суммы выделенных ячеек ── */
 .dm-sum-popup {

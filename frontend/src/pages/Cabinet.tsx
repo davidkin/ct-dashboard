@@ -71,6 +71,9 @@ export default function Cabinet() {
   const [campSort, setCampSort] = useState<CampSort>(DEFAULT_CAMP_SORT);
   const campaigns = useMemo(() => aggregateCampaigns(data?.report ?? null, campSort), [data, campSort]);
   const campTotals = useMemo(() => campaignTotals(campaigns), [campaigns]);
+  /* Открыт по умолчанию: в кабинете это единственное место со списком ссылок,
+     в отличие от карточки партнёра, где рядом есть ещё несколько блоков. */
+  const [campOpen, setCampOpen] = useState(true);
 
   return (
     <div className="cabinet-shell">
@@ -93,6 +96,7 @@ export default function Cabinet() {
       </header>
 
       <main className="app-main">
+      <div className="an">
         {loading && !data && <p className="muted">Загружаю…</p>}
         {t && (
           <div className="an-kpis pd-kpis">
@@ -126,58 +130,62 @@ export default function Cabinet() {
             админ на карточке партнёра, продублирован здесь снизу для траффера. */}
         {data && campaigns.length > 0 && (
           <div className="an-card">
-            <div className="an-card-head">
+            <div className={`pd-acc-head${campOpen ? " open" : ""}`} onClick={() => setCampOpen((s) => !s)}>
               <h3>
                 Кампании <span className="faint">· {campaigns.length}</span>
               </h3>
+              <span className="pd-acc-caret">▶</span>
             </div>
-            <div className="an-table-wrap">
-              <table className="an-table">
-                <thead>
-                  <tr>
-                    <SortTh label="Кампания" col="code" sort={campSort} onSort={setCampSort} />
-                    <th>Тир</th>
-                    <th>Ссылка</th>
-                    <SortTh label="Клики" col="clicks" sort={campSort} onSort={setCampSort} num />
-                    <SortTh label="Фаны" col="fans" sort={campSort} onSort={setCampSort} num />
-                    <SortTh label="Конверт" col="cr" sort={campSort} onSort={setCampSort} num />
-                    <SortTh label="Выплата" col="payout" sort={campSort} onSort={setCampSort} num />
-                  </tr>
-                </thead>
-                <tbody>
-                  {campaigns.map((c) => (
-                    <tr key={c.link_id} style={{ cursor: "default" }}>
-                      <td>{c.code}</td>
-                      <td>
-                        <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
-                      </td>
-                      <td className="pd-camp-url">
-                        <a href={c.of_url} target="_blank" rel="noreferrer">
-                          {c.of_url}
-                        </a>
-                      </td>
-                      <td className="num">{fmt(c.clicks)}</td>
-                      <td className="num">{fmt(c.fans)}</td>
-                      <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
-                      <td className="num accent">{money(c.payout)}</td>
+            {campOpen && (
+              <div className="an-table-wrap">
+                <table className="an-table">
+                  <thead>
+                    <tr>
+                      <SortTh label="Кампания" col="code" sort={campSort} onSort={setCampSort} />
+                      <th>Тир</th>
+                      <th>Ссылка</th>
+                      <SortTh label="Клики" col="clicks" sort={campSort} onSort={setCampSort} num />
+                      <SortTh label="Фаны" col="fans" sort={campSort} onSort={setCampSort} num />
+                      <SortTh label="Конверт" col="cr" sort={campSort} onSort={setCampSort} num />
+                      <SortTh label="Выплата" col="payout" sort={campSort} onSort={setCampSort} num />
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="dm-total-row">
-                    <td>Total</td>
-                    <td />
-                    <td />
-                    <td className="num">{fmt(campTotals.clicks)}</td>
-                    <td className="num">{fmt(campTotals.fans)}</td>
-                    <td className="num">{pct(campTotals.cr)}</td>
-                    <td className="num accent">{money(campTotals.payout)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {campaigns.map((c) => (
+                      <tr key={c.link_id} style={{ cursor: "default" }}>
+                        <td>{c.code}</td>
+                        <td>
+                          <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
+                        </td>
+                        <td className="pd-camp-url">
+                          <a href={c.of_url} target="_blank" rel="noreferrer">
+                            {c.of_url}
+                          </a>
+                        </td>
+                        <td className="num">{fmt(c.clicks)}</td>
+                        <td className="num">{fmt(c.fans)}</td>
+                        <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
+                        <td className="num accent">{money(c.payout)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="dm-total-row">
+                      <td>Total</td>
+                      <td />
+                      <td />
+                      <td className="num">{fmt(campTotals.clicks)}</td>
+                      <td className="num">{fmt(campTotals.fans)}</td>
+                      <td className="num">{pct(campTotals.cr)}</td>
+                      <td className="num accent">{money(campTotals.payout)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </div>
         )}
+      </div>
       </main>
     </div>
   );
