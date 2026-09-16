@@ -103,10 +103,20 @@ export default function Cabinet() {
             <div className="an-kpi">
               <div className="an-kpi-label">Клики</div>
               <div className="an-kpi-val">{fmt(t.clicks)}</div>
+              {data?.report.summary && (
+                <div className="an-kpi-sub">
+                  Free {fmt(data.report.summary.free.clicks)} · VIP {fmt(data.report.summary.paid.clicks)}
+                </div>
+              )}
             </div>
             <div className="an-kpi">
               <div className="an-kpi-label">Фаны</div>
               <div className="an-kpi-val">{fmt(t.fans)}</div>
+              {data?.report.summary && (
+                <div className="an-kpi-sub">
+                  Free {fmt(data.report.summary.free.fans)} · VIP {fmt(data.report.summary.paid.fans)}
+                </div>
+              )}
             </div>
             <div className="an-kpi">
               <div className="an-kpi-label">Конверт</div>

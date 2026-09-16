@@ -143,9 +143,17 @@ export default function PartnerDetail() {
 
   const name = meta?.display_name ?? rep?.campaigns[0]?.partner_name ?? `Партнёр #${pid}`;
 
+  /* Free/VIP разбивка тех же чисел, что уже в totals — считаем из тех же campaigns,
+     чтобы сумма Free+VIP всегда сходилась с общим числом наверху. */
+  const tierSplit = (pick: (c: (typeof campaigns)[number]) => number) => {
+    const free = campaigns.filter((c) => c.tier === "free").reduce((s, c) => s + pick(c), 0);
+    const paid = campaigns.filter((c) => c.tier === "paid").reduce((s, c) => s + pick(c), 0);
+    return `Free ${fmt(free)} · VIP ${fmt(paid)}`;
+  };
+
   const kpis = [
-    { label: "Клики", value: fmt(totals.clicks), accent: false },
-    { label: "Фаны", value: fmt(totals.fans), accent: false },
+    { label: "Клики", value: fmt(totals.clicks), accent: false, sub: tierSplit((c) => c.clicks) },
+    { label: "Фаны", value: fmt(totals.fans), accent: false, sub: tierSplit((c) => c.fans) },
     { label: "Конверт", value: pct(totals.cr), accent: false },
     { label: "Выручка", value: money(meta?.revenue ?? 0), accent: true },
     { label: "Выплата", value: money(totals.payout), accent: true },
@@ -225,6 +233,7 @@ export default function PartnerDetail() {
           <div key={k.label} className="an-kpi">
             <div className="an-kpi-label">{k.label}</div>
             <div className={`an-kpi-val${k.accent ? " accent" : ""}`}>{k.value}</div>
+            {k.sub && <div className="an-kpi-sub">{k.sub}</div>}
           </div>
         ))}
       </div>
