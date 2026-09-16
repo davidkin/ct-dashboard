@@ -339,13 +339,18 @@ function CpfNote({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <span
-        className={`dm-note${editable ? " dm-note-btn" : ""}`}
-        onClick={() => editable && setOpen(true)}
-        title={editable ? "Ставка и история изменений" : undefined}
-      >
+      <span className="dm-note">
         {label} <b>{value != null ? money(value) : "—"}</b>
-        {editable && <span className="dm-note-pen">✎</span>}
+        {editable && (
+          <button
+            type="button"
+            className="dm-note-hist-btn"
+            onClick={() => setOpen(true)}
+            title="Ставка и история изменений"
+          >
+            🕒
+          </button>
+        )}
       </span>
       {open && (
         <CpfHistoryModal
