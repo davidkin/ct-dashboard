@@ -19,9 +19,11 @@ import { registerGlossaryRoutes } from "./routes/glossary";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerCabinetRoutes } from "./routes/cabinet";
+import { registerReplyStatsRoutes } from "./routes/reply-stats";
 import { currentUser, type SessionUser } from "./lib/auth";
 import { startScheduler } from "./of/scheduler";
 import { startDailyCapture } from "./daily/scheduler";
+import { startReplyStatsWorker } from "./om/reply-stats-worker";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -59,6 +61,7 @@ async function main() {
   await registerGlossaryRoutes(app);
   await registerAdminRoutes(app);
   await registerCabinetRoutes(app);
+  await registerReplyStatsRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
   /* В проде за nginx ставь HOST=127.0.0.1 — тогда 3001 не торчит наружу. */
@@ -68,6 +71,7 @@ async function main() {
 
   startScheduler();
   startDailyCapture();
+  startReplyStatsWorker();
 }
 
 main().catch((err) => {

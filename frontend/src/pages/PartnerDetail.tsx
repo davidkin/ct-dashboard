@@ -14,6 +14,7 @@ import { useModel } from "../hooks/useModel";
 import DailyMatrix from "../components/DailyMatrix";
 import DateRangePicker from "../components/DateRangePicker";
 import OmReconcile from "../components/OmReconcile";
+import ReplyStatsWidget from "../components/ReplyStatsWidget";
 import { aggregateCampaigns, campaignTotals, CampSort, DEFAULT_CAMP_SORT } from "../lib/campaignAgg";
 
 /* Профиль партнёра (дизайн, экран 5). Данные — через export-токен (combined),
@@ -256,6 +257,9 @@ export default function PartnerDetail() {
 
       {/* сверка тоталов с OM (истина) — свёрнута, под «Динамика по дням» */}
       <OmReconcile partnerId={pid} collapsible />
+
+      {/* конверсия "фан ответил на приветку" — свёрнута, фоновый воркер досчитывает данные */}
+      <ReplyStatsWidget partnerId={pid} collapsible />
 
       {/* кампании / ссылки — свёрнуты в аккордеон */}
       <div className="an-card">

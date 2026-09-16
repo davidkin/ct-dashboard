@@ -242,6 +242,27 @@ const MIGRATIONS: Migration[] = [
       ON cpf_history(partner_id, tier, effective_from);
     `,
   },
+  {
+    id: "007_fan_reply_stats",
+    sql: `
+    /* Конверсия "фан ответил на приветку": считается фоновым воркером (не на
+       чтении отчёта — OM API отдаёт 1 запрос/сек, вживую это было бы слишком
+       медленно). Воркер постепенно обходит фанов через
+       GET /chats/{fan_id}/messages и кладёт результат сюда; виджет в дашборде
+       просто читает готовые строки. */
+    CREATE TABLE IF NOT EXISTS fan_reply_stats (
+      link_id INTEGER NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+      of_fan_id TEXT NOT NULL,
+      has_greeting INTEGER NOT NULL DEFAULT 0,
+      replied INTEGER NOT NULL DEFAULT 0,
+      reply_seconds REAL,
+      om_error INTEGER NOT NULL DEFAULT 0,
+      checked_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (link_id, of_fan_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_fan_reply_stats_checked ON fan_reply_stats(checked_at);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

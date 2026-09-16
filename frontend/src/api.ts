@@ -762,6 +762,42 @@ export async function addCpfHistory(
   return json.data as CpfHistoryEntry[];
 }
 
+/** Конверсия "фан ответил на приветку" — считается фоновым воркером на бэке,
+    здесь только чтение готовых цифр (см. src/om/reply-stats-worker.ts). */
+export interface ReplyStatsCampaign {
+  campaign_code: string;
+  total: number;
+  replied: number;
+  pct: number;
+}
+export interface ReplyStatsReport {
+  from: string;
+  to: string;
+  partner_id: number | null;
+  creator: string | null;
+  checked: number;
+  eligible: number;
+  pending: number;
+  valid: number;
+  replied: number;
+  pct: number | null;
+  median_reply_seconds: number | null;
+  avg_reply_seconds: number | null;
+  campaigns: ReplyStatsCampaign[];
+}
+
+export async function fetchReplyStats(opts: { partnerId?: number; from?: string; to?: string } = {}): Promise<ReplyStatsReport> {
+  const params = new URLSearchParams();
+  if (opts.partnerId != null) params.set("partner_id", String(opts.partnerId));
+  if (opts.from) params.set("from", opts.from);
+  if (opts.to) params.set("to", opts.to);
+  const qs = params.toString();
+  const res = await fetch(manageUrl(`/reply-stats${qs ? `?${qs}` : ""}`), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as ReplyStatsReport;
+}
+
 export interface CabinetData {
   partner: { id: number; display_name: string; telegram: string | null };
   report: DailyReport;

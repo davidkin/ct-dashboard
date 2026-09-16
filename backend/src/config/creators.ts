@@ -121,6 +121,11 @@ export function creatorsInModelGroup(modelGroup: string): string[] {
     .map(([name]) => name);
 }
 
+/** Все настроенные creator-ы, кроме retired (за ними в OM больше не ходим). */
+export function activeCreatorNames(): string[] {
+  return Object.keys(CREATOR_CONFIG).filter((name) => !isRetiredCreator(name));
+}
+
 export function creatorSlug(name: string): string {
   return name
     .toLowerCase()
