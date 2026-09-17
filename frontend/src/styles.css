@@ -1273,7 +1273,10 @@ table.gs-table { border-collapse: collapse; font-size: 12.5px; color: #000; back
 .rs-stat-val { font-size: 18px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .rs-stat-val.accent { color: var(--accent); }
 .rs-table td, .rs-table th { font-size: 12.5px; }
-.rs-note { padding: 0 20px 14px; font-size: 12px; }
+.rs-progress-wrap { padding: 0 20px 14px; }
+.rs-progress-bar { height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; margin-bottom: 6px; }
+.rs-progress-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; }
+.rs-note { font-size: 12px; margin: 0; }
 @media (max-width: 720px) { .rs-stats { grid-template-columns: repeat(2, 1fr); } }
 
 .an-rownum-h, .an-table td.an-rownum { width: 34px; text-align: center; }

@@ -1,9 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchReplyStats, ReplyStatsReport } from "../api";
 
 /* Конверсия "фан ответил на приветку" — фоновый воркер на бэке понемногу
    обходит фанов через OM API и складывает результат в fan_reply_stats;
-   здесь только читаем готовые цифры (может расти постепенно, см. pending). */
+   здесь только читаем готовые цифры (может расти постепенно, см. pending).
+   Пока pending>0 и карточка открыта — сам перепроверяет каждые 20с, чтобы
+   рост цифр было видно без ручного обновления страницы (это и есть "таймер"
+   для фоновой обработки — воркер общий на всех партнёров, поэтому точный ETA
+   для конкретного партнёра посчитать нельзя, только нижняя оценка). */
+
+const POLL_MS = 20_000;
+/* Пропускная способность воркера: см. BATCH_SIZE/TICK_MS в reply-stats-worker.ts. */
+const WORKER_FANS_PER_HOUR = (45 / 90) * 3600;
 
 function fmtMin(sec: number | null): string {
   if (sec == null) return "—";
@@ -12,11 +20,19 @@ function fmtMin(sec: number | null): string {
   return `${(min / 60).toFixed(1)} ч`;
 }
 
+function fmtEta(pending: number): string {
+  const hours = pending / WORKER_FANS_PER_HOUR;
+  if (hours < 1) return `${Math.ceil(hours * 60)} мин`;
+  return `${hours.toFixed(1)} ч`;
+}
+
 export default function ReplyStatsWidget({ partnerId, collapsible = true }: { partnerId?: number; collapsible?: boolean }) {
   const [rep, setRep] = useState<ReplyStatsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState(!collapsible);
+  const repRef = useRef(rep);
+  repRef.current = rep;
 
   useEffect(() => {
     let alive = true;
@@ -29,6 +45,18 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
       alive = false;
     };
   }, [partnerId]);
+
+  /* Живое обновление, пока есть что досчитывать и карточка открыта. */
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => {
+      if (!repRef.current || repRef.current.pending <= 0) return;
+      fetchReplyStats({ partnerId })
+        .then(setRep)
+        .catch(() => {});
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [open, partnerId]);
 
   const campaigns = (rep?.campaigns ?? []).filter((c) => c.total >= 3);
 
@@ -45,9 +73,15 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
             <ReplyStat label="Ещё считается" value={`${rep.pending}`} />
           </div>
           {rep.pending > 0 && (
-            <p className="muted rs-note">
-              Фоновый процесс постепенно досчитывает остальных ({rep.checked}/{rep.eligible}) — цифры будут расти.
-            </p>
+            <div className="rs-progress-wrap">
+              <div className="rs-progress-bar">
+                <div className="rs-progress-fill" style={{ width: `${Math.min(100, (rep.checked / Math.max(1, rep.eligible)) * 100)}%` }} />
+              </div>
+              <p className="muted rs-note">
+                Фоновый процесс досчитывает остальных ({rep.checked}/{rep.eligible}) · не быстрее ~{fmtEta(rep.pending)} —
+                цифры обновляются сами каждые 20 сек, воркер общий на всех партнёров.
+              </p>
+            </div>
           )}
           {campaigns.length > 0 && (
             <div className="an-table-wrap">
