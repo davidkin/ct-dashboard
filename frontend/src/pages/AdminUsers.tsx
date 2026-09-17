@@ -11,6 +11,8 @@ export default function AdminUsers() {
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("affiliate_manager");
+  const [canSeeExternal, setCanSeeExternal] = useState(true);
+  const [canSeeInhouse, setCanSeeInhouse] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -38,13 +40,26 @@ export default function AdminUsers() {
     setError(null);
     setBusy(true);
     try {
-      await addToWhitelist(email.trim().toLowerCase(), role);
+      await addToWhitelist(email.trim().toLowerCase(), role, canSeeExternal, canSeeInhouse);
       setEmail("");
+      setCanSeeExternal(true);
+      setCanSeeInhouse(true);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function togglePermission(row: WhitelistEntry, field: "external" | "inhouse") {
+    try {
+      const nextExternal = field === "external" ? !row.can_see_external : !!row.can_see_external;
+      const nextInhouse = field === "inhouse" ? !row.can_see_inhouse : !!row.can_see_inhouse;
+      await addToWhitelist(row.email, row.role, nextExternal, nextInhouse);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -78,6 +93,14 @@ export default function AdminUsers() {
             <option value="affiliate_manager">Аффилейт-менеджер</option>
             <option value="admin">Админ</option>
           </select>
+          <label className="au-check">
+            <input type="checkbox" checked={canSeeExternal} onChange={(e) => setCanSeeExternal(e.target.checked)} />
+            External
+          </label>
+          <label className="au-check">
+            <input type="checkbox" checked={canSeeInhouse} onChange={(e) => setCanSeeInhouse(e.target.checked)} />
+            In-house
+          </label>
           <button type="submit" className="btn" disabled={busy || !email}>
             Добавить
           </button>
@@ -90,6 +113,8 @@ export default function AdminUsers() {
               <tr>
                 <th>Почта</th>
                 <th>Роль</th>
+                <th>External</th>
+                <th>In-house</th>
                 <th>Статус</th>
                 <th>Добавил</th>
                 <th />
@@ -98,7 +123,7 @@ export default function AdminUsers() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={5} className="muted">
+                  <td colSpan={7} className="muted">
                     Загружаю…
                   </td>
                 </tr>
@@ -108,6 +133,22 @@ export default function AdminUsers() {
                   <tr key={r.email}>
                     <td>{r.email}</td>
                     <td>{roleLabel(r.role)}</td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={!!r.can_see_external}
+                        onChange={() => togglePermission(r, "external")}
+                        title="Видит партнёров типа External"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={!!r.can_see_inhouse}
+                        onChange={() => togglePermission(r, "inhouse")}
+                        title="Видит партнёров типа In-house"
+                      />
+                    </td>
                     <td className="muted">
                       {r.registered
                         ? r.user_active
@@ -125,7 +166,7 @@ export default function AdminUsers() {
                 ))}
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="muted">
+                  <td colSpan={7} className="muted">
                     Список пуст.
                   </td>
                 </tr>

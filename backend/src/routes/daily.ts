@@ -3,6 +3,8 @@ import { buildDailyReport } from "../daily/report";
 import { captureDailyClicks } from "../daily/capture";
 import { importTrafficSheet } from "../daily/sheet-import";
 import { todayLocal, addDays } from "../lib/tz";
+import { canSeePartnerType } from "../lib/auth";
+import { getDb } from "../db/index";
 
 export async function registerDailyRoutes(app: FastifyInstance): Promise<void> {
   /**
@@ -13,10 +15,19 @@ export async function registerDailyRoutes(app: FastifyInstance): Promise<void> {
    */
   app.get<{ Querystring: { creator?: string; from?: string; to?: string; all?: string; partner?: string; sheet_only?: string; source?: string; tier?: string } }>(
     "/api/daily-tracking",
-    async (req) => {
+    async (req, reply) => {
       const to = req.query.to || todayLocal();
       const from = req.query.from || addDays(to, -29);
       const partnerNum = req.query.partner ? Number(req.query.partner) : null;
+      if (Number.isFinite(partnerNum) && partnerNum != null) {
+        const partner = getDb().prepare(`SELECT type FROM partners WHERE id = ?`).get(partnerNum) as
+          | { type: string | null }
+          | undefined;
+        if (partner && !canSeePartnerType(req.user, partner.type)) {
+          reply.code(403);
+          return { error: "Нет доступа к партнёрам этого типа" };
+        }
+      }
       const report = buildDailyReport({
         creator: req.query.creator || null,
         from,

@@ -15,6 +15,8 @@ export interface SessionUser {
   id: number;
   email: string;
   role: Role;
+  canSeeExternal: boolean;
+  canSeeInhouse: boolean;
 }
 
 const COOKIE_NAME = "ct_session";
@@ -77,14 +79,31 @@ export function currentUser(req: FastifyRequest): SessionUser | null {
   if (!token) return null;
   const row = getDb()
     .prepare(
-      `SELECT u.id, u.username AS email, u.role, u.active
+      `SELECT u.id, u.username AS email, u.role, u.active, u.can_see_external, u.can_see_inhouse
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND s.expires_at > datetime('now')`,
     )
-    .get(token) as { id: number; email: string; role: string; active: number } | undefined;
+    .get(token) as
+    | { id: number; email: string; role: string; active: number; can_see_external: number; can_see_inhouse: number }
+    | undefined;
   if (!row || !row.active) return null;
   getDb().prepare(`UPDATE sessions SET last_seen_at = datetime('now') WHERE token = ?`).run(token);
-  return { id: row.id, email: row.email, role: row.role as Role };
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role as Role,
+    canSeeExternal: !!row.can_see_external,
+    canSeeInhouse: !!row.can_see_inhouse,
+  };
+}
+
+/** Видит ли этот пользователь партнёра такого типа (p.type из Glossary: "External"/"In-house").
+    Незнакомый/пустой тип (напр. "NEW") не прячем — фильтруем только по двум известным значениям. */
+export function canSeePartnerType(user: SessionUser | undefined, type: string | null | undefined): boolean {
+  if (!user) return false;
+  if (type === "External") return user.canSeeExternal;
+  if (type === "In-house") return user.canSeeInhouse;
+  return true;
 }
 
 /** preHandler-хелпер: 403, если текущий пользователь не admin. Используй в конце write-роутов,

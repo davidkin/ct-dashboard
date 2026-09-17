@@ -666,6 +666,8 @@ export async function logout(): Promise<void> {
 export interface WhitelistEntry {
   email: string;
   role: Role;
+  can_see_external: 0 | 1;
+  can_see_inhouse: 0 | 1;
   added_by: string | null;
   created_at: string;
   registered: 0 | 1;
@@ -679,12 +681,17 @@ export async function fetchWhitelist(): Promise<WhitelistEntry[]> {
   return json.data as WhitelistEntry[];
 }
 
-export async function addToWhitelist(email: string, role: Role): Promise<void> {
+export async function addToWhitelist(
+  email: string,
+  role: Role,
+  canSeeExternal = true,
+  canSeeInhouse = true,
+): Promise<void> {
   const res = await fetch(manageUrl("/admin/whitelist"), {
     method: "POST",
     credentials: "include",
     headers: authHeaders(),
-    body: JSON.stringify({ email, role }),
+    body: JSON.stringify({ email, role, can_see_external: canSeeExternal, can_see_inhouse: canSeeInhouse }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);

@@ -1843,9 +1843,10 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .login-submit { width: 100%; margin-top: 6px; padding: 9px; font-size: 13.5px; }
 
 /* === Список доступа (админ) === */
-.au-form { display: flex; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--lineSoft); flex-wrap: wrap; }
+.au-form { display: flex; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--lineSoft); flex-wrap: wrap; align-items: center; }
 .au-form .input { flex: 1 1 220px; min-width: 180px; }
 .au-form select.input { flex: 0 0 200px; }
+.au-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 
 /* === Кабинет траффера (публичная страница, без шелла приложения) === */
 .cabinet-shell { min-height: 100vh; background: var(--bg); }

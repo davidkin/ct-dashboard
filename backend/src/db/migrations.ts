@@ -263,6 +263,18 @@ const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS idx_fan_reply_stats_checked ON fan_reply_stats(checked_at);
     `,
   },
+  {
+    id: "008_partner_type_permissions",
+    sql: `
+    /* Пермишен на видимость партнёров по типу (External / In-house), на почту.
+       По умолчанию оба включены — правки в "Доступ" не режут видимость
+       никому, пока админ явно не выключит галочку. */
+    ALTER TABLE allowed_emails ADD COLUMN can_see_external INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE allowed_emails ADD COLUMN can_see_inhouse INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE users ADD COLUMN can_see_external INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE users ADD COLUMN can_see_inhouse INTEGER NOT NULL DEFAULT 1;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

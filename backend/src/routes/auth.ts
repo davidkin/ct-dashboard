@@ -48,16 +48,19 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     }
 
     /* Аккаунта нет — заводим, только если почта в вайт-листе. */
-    const allowed = db.prepare(`SELECT role FROM allowed_emails WHERE email = ?`).get(email) as
-      | { role: string }
-      | undefined;
+    const allowed = db
+      .prepare(`SELECT role, can_see_external, can_see_inhouse FROM allowed_emails WHERE email = ?`)
+      .get(email) as { role: string; can_see_external: number; can_see_inhouse: number } | undefined;
     if (!allowed) {
       reply.code(403);
       return { error: "Эта почта не в списке доступа. Попроси администратора добавить её." };
     }
     const info = db
-      .prepare(`INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)`)
-      .run(email, hashPassword(password), allowed.role);
+      .prepare(
+        `INSERT INTO users (username, password_hash, role, can_see_external, can_see_inhouse)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(email, hashPassword(password), allowed.role, allowed.can_see_external, allowed.can_see_inhouse);
     issueSession(reply, Number(info.lastInsertRowid));
     return { data: { email, role: allowed.role } };
   });

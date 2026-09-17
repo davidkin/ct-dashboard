@@ -1,6 +1,7 @@
 import { FastifyInstance } from "fastify";
 import Database from "better-sqlite3";
 import { getDb } from "../db/index";
+import { canSeePartnerType, type SessionUser } from "../lib/auth";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -78,13 +79,13 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
       const creator = req.query.creator?.trim();
       const periodActive = !!(req.query.from && req.query.to && DATE_RE.test(req.query.from) && DATE_RE.test(req.query.to));
       if (periodActive) {
-        return periodMode(db, req.query.from!, req.query.to!, creator);
+        return periodMode(db, req.query.from!, req.query.to!, creator, req.user);
       }
-      return classicMode(db, creator);
+      return classicMode(db, creator, req.user);
     },
   );
 
-  async function classicMode(db: Database.Database, creator?: string) {
+  async function classicMode(db: Database.Database, creator: string | undefined, user: SessionUser | undefined) {
 
     const sql = creator
       ? `SELECT
@@ -137,12 +138,13 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
          GROUP BY p.id
          ORDER BY p.display_name COLLATE NOCASE`;
 
-    const rows = (creator
-      ? db.prepare(sql).all(creator)
-      : db.prepare(sql).all()) as Array<{
+    const rows = (
+      (creator ? db.prepare(sql).all(creator) : db.prepare(sql).all()) as Array<{
         id: number;
+        type: string | null;
         [k: string]: unknown;
-      }>;
+      }>
+    ).filter((r) => canSeePartnerType(user, r.type));
 
     /* === Per-creator breakdown (для раскрывающихся строк) === */
     const breakdownSql = `
@@ -297,7 +299,7 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
    * Считаем clicks/subs/spenders/revenue как ПРИРОСТ за период.
    * Payout пересчитывается per-link по приросту.
    */
-  async function periodMode(db: Database.Database, from: string, to: string, creator?: string) {
+  async function periodMode(db: Database.Database, from: string, to: string, creator: string | undefined, user: SessionUser | undefined) {
     const deltas = periodLinkDelta(db, from, to)
       .filter((l) => !creator || l.creator === creator);
 
@@ -350,12 +352,14 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
     }
 
     /* Все партнёры (даже с 0 в периоде — пользователь просил всех) */
-    const partners = db
-      .prepare(`SELECT p.id, p.display_name, p.glossary_name, p.telegram, p.type, p.source, p.monthly_fee, p.notes FROM partners p ORDER BY p.display_name COLLATE NOCASE`)
-      .all() as Array<{
-        id: number; display_name: string; glossary_name: string; telegram: string | null;
-        type: string | null; source: string | null; monthly_fee: number | null; notes: string | null;
-      }>;
+    const partners = (
+      db
+        .prepare(`SELECT p.id, p.display_name, p.glossary_name, p.telegram, p.type, p.source, p.monthly_fee, p.notes FROM partners p ORDER BY p.display_name COLLATE NOCASE`)
+        .all() as Array<{
+          id: number; display_name: string; glossary_name: string; telegram: string | null;
+          type: string | null; source: string | null; monthly_fee: number | null; notes: string | null;
+        }>
+    ).filter((p) => canSeePartnerType(user, p.type));
 
     /* Линки для drill-down — выводим только те у которых был >0 в окне */
     const linksByPartner = new Map<number, ReturnType<typeof rebuildLinkRow>[]>();
@@ -437,10 +441,14 @@ export async function registerPartnerRoutes(app: FastifyInstance): Promise<void>
       const id = Number(req.params.id);
       const creator = req.query.creator?.trim();
 
-      const partner = db.prepare(`SELECT * FROM partners WHERE id = ?`).get(id);
+      const partner = db.prepare(`SELECT * FROM partners WHERE id = ?`).get(id) as { type: string | null } | undefined;
       if (!partner) {
         reply.code(404);
         return { error: "Partner not found" };
+      }
+      if (!canSeePartnerType(req.user, partner.type)) {
+        reply.code(403);
+        return { error: "Нет доступа к партнёрам этого типа" };
       }
       const links = creator
         ? db
