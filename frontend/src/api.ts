@@ -805,9 +805,21 @@ export async function fetchReplyStats(opts: { partnerId?: number; from?: string;
   return json.data as ReplyStatsReport;
 }
 
+export interface CabinetLifetimeLink {
+  id: number;
+  creator: string;
+  campaign_code: string;
+  clicks: number;
+  fans: number;
+  payout: number;
+}
 export interface CabinetData {
   partner: { id: number; display_name: string; telegram: string | null };
   report: DailyReport;
+  lifetime: {
+    links: CabinetLifetimeLink[];
+    total: { clicks: number; fans: number; payout: number };
+  };
 }
 
 /** Личный кабинет траффера — без сессии, токен в адресе и есть авторизация. */

@@ -128,6 +128,58 @@ export default function Cabinet() {
             </div>
           </div>
         )}
+        {/* Тотал за всю жизнь ссылок — не зависит от выбранного периода выше.
+            Нужен для партнёров, у кого активность была ДО старта посуточного
+            трекинга: таблица по дням тогда показывает 0 (нечего восстановить
+            задним числом), а тут — реальный кумулятивный счётчик с линка. */}
+        {data && data.lifetime.total.clicks + data.lifetime.total.fans + data.lifetime.total.payout > 0 && (
+          <div className="an-card">
+            <div className="an-card-head">
+              <h3>Всего за всё время</h3>
+            </div>
+            <div className="an-widget-nums" style={{ padding: "0 20px 16px" }}>
+              <div>
+                <div className="an-kpi-label">Клики</div>
+                <div className="an-kpi-val">{fmt(data.lifetime.total.clicks)}</div>
+              </div>
+              <div>
+                <div className="an-kpi-label">Фаны</div>
+                <div className="an-kpi-val">{fmt(data.lifetime.total.fans)}</div>
+              </div>
+              <div>
+                <div className="an-kpi-label">Выплата</div>
+                <div className="an-kpi-val accent">{money(data.lifetime.total.payout)}</div>
+              </div>
+            </div>
+            <div className="an-table-wrap">
+              <table className="an-table">
+                <thead>
+                  <tr>
+                    <th>Кампания</th>
+                    <th>Модель</th>
+                    <th className="num">Клики</th>
+                    <th className="num">Фаны</th>
+                    <th className="num">Выплата</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.lifetime.links
+                    .filter((l) => l.clicks > 0 || l.fans > 0 || l.payout > 0)
+                    .map((l) => (
+                      <tr key={l.id} style={{ cursor: "default" }}>
+                        <td>{l.campaign_code}</td>
+                        <td className="muted">{l.creator}</td>
+                        <td className="num">{fmt(l.clicks)}</td>
+                        <td className="num">{fmt(l.fans)}</td>
+                        <td className="num accent">{money(l.payout)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {data && (
           <DailyMatrix
             campaigns={data.report.campaigns}
