@@ -204,7 +204,15 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
 
   /**
    * PATCH /api/links/:id — правка CPF/source/revshare линка.
-   * Выплаты (фаны×cpf) пересчитываются на чтении в «Таблице» автоматически.
+   * Выплаты (фаны×cpf) пересчитываются на чтении в «Таблице» автоматически —
+   * НО только пока у партнёра+тира нет ни одной записи в cpf_history: как
+   * только она появляется (через модалку "история CPF" на странице партнёра),
+   * resolveCpf в report.ts полностью игнорирует live-значение на линке и берёт
+   * ставку из истории. Поэтому если история уже есть — правка здесь молча ни
+   * на что не влияла (реальный баг, нашёл 2026-09-18). Чиним тем же способом:
+   * если у партнёра+тира этого линка УЖЕ есть история, кладём новую запись
+   * "действует с сегодня" со свежерезолвленным значением — тогда правка
+   * реально применяется, начиная с сегодня, не трогая прошлое.
    */
   app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>(
     "/api/links/:id",
@@ -222,9 +230,42 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
         reply.code(400);
         return { error: "No fields to update" };
       }
+      const cpfChanged = req.body?.cpf_free !== undefined || req.body?.cpf_paid !== undefined;
       values.push(id);
-      const r = db.prepare(`UPDATE links SET ${fields.join(", ")} WHERE id = ?`).run(...values);
-      if (r.changes === 0) {
+
+      const tx = db.transaction(() => {
+        const r = db.prepare(`UPDATE links SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+        if (r.changes === 0) return null;
+
+        const link = db
+          .prepare(`SELECT id, partner_id, campaign_code, cpf_free, cpf_paid FROM links WHERE id = ?`)
+          .get(id) as { id: number; partner_id: number; campaign_code: string; cpf_free: number | null; cpf_paid: number | null };
+
+        if (cpfChanged && link.partner_id) {
+          const tier: "free" | "paid" = link.campaign_code.startsWith("camp_paid") ? "paid" : "free";
+          const historyCount = db
+            .prepare(`SELECT COUNT(*) AS n FROM cpf_history WHERE partner_id = ? AND tier = ?`)
+            .get(link.partner_id, tier) as { n: number };
+          if (historyCount.n > 0) {
+            /* НЕ через pickCpf — тот приоритезирует partner.cpf_free над
+               link.cpf_free, а тут нужно ровно то значение, которое юзер
+               только что явно поставил на ЭТОТ линк (иначе если у партнёра
+               уже стоит live cpf_free, оно молча перекроет свежую правку). */
+            const submitted = req.body?.cpf_free ?? req.body?.cpf_paid;
+            const currentValue = submitted != null ? Number(submitted) : (link.cpf_free ?? link.cpf_paid ?? 0);
+            if (currentValue > 0) {
+              const today = todayLocal();
+              db.prepare(
+                `INSERT INTO cpf_history (partner_id, tier, cpf, effective_from, created_by) VALUES (?, ?, ?, ?, ?)`,
+              ).run(link.partner_id, tier, currentValue, today, req.user?.email ?? null);
+            }
+          }
+        }
+        return link;
+      });
+
+      const link = tx();
+      if (!link) {
         reply.code(404);
         return { error: "link not found" };
       }
