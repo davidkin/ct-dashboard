@@ -9,6 +9,7 @@
 import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
 import { todayLocal, addDays } from "../lib/tz";
+import { processScopedReplyStatsBatch } from "../om/reply-stats-worker";
 
 interface Query {
   partner_id?: string;
@@ -107,4 +108,25 @@ export async function registerReplyStatsRoutes(app: FastifyInstance): Promise<vo
       },
     };
   });
+
+  /**
+   * POST /api/reply-stats/recalculate — ручной пересчёт для партнёра за
+   * конкретный диапазон дат подписки, в обход суточного троттлинга фонового
+   * воркера. Один вызов ограничен по батчу (nginx proxy_read_timeout 120s) —
+   * если remaining>0, фронт дёргает ещё раз тем же диапазоном.
+   */
+  app.post<{ Body: { partner_id?: number; from?: string; to?: string } }>(
+    "/api/reply-stats/recalculate",
+    async (req, reply) => {
+      const partnerId = Number(req.body?.partner_id);
+      const from = (req.body?.from ?? "").trim();
+      const to = (req.body?.to ?? "").trim();
+      if (!Number.isFinite(partnerId) || !/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        reply.code(400);
+        return { error: "Укажи partner_id и корректные from/to (ГГГГ-ММ-ДД)" };
+      }
+      const result = await processScopedReplyStatsBatch(partnerId, from, to);
+      return { data: result };
+    },
+  );
 }

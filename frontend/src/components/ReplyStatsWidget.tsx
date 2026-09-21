@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchReplyStats, ReplyStatsReport } from "../api";
+import { fetchReplyStats, recalculateReplyStats, ReplyStatsReport } from "../api";
+import DateRangePicker from "./DateRangePicker";
 
 /* Конверсия "фан ответил на приветку" — фоновый воркер на бэке понемногу
    обходит фанов через OM API и складывает результат в fan_reply_stats;
@@ -17,6 +18,10 @@ const WORKER_FANS_PER_HOUR = (45 / 90) * 3600;
    и бессмысленные (жаловался David — виджет с 30-дневным окном показывал
    "0.0%, 3 фана" для партнёра, у которого реально 1499 посчитанных). */
 const LIFETIME_FROM = "2020-01-01";
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function fmtMin(sec: number | null): string {
   if (sec == null) return "—";
@@ -36,32 +41,68 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [open, setOpen] = useState(!collapsible);
+  const [from, setFrom] = useState(LIFETIME_FROM);
+  const [to, setTo] = useState(todayISO());
+  const [recalcBusy, setRecalcBusy] = useState(false);
+  const [recalcNote, setRecalcNote] = useState<string | null>(null);
   const repRef = useRef(rep);
   repRef.current = rep;
+
+  function load() {
+    setLoading(true);
+    fetchReplyStats({ partnerId, from, to })
+      .then(setRep)
+      .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  }
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchReplyStats({ partnerId, from: LIFETIME_FROM })
+    fetchReplyStats({ partnerId, from, to })
       .then((r) => alive && setRep(r))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
-  }, [partnerId]);
+  }, [partnerId, from, to]);
 
   /* Живое обновление, пока есть что досчитывать и карточка открыта. */
   useEffect(() => {
     if (!open) return;
     const id = setInterval(() => {
       if (!repRef.current || repRef.current.pending <= 0) return;
-      fetchReplyStats({ partnerId, from: LIFETIME_FROM })
+      fetchReplyStats({ partnerId, from, to })
         .then(setRep)
         .catch(() => {});
     }, POLL_MS);
     return () => clearInterval(id);
-  }, [open, partnerId]);
+  }, [open, partnerId, from, to]);
+
+  /* Ручной пересчёт: гоняет батчи по 80 фанов, пока remaining не станет 0
+     (или пока пользователь не уйдёт со страницы) — обходит суточный
+     троттлинг фона и не ждёт общую очередь на всех партнёров. */
+  async function recalculate() {
+    if (partnerId == null || recalcBusy) return;
+    setRecalcBusy(true);
+    setRecalcNote(null);
+    try {
+      let totalChecked = 0;
+      for (let i = 0; i < 50; i++) {
+        const res = await recalculateReplyStats(partnerId, from, to);
+        totalChecked += res.checked;
+        setRecalcNote(`Пересчитано ${totalChecked}, осталось ~${res.remaining}…`);
+        load();
+        if (res.remaining <= 0 || res.checked === 0) break;
+      }
+      setRecalcNote(`Готово — пересчитано ${totalChecked} фанов за выбранный период.`);
+    } catch (e) {
+      setRecalcNote(`Ошибка: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRecalcBusy(false);
+    }
+  }
 
   const body = (
     <>
@@ -87,9 +128,21 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
               </p>
             </div>
           )}
+          {recalcNote && <p className="muted rs-note">{recalcNote}</p>}
         </>
       )}
     </>
+  );
+
+  const controls = (
+    <div className="an-card-head-actions" onClick={(e) => e.stopPropagation()}>
+      <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
+      {partnerId != null && (
+        <button type="button" className="btn ghost" onClick={recalculate} disabled={recalcBusy}>
+          {recalcBusy ? "Считаю…" : "⟳ Пересчитать"}
+        </button>
+      )}
+    </div>
   );
 
   return (
@@ -99,6 +152,7 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
           <h3>
             Конверсия в ответ <span className="faint">· % фанов, ответивших на приветку</span>
           </h3>
+          {open && controls}
           <span className="pd-acc-caret">▶</span>
         </div>
       ) : (
@@ -106,6 +160,7 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
           <h3>
             Конверсия в ответ <span className="faint">· % фанов, ответивших на приветку</span>
           </h3>
+          {controls}
         </div>
       )}
       {(!collapsible || open) && body}

@@ -805,6 +805,24 @@ export async function fetchReplyStats(opts: { partnerId?: number; from?: string;
   return json.data as ReplyStatsReport;
 }
 
+/** Один "тик" ручного пересчёта — до 80 фанов за вызов (лимит nginx на ответ).
+    Если remaining>0, вызывай ещё раз тем же диапазоном, пока не станет 0. */
+export async function recalculateReplyStats(
+  partnerId: number,
+  from: string,
+  to: string,
+): Promise<{ checked: number; remaining: number }> {
+  const res = await fetch(manageUrl("/reply-stats/recalculate"), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ partner_id: partnerId, from, to }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as { checked: number; remaining: number };
+}
+
 export interface CabinetLifetimeLink {
   id: number;
   creator: string;

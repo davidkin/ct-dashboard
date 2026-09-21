@@ -90,6 +90,51 @@ function selectCandidates(limit: number): Candidate[] {
     .all(...creators, limit) as Candidate[];
 }
 
+/** Ручной "Пересчитать": кандидаты партнёра в конкретном диапазоне дат подписки,
+    без суточного троттлинга (кроме уже финально ответивших — это не трогаем,
+    ответ не может "исчезнуть"). Считает и remaining, чтобы фронт мог дозапросить. */
+function selectScopedCandidates(
+  partnerId: number,
+  from: string,
+  to: string,
+  limit: number,
+): { candidates: Candidate[]; remaining: number } {
+  const db = getDb();
+  const creators = activeCreatorNames();
+  if (!creators.length) return { candidates: [], remaining: 0 };
+  const placeholders = creators.map(() => "?").join(",");
+  const baseWhere = `
+    l.creator IN (${placeholders})
+    AND l.partner_id = ?
+    AND ls.of_fan_id IS NOT NULL
+    AND ls.om_subscribed_at >= ? AND ls.om_subscribed_at < ?
+    AND ls.om_subscribed_at <= datetime('now', '-3 days')
+    AND (frs.of_fan_id IS NULL OR frs.replied = 0)
+  `;
+  const params = [...creators, partnerId, from, `${to} 23:59:59.999`];
+  const candidates = db
+    .prepare(
+      `SELECT l.id AS link_id, l.creator, ls.of_fan_id
+       FROM link_subscribers ls
+       JOIN links l ON l.id = ls.link_id
+       LEFT JOIN fan_reply_stats frs ON frs.link_id = ls.link_id AND frs.of_fan_id = ls.of_fan_id
+       WHERE ${baseWhere}
+       ORDER BY ls.om_subscribed_at ASC
+       LIMIT ?`,
+    )
+    .all(...params, limit) as Candidate[];
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) AS n
+       FROM link_subscribers ls
+       JOIN links l ON l.id = ls.link_id
+       LEFT JOIN fan_reply_stats frs ON frs.link_id = ls.link_id AND frs.of_fan_id = ls.of_fan_id
+       WHERE ${baseWhere}`,
+    )
+    .get(...params) as { n: number };
+  return { candidates, remaining: Math.max(0, totalRow.n - candidates.length) };
+}
+
 const upsertStmt = () =>
   getDb().prepare(
     `INSERT INTO fan_reply_stats (link_id, of_fan_id, has_greeting, replied, reply_seconds, om_error, checked_at)
@@ -102,6 +147,35 @@ const upsertStmt = () =>
        checked_at = excluded.checked_at`,
   );
 
+async function checkOneFan(c: Candidate, upsert: ReturnType<typeof upsertStmt>): Promise<void> {
+  const platformAccountId = getOMAccountForCreator(c.creator);
+  const token = getOMTokenForCreator(c.creator);
+  if (!platformAccountId || !token) return;
+  try {
+    const accountId = await resolveInternalAccountId(platformAccountId, token);
+    const { messages, notFound } = await fetchMessages(accountId, token, c.of_fan_id);
+    if (notFound) {
+      upsert.run(c.link_id, c.of_fan_id, 0, 0, null, 1);
+    } else {
+      const greeting = messages.find((m) => m.is_sent_by_me);
+      if (!greeting) {
+        upsert.run(c.link_id, c.of_fan_id, 0, 0, null, 0);
+      } else {
+        const idx = messages.indexOf(greeting);
+        const reply = messages.slice(idx + 1).find((m) => !m.is_sent_by_me);
+        if (reply) {
+          const dt = (new Date(reply.created_at).getTime() - new Date(greeting.created_at).getTime()) / 1000;
+          upsert.run(c.link_id, c.of_fan_id, 1, 1, dt, 0);
+        } else {
+          upsert.run(c.link_id, c.of_fan_id, 1, 0, null, 0);
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[reply-stats] fan=${c.of_fan_id} link=${c.link_id}:`, err instanceof Error ? err.message : err);
+  }
+}
+
 let running = false;
 
 export async function processReplyStatsBatch(limit = BATCH_SIZE): Promise<{ checked: number }> {
@@ -113,32 +187,7 @@ export async function processReplyStatsBatch(limit = BATCH_SIZE): Promise<{ chec
     if (!candidates.length) return { checked: 0 };
     const upsert = upsertStmt();
     for (const c of candidates) {
-      const platformAccountId = getOMAccountForCreator(c.creator);
-      const token = getOMTokenForCreator(c.creator);
-      if (!platformAccountId || !token) continue;
-      try {
-        const accountId = await resolveInternalAccountId(platformAccountId, token);
-        const { messages, notFound } = await fetchMessages(accountId, token, c.of_fan_id);
-        if (notFound) {
-          upsert.run(c.link_id, c.of_fan_id, 0, 0, null, 1);
-        } else {
-          const greeting = messages.find((m) => m.is_sent_by_me);
-          if (!greeting) {
-            upsert.run(c.link_id, c.of_fan_id, 0, 0, null, 0);
-          } else {
-            const idx = messages.indexOf(greeting);
-            const reply = messages.slice(idx + 1).find((m) => !m.is_sent_by_me);
-            if (reply) {
-              const dt = (new Date(reply.created_at).getTime() - new Date(greeting.created_at).getTime()) / 1000;
-              upsert.run(c.link_id, c.of_fan_id, 1, 1, dt, 0);
-            } else {
-              upsert.run(c.link_id, c.of_fan_id, 1, 0, null, 0);
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`[reply-stats] fan=${c.of_fan_id} link=${c.link_id}:`, err instanceof Error ? err.message : err);
-      }
+      await checkOneFan(c, upsert);
       checked++;
       await sleep(REQUEST_DELAY_MS);
     }
@@ -146,6 +195,45 @@ export async function processReplyStatsBatch(limit = BATCH_SIZE): Promise<{ chec
     running = false;
   }
   return { checked };
+}
+
+/** Ручной "Пересчитать" на диапазон дат подписки конкретного партнёра — вызывается
+    из UI-кнопки, не ждёт фоновую очередь. Один вызов ограничен по времени (nginx
+    proxy_read_timeout 120s), поэтому лимит батча небольшой; фронт дозапрашивает,
+    пока remaining>0. Отдельный флаг от фонового `running` — но фон всё равно
+    ПРОПУСКАЕТ свой тик, пока это true (см. isScopedRunning в tick ниже): один
+    OM-аккаунт, рейт-лимит общий, оба разом = сплошные 429 и впустую сожжённое
+    время сна между ретраями. */
+let scopedRunning = false;
+export function isScopedRunning(): boolean {
+  return scopedRunning;
+}
+/* Замерено на живом OM API: ~1.8с/фан (не 1.1с — сетевой round-trip сверху
+   sleep), т.е. 80 фанов занимало 145с — больше чем nginx proxy_read_timeout
+   120с, запрос обрывался хотя бэк доработал. 45 фанов ≈ 80с, запас есть. */
+const SCOPED_BATCH_LIMIT = 45;
+
+export async function processScopedReplyStatsBatch(
+  partnerId: number,
+  from: string,
+  to: string,
+): Promise<{ checked: number; remaining: number }> {
+  if (scopedRunning) return { checked: 0, remaining: 0 };
+  scopedRunning = true;
+  let checked = 0;
+  try {
+    const { candidates, remaining } = selectScopedCandidates(partnerId, from, to, SCOPED_BATCH_LIMIT);
+    if (!candidates.length) return { checked: 0, remaining };
+    const upsert = upsertStmt();
+    for (const c of candidates) {
+      await checkOneFan(c, upsert);
+      checked++;
+      await sleep(REQUEST_DELAY_MS);
+    }
+    return { checked, remaining };
+  } finally {
+    scopedRunning = false;
+  }
 }
 
 let timer: NodeJS.Timeout | null = null;
@@ -157,6 +245,11 @@ export function startReplyStatsWorker(): void {
     return;
   }
   const tick = async () => {
+    /* Ручной "Пересчитать" и фоновый воркер бьют в ОДИН и тот же OM-аккаунт —
+       конкурируя, оба чаще ловят 429 и впустую жгут время на сон между
+       ретраями. Приоритет ручному запуску: фон просто пропускает тик, пока
+       кто-то жмёт "Пересчитать". */
+    if (isScopedRunning()) return;
     try {
       const res = await processReplyStatsBatch();
       if (res.checked > 0) console.log(`[reply-stats] checked ${res.checked} fans`);
