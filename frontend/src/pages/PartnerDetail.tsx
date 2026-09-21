@@ -181,7 +181,7 @@ export default function PartnerDetail() {
   return (
     <div className="an fadeUp">
       <div className="pd-back">
-        <button className="btn ghost" onClick={() => navigate(-1)}>
+        <button className="btn ghost" onClick={() => navigate("/")}>
           ← Назад
         </button>
         <div className="an-period">
