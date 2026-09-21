@@ -63,8 +63,6 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
     return () => clearInterval(id);
   }, [open, partnerId]);
 
-  const campaigns = (rep?.campaigns ?? []).filter((c) => c.total >= 3);
-
   const body = (
     <>
       {err && <div className="alert" style={{ margin: "0 20px 16px" }}>{err}</div>}
@@ -84,41 +82,10 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
               </div>
               <p className="muted rs-note">
                 Фоновый процесс досчитывает остальных ({rep.checked}/{rep.eligible}) · не быстрее ~{fmtEta(rep.pending)} —
-                цифры обновляются сами каждые 20 сек, воркер общий на всех партнёров.
+                цифры обновляются сами каждые 20 сек, воркер общий на всех партнёров. Разбивка по кампаниям — в таблице
+                «Кампании» ниже.
               </p>
             </div>
-          )}
-          {campaigns.length > 0 && (
-            <div className="an-table-wrap">
-              <table className="an-table rs-table">
-                <thead>
-                  <tr>
-                    <th>Кампания</th>
-                    <th className="num">Фанов</th>
-                    <th className="num">Ответили</th>
-                    <th className="num">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {campaigns
-                    .slice()
-                    .sort((a, b) => b.total - a.total)
-                    .map((c) => (
-                      <tr key={c.campaign_code}>
-                        <td>{c.campaign_code}</td>
-                        <td className="num">{c.total}</td>
-                        <td className="num">{c.replied}</td>
-                        <td className="num">{c.pct.toFixed(0)}%</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {!campaigns.length && !loading && (
-            <p className="muted" style={{ padding: "0 20px 20px" }}>
-              Пока недостаточно данных (нужно хотя бы 3 фана на кампанию).
-            </p>
           )}
         </>
       )}

@@ -5,9 +5,11 @@ import {
   DailyReport,
   fetchAnalytics,
   fetchExportReport,
+  fetchReplyStats,
   isAdmin,
   isAdminConfigured,
   patchPartner,
+  ReplyStatsCampaign,
   setPayoutStatus,
 } from "../api";
 import { useModel } from "../hooks/useModel";
@@ -79,6 +81,7 @@ export default function PartnerDetail() {
   const [archOv, setArchOv] = useState<boolean | null>(null);
   const [noteOv, setNoteOv] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState<string | undefined>(undefined);
+  const [replyByCode, setReplyByCode] = useState<Map<string, ReplyStatsCampaign>>(new Map());
 
   useEffect(() => {
     setLoading(true);
@@ -98,6 +101,21 @@ export default function PartnerDetail() {
       .catch((e) => setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [pid, from, to, reloadNonce, model]);
+
+  /* Конверсия в ответ по кампаниям — за всё время (не по периоду страницы,
+     та же логика, что в ReplyStatsWidget), для колонок в таблице «Кампании». */
+  useEffect(() => {
+    let alive = true;
+    fetchReplyStats({ partnerId: pid, from: "2020-01-01" })
+      .then((r) => {
+        if (!alive) return;
+        setReplyByCode(new Map(r.campaigns.map((c) => [c.campaign_code, c])));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [pid, reloadNonce]);
 
   /* Сортировка таблицы кампаний: по умолчанию по номеру кампании, free перед paid. */
   const [campSort, setCampSort] = useState<CampSort>(DEFAULT_CAMP_SORT);
@@ -278,29 +296,38 @@ export default function PartnerDetail() {
                   <SortTh label="Фаны" col="fans" sort={campSort} onSort={setCampSort} num />
                   <SortTh label="Конверт" col="cr" sort={campSort} onSort={setCampSort} num />
                   <SortTh label="Выплата" col="payout" sort={campSort} onSort={setCampSort} num />
+                  <th className="num" title="Фанов, ответивших на приветку хоть раз, из посчитанных фоновым процессом">
+                    Ответили на приветку
+                  </th>
+                  <th className="num">%</th>
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map((c) => (
-                  <tr key={c.link_id} style={{ cursor: "default" }}>
-                    <td>{c.code}</td>
-                    <td>
-                      <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
-                    </td>
-                    <td className="pd-camp-url">
-                      <a href={c.of_url} target="_blank" rel="noreferrer">
-                        {c.of_url}
-                      </a>
-                    </td>
-                    <td className="num">{fmt(c.clicks)}</td>
-                    <td className="num">{fmt(c.fans)}</td>
-                    <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
-                    <td className="num accent">{money(c.payout)}</td>
-                  </tr>
-                ))}
+                {campaigns.map((c) => {
+                  const rs = replyByCode.get(c.code);
+                  return (
+                    <tr key={c.link_id} style={{ cursor: "default" }}>
+                      <td>{c.code}</td>
+                      <td>
+                        <span className={`tag pd-tier-${c.tier}`}>{c.tier}</span>
+                      </td>
+                      <td className="pd-camp-url">
+                        <a href={c.of_url} target="_blank" rel="noreferrer">
+                          {c.of_url}
+                        </a>
+                      </td>
+                      <td className="num">{fmt(c.clicks)}</td>
+                      <td className="num">{fmt(c.fans)}</td>
+                      <td className="num muted">{pct(c.clicks > 0 ? c.fans / c.clicks : null)}</td>
+                      <td className="num accent">{money(c.payout)}</td>
+                      <td className="num muted">{rs ? `${rs.replied}/${rs.total}` : "—"}</td>
+                      <td className="num muted">{rs ? `${rs.pct.toFixed(0)}%` : "—"}</td>
+                    </tr>
+                  );
+                })}
                 {!campaigns.length && (
                   <tr>
-                    <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>
+                    <td colSpan={9} className="muted" style={{ textAlign: "center", padding: 24 }}>
                       Нет кампаний за период.
                     </td>
                   </tr>
@@ -316,6 +343,8 @@ export default function PartnerDetail() {
                     <td className="num">{fmt(totals.fans)}</td>
                     <td className="num">{pct(totals.cr)}</td>
                     <td className="num accent">{money(totals.payout)}</td>
+                    <td />
+                    <td />
                   </tr>
                 </tfoot>
               )}
