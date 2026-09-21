@@ -135,7 +135,7 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
   );
 
   const controls = (
-    <div className="an-card-head-actions" onClick={(e) => e.stopPropagation()}>
+    <div className="an-card-head-actions">
       <DateRangePicker from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
       {partnerId != null && (
         <button type="button" className="btn ghost" onClick={recalculate} disabled={recalcBusy}>
@@ -145,26 +145,32 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
     </div>
   );
 
+  /* Пикер — position:absolute, разворачивается НИЖЕ шапки. .an-card рубит
+     оверфлоу под скруглённые углы (overflow:hidden) — если пикер внутри
+     карточки, выпадашка обрезается тем же краем (нашёл David на скрине).
+     Тот же класс бага, что был с попапом share-link раньше в этом же
+     проекте — решение то же: вынести абсолютно позиционируемый элемент из
+     любого overflow:hidden предка. Заголовок+управление — отдельным баром
+     НАД карточкой (как «Итоги за период»), сама карточка — только контент. */
   return (
-    <div className="an-card">
-      {collapsible ? (
-        <div className={`pd-acc-head${open ? " open" : ""}`} onClick={() => setOpen((s) => !s)}>
-          <h3>
+    <>
+      <div className="an-widgets-bar">
+        {collapsible ? (
+          <div className={`pd-acc-head${open ? " open" : ""}`} style={{ flex: 1 }} onClick={() => setOpen((s) => !s)}>
+            <h3>
+              Конверсия в ответ <span className="faint">· % фанов, ответивших на приветку</span>
+            </h3>
+            <span className="pd-acc-caret">▶</span>
+          </div>
+        ) : (
+          <h3 className="an-widgets-title">
             Конверсия в ответ <span className="faint">· % фанов, ответивших на приветку</span>
           </h3>
-          {open && controls}
-          <span className="pd-acc-caret">▶</span>
-        </div>
-      ) : (
-        <div className="an-card-head">
-          <h3>
-            Конверсия в ответ <span className="faint">· % фанов, ответивших на приветку</span>
-          </h3>
-          {controls}
-        </div>
-      )}
-      {(!collapsible || open) && body}
-    </div>
+        )}
+        {(!collapsible || open) && controls}
+      </div>
+      {(!collapsible || open) && <div className="an-card rs-card">{body}</div>}
+    </>
   );
 }
 
