@@ -132,7 +132,7 @@ export default function Cabinet() {
             Нужен для партнёров, у кого активность была ДО старта посуточного
             трекинга: таблица по дням тогда показывает 0 (нечего восстановить
             задним числом), а тут — реальный кумулятивный счётчик с линка. */}
-        {data && data.lifetime.total.clicks + data.lifetime.total.fans + data.lifetime.total.payout > 0 && (
+        {data?.lifetime && data.lifetime.total.clicks + data.lifetime.total.fans + data.lifetime.total.payout > 0 && (
           <div className="an-card">
             <div className="an-card-head">
               <h3>Всего за всё время</h3>

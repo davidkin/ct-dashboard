@@ -242,6 +242,9 @@ export default function PartnerDetail() {
       {/* виджеты «Тотал залив» + «Общая выплата» по этому партнёру (свой диапазон) */}
       <PartnerTotalsWidgets pid={pid} />
 
+      {/* конверсия "фан ответил на приветку" — вынесена наверх, видное место, всегда развёрнута */}
+      <ReplyStatsWidget partnerId={pid} collapsible={false} />
+
       {/* персональная таблица трафика (день × кампания) — сразу под «Итоги за период» */}
       {rep && (
         <DailyMatrix
@@ -252,14 +255,8 @@ export default function PartnerDetail() {
         />
       )}
 
-      {/* daily chart — «Динамика по дням» */}
-      {rep && <ProfileChart rows={rep.rows} />}
-
-      {/* сверка тоталов с OM (истина) — свёрнута, под «Динамика по дням» */}
+      {/* сверка тоталов с OM (истина) */}
       <OmReconcile partnerId={pid} collapsible />
-
-      {/* конверсия "фан ответил на приветку" — свёрнута, фоновый воркер досчитывает данные */}
-      <ReplyStatsWidget partnerId={pid} collapsible />
 
       {/* кампании / ссылки — свёрнуты в аккордеон */}
       <div className="an-card">
@@ -404,41 +401,3 @@ function PartnerTotalsWidgets({ pid }: { pid: number }) {
   );
 }
 
-function ProfileChart({ rows }: { rows: DailyReport["rows"] }) {
-  const daily = rows.map((r) => ({ day: r.date, clicks: r.total.clicks ?? 0, fans: r.total.subs }));
-  if (!daily.length) return null;
-  const W = 100;
-  const H = 42;
-  const maxC = Math.max(1, ...daily.map((d) => d.clicks));
-  const maxF = Math.max(1, ...daily.map((d) => d.fans));
-  const pts = (key: "clicks" | "fans", max: number) =>
-    daily
-      .map((d, i) => {
-        const x = daily.length === 1 ? 0 : (i / (daily.length - 1)) * W;
-        const y = H - (d[key] / max) * (H - 4) - 2;
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
-      })
-      .join(" ");
-  return (
-    <div className="an-card an-chart">
-      <div className="an-chart-head">
-        <h3>Динамика по дням</h3>
-        <div className="an-legend">
-          <span>
-            <i style={{ background: "var(--accent)" }} /> Клики
-          </span>
-          <span>
-            <i style={{ background: "#7FA8C9" }} /> Фаны
-          </span>
-        </div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="an-chart-svg">
-        {[10.5, 21, 31.5].map((y) => (
-          <line key={y} x1="0" y1={y} x2={W} y2={y} stroke="var(--lineSoft)" strokeWidth="0.3" />
-        ))}
-        <polyline points={pts("clicks", maxC)} fill="none" stroke="var(--accent)" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={pts("fans", maxF)} fill="none" stroke="#7FA8C9" strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
-  );
-}

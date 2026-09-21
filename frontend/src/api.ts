@@ -816,7 +816,8 @@ export interface CabinetLifetimeLink {
 export interface CabinetData {
   partner: { id: number; display_name: string; telegram: string | null };
   report: DailyReport;
-  lifetime: {
+  /* optional: старый бэк (до рестарта) этого поля ещё не отдаёт */
+  lifetime?: {
     links: CabinetLifetimeLink[];
     total: { clicks: number; fans: number; payout: number };
   };

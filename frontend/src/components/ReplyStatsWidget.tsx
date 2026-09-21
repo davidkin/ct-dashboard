@@ -12,6 +12,11 @@ import { fetchReplyStats, ReplyStatsReport } from "../api";
 const POLL_MS = 20_000;
 /* Пропускная способность воркера: см. BATCH_SIZE/TICK_MS в reply-stats-worker.ts. */
 const WORKER_FANS_PER_HOUR = (45 / 90) * 3600;
+/* Это метрика "здоровья" воронки, не привязана к периоду страницы (как
+   "Сверка с ОМ") — за всё время, иначе на короткой выборке цифры пустые
+   и бессмысленные (жаловался David — виджет с 30-дневным окном показывал
+   "0.0%, 3 фана" для партнёра, у которого реально 1499 посчитанных). */
+const LIFETIME_FROM = "2020-01-01";
 
 function fmtMin(sec: number | null): string {
   if (sec == null) return "—";
@@ -37,7 +42,7 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    fetchReplyStats({ partnerId })
+    fetchReplyStats({ partnerId, from: LIFETIME_FROM })
       .then((r) => alive && setRep(r))
       .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)))
       .finally(() => alive && setLoading(false));
@@ -51,7 +56,7 @@ export default function ReplyStatsWidget({ partnerId, collapsible = true }: { pa
     if (!open) return;
     const id = setInterval(() => {
       if (!repRef.current || repRef.current.pending <= 0) return;
-      fetchReplyStats({ partnerId })
+      fetchReplyStats({ partnerId, from: LIFETIME_FROM })
         .then(setRep)
         .catch(() => {});
     }, POLL_MS);
