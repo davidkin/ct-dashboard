@@ -458,4 +458,59 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
       };
     },
   );
+
+  /**
+   * DELETE /api/partners/:id/cpf-history/:historyId — убрать ошибочную запись
+   * (миссклик). Только эта строка; остальная история пересчитывается сама на
+   * чтении, ничего дополнительно двигать не нужно — resolveCpf в report.ts
+   * просто перестанет видеть удалённую запись при сканировании.
+   */
+  app.delete<{ Params: { id: string; historyId: string } }>(
+    "/api/partners/:id/cpf-history/:historyId",
+    async (req, reply) => {
+      const id = Number(req.params.id);
+      const historyId = Number(req.params.historyId);
+
+      const row = db
+        .prepare(`SELECT id, tier FROM cpf_history WHERE id = ? AND partner_id = ?`)
+        .get(historyId, id) as { id: number; tier: "free" | "paid" } | undefined;
+      if (!row) {
+        reply.code(404);
+        return { error: "Запись истории не найдена" };
+      }
+
+      const tx = db.transaction(() => {
+        db.prepare(`DELETE FROM cpf_history WHERE id = ?`).run(historyId);
+
+        /* Кэш на партнёре — та же синхронизация, что при добавлении: пересчитать
+           "сегодняшнюю" ставку без удалённой строки. Если истории по тиру больше
+           не осталось вообще — оставляем кэш как есть (фолбэк на pickCpf сам
+           отработает на чтении отчёта). */
+        const today = todayLocal();
+        const currentRow = db
+          .prepare(
+            `SELECT cpf FROM cpf_history WHERE partner_id = ? AND tier = ? AND effective_from <= ?
+             ORDER BY effective_from DESC, id DESC LIMIT 1`,
+          )
+          .get(id, row.tier, today) as { cpf: number } | undefined;
+        if (currentRow) {
+          const col = row.tier === "paid" ? "cpf_paid" : "cpf_free";
+          db.prepare(`UPDATE partners SET ${col} = ?, updated_at = datetime('now') WHERE id = ?`).run(
+            currentRow.cpf,
+            id,
+          );
+        }
+      });
+      tx();
+
+      return {
+        data: db
+          .prepare(
+            `SELECT id, tier, cpf, effective_from, created_by, created_at
+             FROM cpf_history WHERE partner_id = ? ORDER BY effective_from DESC, id DESC`,
+          )
+          .all(id),
+      };
+    },
+  );
 }

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { addCpfHistory, CpfHistoryEntry, DailyReport, fetchCpfHistory, isAdminConfigured } from "../api";
+import { addCpfHistory, CpfHistoryEntry, DailyReport, deleteCpfHistory, fetchCpfHistory, isAdminConfigured } from "../api";
 
 /* Дневная матрица трафика (день × кампания) в дизайн-системе профиля (an-/dm-),
    тема-адаптивная, без Google-Sheets грида. Колонки Дата + Total зафиксированы
@@ -428,6 +428,18 @@ function CpfHistoryModal({
     }
   }
 
+  async function remove(historyId: number) {
+    if (!confirm("Убрать эту запись из истории? Отменить нельзя.")) return;
+    setError(null);
+    try {
+      await deleteCpfHistory(partnerId, historyId);
+      onChanged();
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal pm-wrap" onClick={(e) => e.stopPropagation()}>
@@ -478,6 +490,7 @@ function CpfHistoryModal({
                   <th>Действует с</th>
                   <th className="num">Ставка</th>
                   <th>Кто указал</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -486,6 +499,11 @@ function CpfHistoryModal({
                     <td>{h.effective_from}</td>
                     <td className="num">{money(h.cpf)}</td>
                     <td className="muted">{h.created_by ?? "—"}</td>
+                    <td className="gl-actions">
+                      <button type="button" className="gl-del" onClick={() => remove(h.id)} title="Убрать запись (миссклик)">
+                        ✕
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

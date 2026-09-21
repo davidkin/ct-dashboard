@@ -769,6 +769,17 @@ export async function addCpfHistory(
   return json.data as CpfHistoryEntry[];
 }
 
+/** Убрать ошибочную запись истории (миссклик) — не трогает остальные. */
+export async function deleteCpfHistory(partnerId: number, historyId: number): Promise<CpfHistoryEntry[]> {
+  const res = await fetch(manageUrl(`/partners/${partnerId}/cpf-history/${historyId}`), {
+    method: "DELETE",
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data as CpfHistoryEntry[];
+}
+
 /** Конверсия "фан ответил на приветку" — считается фоновым воркером на бэке,
     здесь только чтение готовых цифр (см. src/om/reply-stats-worker.ts). */
 export interface ReplyStatsCampaign {
