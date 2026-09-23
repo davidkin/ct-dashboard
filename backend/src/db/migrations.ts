@@ -275,6 +275,17 @@ const MIGRATIONS: Migration[] = [
     ALTER TABLE users ADD COLUMN can_see_inhouse INTEGER NOT NULL DEFAULT 1;
     `,
   },
+  {
+    id: "009_link_baseline_totals",
+    sql: `
+    /* Тотал кликов/фанов на ссылке в OM на момент её привязки в Глоссарии —
+       чтобы сразу было видно, что ссылка не с нуля (была история до нас), а
+       не выглядело потом как расхождение/баг в сверке дневных снимков. */
+    ALTER TABLE links ADD COLUMN baseline_clicks INTEGER;
+    ALTER TABLE links ADD COLUMN baseline_fans INTEGER;
+    ALTER TABLE links ADD COLUMN baseline_captured_at TEXT;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

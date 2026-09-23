@@ -318,16 +318,23 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
         cpf: number;
         source: string | null;
         of_tracking_link_id: number | null;
+        baseline_clicks: number | null;
+        baseline_fans: number | null;
       }> = [];
 
-      /* OM тянем по одному разу на модель, а не на каждую ссылку. */
-      const omCache = new Map<string, Map<string, { id: string; url: string }>>();
+      /* OM тянем по одному разу на модель, а не на каждую ссылку. Заодно берём
+         текущий clicks/subscribers — это baseline на момент добавления, без
+         него потом расхождение между "таблицей за 30 дней" и "сверкой с OM"
+         выглядит как баг, хотя ссылка просто не с нуля. */
+      const omCache = new Map<string, Map<string, { id: string; url: string; clicks: number; subscribers: number }>>();
       const omFor = async (creator: string) => {
         if (omCache.has(creator)) return omCache.get(creator)!;
         const acct = getOMAccountForCreator(creator);
         if (!acct) return null;
         const links = await listTrackingLinks(acct);
-        const map = new Map(links.map((l) => [l.name, { id: String(l.id), url: l.url }]));
+        const map = new Map(
+          links.map((l) => [l.name, { id: String(l.id), url: l.url, clicks: l.clicks, subscribers: l.subscribers }]),
+        );
         omCache.set(creator, map);
         return map;
       };
@@ -378,9 +385,11 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
 
         let ofUrl = (raw.of_url ?? "").toString().trim();
         let trackingId = raw.of_tracking_link_id ?? null;
+        let baselineClicks: number | null = null;
+        let baselineFans: number | null = null;
 
         if (!isRetiredCreator(creator)) {
-          let om: Map<string, { id: string; url: string }> | null = null;
+          let om: Map<string, { id: string; url: string; clicks: number; subscribers: number }> | null = null;
           try {
             om = await omFor(creator);
           } catch (e) {
@@ -394,6 +403,8 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
           }
           ofUrl = ofUrl || hit.url;
           trackingId = trackingId ?? Number(hit.id);
+          baselineClicks = hit.clicks;
+          baselineFans = hit.subscribers;
         }
 
         if (!ofUrl) {
@@ -412,6 +423,8 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
           cpf,
           source: (raw.source ?? partner.source ?? null) as string | null,
           of_tracking_link_id: trackingId,
+          baseline_clicks: baselineClicks,
+          baseline_fans: baselineFans,
         });
       }
 
@@ -421,10 +434,11 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
       }
 
       const ins = db.prepare(
-        `INSERT INTO links (partner_id, creator, campaign_code, of_url, cpf_free, cpf_paid, source, of_tracking_link_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO links (partner_id, creator, campaign_code, of_url, cpf_free, cpf_paid, source, of_tracking_link_id, baseline_clicks, baseline_fans, baseline_captured_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       const created: number[] = [];
+      const capturedAt = new Date().toISOString();
       db.transaction(() => {
         for (const l of prepared) {
           /* CPF платной кампании исторически лежит в cpf_free платной ссылки —
@@ -438,18 +452,32 @@ export async function registerGlossaryRoutes(app: FastifyInstance): Promise<void
             null,
             l.source,
             l.of_tracking_link_id,
+            l.baseline_clicks,
+            l.baseline_fans,
+            l.baseline_clicks != null ? capturedAt : null,
           );
           created.push(Number(info.lastInsertRowid));
         }
       })();
 
+      /* Ссылки, у которых уже была история на OM до привязки — иначе потом
+         это молча выглядит как расхождение/баг в сверке "30 дней" vs OM. */
+      const warnings = prepared
+        .filter((l) => (l.baseline_clicks ?? 0) > 0 || (l.baseline_fans ?? 0) > 0)
+        .map((l) => ({
+          campaign_code: l.campaign_code,
+          baseline_clicks: l.baseline_clicks,
+          baseline_fans: l.baseline_fans,
+        }));
+
       return {
         data: {
           partner_id: partner.id,
           created: created.length,
+          warnings,
           links: db
             .prepare(
-              `SELECT id, campaign_code, creator, of_url, cpf_free, source, of_tracking_link_id
+              `SELECT id, campaign_code, creator, of_url, cpf_free, source, of_tracking_link_id, baseline_clicks, baseline_fans
                FROM links WHERE id IN (${created.map(() => "?").join(",")})`,
             )
             .all(...created),

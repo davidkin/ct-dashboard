@@ -1086,10 +1086,16 @@ export class GlossaryValidationError extends Error {
   }
 }
 
+export interface GlossaryLinkBaselineWarning {
+  campaign_code: string;
+  baseline_clicks: number | null;
+  baseline_fans: number | null;
+}
+
 export async function addGlossaryLinks(
   partner_id: number,
   links: NewGlossaryLink[],
-): Promise<{ partner_id: number; created: number }> {
+): Promise<{ partner_id: number; created: number; warnings: GlossaryLinkBaselineWarning[] }> {
   const res = await fetch(manageUrl("/glossary/links"), {
     method: "POST",
     credentials: "include",

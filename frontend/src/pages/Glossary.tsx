@@ -912,7 +912,7 @@ function AddLinksModal({
     }
     setBusy(true);
     try {
-      await addGlossaryLinks(
+      const result = await addGlossaryLinks(
         partner.id,
         picked.map((l) => ({
           campaign_code: l.code,
@@ -921,6 +921,14 @@ function AddLinksModal({
           source: source || null,
         })),
       );
+      if (result.warnings.length > 0) {
+        const lines = result.warnings.map(
+          (w) => `${w.campaign_code}: ${w.baseline_clicks ?? 0} кликов / ${w.baseline_fans ?? 0} фанов`,
+        );
+        alert(
+          `Внимание: у этих ссылок уже была история на OM до добавления (не с нуля) —\n\n${lines.join("\n")}\n\nДневная таблица "30 дней" будет показывать только прирост с сегодняшнего дня, не эти цифры.`,
+        );
+      }
       onDone();
     } catch (e) {
       if (e instanceof GlossaryValidationError) {
