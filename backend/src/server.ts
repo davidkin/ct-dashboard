@@ -20,6 +20,7 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerCabinetRoutes } from "./routes/cabinet";
 import { registerReplyStatsRoutes } from "./routes/reply-stats";
+import { registerBroadcastRoutes } from "./routes/broadcast";
 import { currentUser, type SessionUser } from "./lib/auth";
 import { startScheduler } from "./of/scheduler";
 import { startDailyCapture } from "./daily/scheduler";
@@ -62,6 +63,7 @@ async function main() {
   await registerAdminRoutes(app);
   await registerCabinetRoutes(app);
   await registerReplyStatsRoutes(app);
+  await registerBroadcastRoutes(app);
 
   const port = Number(process.env.PORT || 3001);
   /* В проде за nginx ставь HOST=127.0.0.1 — тогда 3001 не торчит наружу. */

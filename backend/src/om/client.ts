@@ -115,9 +115,62 @@ async function paginate<T>(
   return all;
 }
 
-export async function listAccounts(): Promise<OMAccount[]> {
-  const res = await request<{ accounts: OMAccount[] }>(`/api/v0/accounts?limit=1000`);
+export async function listAccounts(platformAccountId?: string): Promise<OMAccount[]> {
+  const res = await request<{ accounts: OMAccount[] }>(`/api/v0/accounts?limit=1000`, platformAccountId);
   return res.accounts ?? [];
+}
+
+/** internal OM account id (73039-style) по platform_account_id (OF numeric id) — путь для chats/messages его требует. */
+export async function resolveInternalAccountId(platformAccountId: string): Promise<string> {
+  const accounts = await listAccounts(platformAccountId);
+  const match = accounts.find((a) => a.platform_account_id === platformAccountId);
+  if (!match) throw new Error(`no OM account for platform_account_id ${platformAccountId}`);
+  return String(match.id);
+}
+
+export interface OMSubscription {
+  fan: { id: string };
+  price_gross: number;
+  regular_price_gross: number;
+  action: string;
+  type: string;
+  subscribed_at: string;
+  expires_at: string;
+}
+
+/** subscriptions — активные и прошлые подписки аккаунта, с ценой и реальной датой. */
+export async function listSubscriptions(
+  platformAccountId: string,
+  opts: { start?: string; end?: string; limit?: number } = {},
+): Promise<OMSubscription[]> {
+  const start = opts.start ?? isoDaysAgo(3650);
+  const end = opts.end ?? isoNow();
+  const limit = opts.limit ?? 1000;
+  return paginate<OMSubscription>((cursor) => {
+    const p = new URLSearchParams({ start, end, limit: String(limit) });
+    if (cursor) p.set("cursor", cursor);
+    return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/subscriptions?${p}`;
+  }, platformAccountId);
+}
+
+/** Отправка сообщения фану. internalAccountId — 73039-style id (см. resolveInternalAccountId), НЕ platform_account_id. */
+export async function sendChatMessage(
+  internalAccountId: string,
+  fanId: string,
+  text: string,
+  platformAccountId: string,
+): Promise<{ send_id: string }> {
+  const res = await fetch(`${BASE}/api/v0/accounts/${internalAccountId}/chats/${fanId}/messages`, {
+    method: "POST",
+    headers: { ...authHeaders(platformAccountId), "Content-Type": "application/json" },
+    body: JSON.stringify({ text, price: null, locked_text: false, media: [] }),
+  });
+  if (res.status === 429) throw new Error("OM API 429: rate limit exceeded");
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`OM API ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return (await res.json()) as { send_id: string };
 }
 
 /**

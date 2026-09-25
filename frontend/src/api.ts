@@ -1136,3 +1136,46 @@ export async function deleteGlossaryLink(id: number): Promise<void> {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
 }
+
+/* === Рассылка сообщений фанам через OM === */
+export interface BroadcastFan {
+  fan_id: string;
+  subscribed_at: string;
+  price_gross: number;
+}
+
+export async function fetchBroadcastFans(creator: string): Promise<{ creator: string; count: number; fans: BroadcastFan[] }> {
+  const res = await fetch(manageUrl(`/broadcast/fans?creator=${encodeURIComponent(creator)}`), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
+export async function startBroadcast(creator: string, fanIds: string[], text: string): Promise<{ job_id: string; total: number }> {
+  const res = await fetch(manageUrl("/broadcast/start"), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ creator, fan_ids: fanIds, text }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
+export interface BroadcastStatus {
+  job_id: string;
+  creator: string;
+  total: number;
+  sent: number;
+  failed: number;
+  done: boolean;
+  results: Array<{ fan_id: string; ok: boolean; error?: string }>;
+}
+
+export async function fetchBroadcastStatus(jobId: string): Promise<BroadcastStatus> {
+  const res = await fetch(manageUrl(`/broadcast/status/${jobId}`), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}

@@ -38,6 +38,11 @@ export default function App() {
                 Доступ
               </NavLink>
             )}
+            {user.role === "admin" && (
+              <NavLink to="/broadcast" className={({ isActive }) => `app-nav-link${isActive ? " active" : ""}`}>
+                Рассылка
+              </NavLink>
+            )}
           </nav>
         </div>
         <div className="app-header-actions">

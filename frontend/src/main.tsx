@@ -8,6 +8,7 @@ import CreatorPage from "./pages/CreatorPage";
 import Glossary from "./pages/Glossary";
 import PartnerDetail from "./pages/PartnerDetail";
 import AdminUsers from "./pages/AdminUsers";
+import Broadcast from "./pages/Broadcast";
 import Cabinet from "./pages/Cabinet";
 import "./styles.css";
 
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
             <Route path="partners/:id" element={<PartnerDetail />} />
             <Route path="creators/:slug" element={<CreatorPage />} />
             <Route path="admin/users" element={<AdminUsers />} />
+            <Route path="broadcast" element={<Broadcast />} />
           </Route>
         </Routes>
       </ModelProvider>
