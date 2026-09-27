@@ -9,6 +9,7 @@ import {
   fetchBroadcastStatus,
   getSession,
   startBroadcast,
+  stopBroadcast,
 } from "../api";
 
 const CREATORS = ["Lily Free", "Lily Vip"];
@@ -24,6 +25,8 @@ export default function Broadcast() {
   const [text, setText] = useState("");
   const [job, setJob] = useState<BroadcastStatus | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
+  const [tableOpen, setTableOpen] = useState(true);
+  const [stopping, setStopping] = useState(false);
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -90,13 +93,15 @@ export default function Broadcast() {
     setError(null);
     try {
       const res = await startBroadcast(creator, [...selected], text.trim());
-      setJob({ job_id: res.job_id, creator, total: res.total, sent: 0, failed: 0, done: false, results: [] });
+      setJob({ job_id: res.job_id, creator, total: res.total, sent: 0, failed: 0, done: false, stopped: false, results: [] });
+      setStopping(false);
       pollRef.current = window.setInterval(async () => {
         try {
           const st = await fetchBroadcastStatus(res.job_id);
           setJob(st);
           if (st.done) {
             stopPoll();
+            setStopping(false);
             setHistoryKey((k) => k + 1);
           }
         } catch (e) {
@@ -106,6 +111,17 @@ export default function Broadcast() {
       }, 2000);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function stop() {
+    if (!job || !confirm("Остановить рассылку? Уже отправленные сообщения не отменить.")) return;
+    setStopping(true);
+    try {
+      await stopBroadcast(job.job_id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStopping(false);
     }
   }
 
@@ -130,9 +146,21 @@ export default function Broadcast() {
         {job && (
           <div style={{ padding: "0 20px 16px" }}>
             <p>
-              {job.done ? "Готово" : "Отправляю…"} — отправлено {job.sent}, ошибок {job.failed}, всего {job.total}
+              {job.done ? (job.stopped ? "Остановлено" : "Готово") : "Отправляю…"} — отправлено {job.sent}, ошибок{" "}
+              {job.failed}, всего {job.total}
               {!job.done && " (~1 сообщение/сек, не закрывай страницу)"}
             </p>
+            <div className="bc-progress">
+              <div
+                className="bc-progress-fill"
+                style={{ width: `${job.total ? ((job.sent + job.failed) / job.total) * 100 : 0}%` }}
+              />
+            </div>
+            {!job.done && (
+              <button type="button" className="btn ghost" onClick={stop} disabled={stopping} style={{ marginTop: 8 }}>
+                {stopping ? "Останавливаю…" : "Стоп"}
+              </button>
+            )}
             {job.done && job.failed > 0 && (
               <p className="muted">
                 Ошибки: {job.results.filter((r) => !r.ok).map((r) => `${r.fan_id} (${r.error})`).join(", ")}
@@ -159,47 +187,54 @@ export default function Broadcast() {
           <span className="muted">Всего фанов: {fans.length}</span>
         </div>
 
-        <div className="an-table-wrap">
-          <table className="an-table">
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" checked={selected.size === fans.length && fans.length > 0} onChange={toggleAll} />
-                </th>
-                <th>Fan ID</th>
-                <th>Подписан</th>
-                <th className="num">Цена</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={4} className="muted">
-                    Загружаю…
-                  </td>
-                </tr>
-              )}
-              {!loading &&
-                fans.map((f) => (
-                  <tr key={f.fan_id}>
-                    <td>
-                      <input type="checkbox" checked={selected.has(f.fan_id)} onChange={() => toggle(f.fan_id)} />
-                    </td>
-                    <td>{f.fan_id}</td>
-                    <td className="muted">{f.subscribed_at?.slice(0, 10) ?? "—"}</td>
-                    <td className="num">{money(f.price_gross)}</td>
-                  </tr>
-                ))}
-              {!loading && fans.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="muted">
-                    Нет фанов.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className={`pd-acc-head${tableOpen ? " open" : ""}`} onClick={() => setTableOpen((s) => !s)}>
+          <h3 style={{ fontSize: 15 }}>Список фанов ({fans.length})</h3>
+          <span className="pd-acc-caret">▶</span>
         </div>
+
+        {tableOpen && (
+          <div className="an-table-wrap">
+            <table className="an-table">
+              <thead>
+                <tr>
+                  <th>
+                    <input type="checkbox" checked={selected.size === fans.length && fans.length > 0} onChange={toggleAll} />
+                  </th>
+                  <th>Fan ID</th>
+                  <th>Подписан</th>
+                  <th className="num">Цена</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={4} className="muted">
+                      Загружаю…
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  fans.map((f) => (
+                    <tr key={f.fan_id}>
+                      <td>
+                        <input type="checkbox" checked={selected.has(f.fan_id)} onChange={() => toggle(f.fan_id)} />
+                      </td>
+                      <td>{f.fan_id}</td>
+                      <td className="muted">{f.subscribed_at?.slice(0, 10) ?? "—"}</td>
+                      <td className="num">{money(f.price_gross)}</td>
+                    </tr>
+                  ))}
+                {!loading && fans.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="muted">
+                      Нет фанов.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <BroadcastHistory refreshKey={historyKey} />
@@ -297,7 +332,7 @@ function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
                     <td className="num">{j.sent}</td>
                     <td className={`num ${j.failed > 0 ? "down" : ""}`}>{j.failed}</td>
                     <td className="muted">{j.started_by ?? "—"}</td>
-                    <td className="muted">{j.done ? "готово" : "идёт…"}</td>
+                    <td className="muted">{j.done ? (j.stopped ? "остановлено" : "готово") : "идёт…"}</td>
                   </tr>
                   {openJob === j.job_id && (
                     <tr>

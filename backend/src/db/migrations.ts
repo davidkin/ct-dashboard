@@ -314,6 +314,14 @@ const MIGRATIONS: Migration[] = [
     CREATE INDEX IF NOT EXISTS idx_broadcast_sends_job ON broadcast_sends(job_id);
     `,
   },
+  {
+    id: "011_broadcast_stop",
+    sql: `
+    /* Кнопка "Стоп" для запущенной рассылки: флаг проверяется джобой между
+       отправками, останавливается на следующей итерации (не мгновенно). */
+    ALTER TABLE broadcast_jobs ADD COLUMN stop_requested INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

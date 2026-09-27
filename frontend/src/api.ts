@@ -1170,7 +1170,18 @@ export interface BroadcastStatus {
   sent: number;
   failed: number;
   done: boolean;
+  stopped: boolean;
   results: Array<{ fan_id: string; ok: boolean; error?: string }>;
+}
+
+export async function stopBroadcast(jobId: string): Promise<void> {
+  const res = await fetch(manageUrl(`/broadcast/stop/${jobId}`), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
 }
 
 export async function fetchBroadcastStatus(jobId: string): Promise<BroadcastStatus> {
@@ -1191,6 +1202,7 @@ export interface BroadcastJobSummary {
   started_at: string;
   finished_at: string | null;
   done: boolean;
+  stopped: boolean;
 }
 
 export async function fetchBroadcastJobs(): Promise<BroadcastJobSummary[]> {

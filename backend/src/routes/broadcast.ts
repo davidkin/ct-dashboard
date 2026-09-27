@@ -23,6 +23,7 @@ async function runBroadcast(jobId: string, fanIds: string[], text: string, platf
   const bumpJob = db.prepare(
     `UPDATE broadcast_jobs SET sent = sent + ?, failed = failed + ? WHERE id = ?`,
   );
+  const stopCheck = db.prepare(`SELECT stop_requested FROM broadcast_jobs WHERE id = ?`);
   let internalAccountId: string;
   try {
     internalAccountId = await resolveInternalAccountId(platformAccountId);
@@ -33,6 +34,8 @@ async function runBroadcast(jobId: string, fanIds: string[], text: string, platf
     return;
   }
   for (const fanId of fanIds) {
+    const row = stopCheck.get(jobId) as { stop_requested: number } | undefined;
+    if (row?.stop_requested) break;
     try {
       await sendChatMessage(internalAccountId, fanId, text, platformAccountId);
       insertSend.run(jobId, fanId, 1, null);
@@ -56,6 +59,7 @@ interface JobRow {
   started_by: string | null;
   started_at: string;
   finished_at: string | null;
+  stop_requested: number;
 }
 
 export async function registerBroadcastRoutes(app: FastifyInstance): Promise<void> {
@@ -146,9 +150,28 @@ export async function registerBroadcastRoutes(app: FastifyInstance): Promise<voi
         sent: job.sent,
         failed: job.failed,
         done: job.finished_at != null,
+        stopped: job.finished_at != null && job.stop_requested === 1,
         results: results.map((r) => ({ fan_id: r.fan_id, ok: !!r.ok, error: r.error ?? undefined })),
       },
     };
+  });
+
+  /** POST /api/broadcast/stop/:job_id — попросить джобу остановиться (сработает на следующей отправке). */
+  app.post<{ Params: { job_id: string } }>("/api/broadcast/stop/:job_id", async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const db = getDb();
+    const job = db.prepare(`SELECT id, finished_at FROM broadcast_jobs WHERE id = ?`).get(req.params.job_id) as
+      | { id: string; finished_at: string | null }
+      | undefined;
+    if (!job) {
+      reply.code(404);
+      return { error: "Джоба не найдена" };
+    }
+    if (job.finished_at != null) {
+      return { data: { already_done: true } };
+    }
+    db.prepare(`UPDATE broadcast_jobs SET stop_requested = 1 WHERE id = ?`).run(job.id);
+    return { data: { stopping: true } };
   });
 
   /** GET /api/broadcast/jobs — история рассылок, для лога ошибок. */
@@ -170,6 +193,7 @@ export async function registerBroadcastRoutes(app: FastifyInstance): Promise<voi
         started_at: j.started_at,
         finished_at: j.finished_at,
         done: j.finished_at != null,
+        stopped: j.finished_at != null && j.stop_requested === 1,
       })),
     };
   });
