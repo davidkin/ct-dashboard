@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BroadcastFan,
+  BroadcastJobSummary,
   BroadcastStatus,
   fetchBroadcastFans,
+  fetchBroadcastJobs,
   fetchBroadcastStatus,
   getSession,
   startBroadcast,
@@ -21,6 +23,7 @@ export default function Broadcast() {
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [job, setJob] = useState<BroadcastStatus | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -92,7 +95,10 @@ export default function Broadcast() {
         try {
           const st = await fetchBroadcastStatus(res.job_id);
           setJob(st);
-          if (st.done) stopPoll();
+          if (st.done) {
+            stopPoll();
+            setHistoryKey((k) => k + 1);
+          }
         } catch (e) {
           setError(e instanceof Error ? e.message : String(e));
           stopPoll();
@@ -194,6 +200,130 @@ export default function Broadcast() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <BroadcastHistory refreshKey={historyKey} />
+    </div>
+  );
+}
+
+/** История рассылок: список джоб + разворачиваемые ошибки по каждой. */
+function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
+  const [jobs, setJobs] = useState<BroadcastJobSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [openJob, setOpenJob] = useState<string | null>(null);
+  const [detail, setDetail] = useState<BroadcastStatus | null>(null);
+
+  useEffect(() => {
+    void load();
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      setJobs(await fetchBroadcastJobs());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggleOpen(jobId: string) {
+    if (openJob === jobId) {
+      setOpenJob(null);
+      setDetail(null);
+      return;
+    }
+    setOpenJob(jobId);
+    setDetail(null);
+    try {
+      setDetail(await fetchBroadcastStatus(jobId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div className="an-card" style={{ marginTop: 20 }}>
+      <div className="an-card-head">
+        <h3>История рассылок</h3>
+        <button type="button" className="btn ghost" onClick={load}>
+          ⟳ Обновить
+        </button>
+      </div>
+      {error && <p className="pm-err" style={{ padding: "0 20px" }}>{error}</p>}
+      <div className="an-table-wrap">
+        <table className="an-table">
+          <thead>
+            <tr>
+              <th>Начата</th>
+              <th>Модель</th>
+              <th>Текст</th>
+              <th className="num">Всего</th>
+              <th className="num">Отправлено</th>
+              <th className="num">Ошибок</th>
+              <th>Кто</th>
+              <th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={8} className="muted">
+                  Загружаю…
+                </td>
+              </tr>
+            )}
+            {!loading && jobs.length === 0 && (
+              <tr>
+                <td colSpan={8} className="muted">
+                  Рассылок ещё не было.
+                </td>
+              </tr>
+            )}
+            {!loading &&
+              jobs.map((j) => (
+                <Fragment key={j.job_id}>
+                  <tr onClick={() => toggleOpen(j.job_id)} style={{ cursor: "pointer" }}>
+                    <td className="muted">{j.started_at?.replace("T", " ").slice(0, 16)}</td>
+                    <td>{j.creator}</td>
+                    <td style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {j.text}
+                    </td>
+                    <td className="num">{j.total}</td>
+                    <td className="num">{j.sent}</td>
+                    <td className={`num ${j.failed > 0 ? "down" : ""}`}>{j.failed}</td>
+                    <td className="muted">{j.started_by ?? "—"}</td>
+                    <td className="muted">{j.done ? "готово" : "идёт…"}</td>
+                  </tr>
+                  {openJob === j.job_id && (
+                    <tr>
+                      <td colSpan={8} style={{ background: "rgba(255,255,255,0.03)" }}>
+                        {!detail && <span className="muted">Загружаю…</span>}
+                        {detail && detail.results.filter((r) => !r.ok).length === 0 && (
+                          <span className="muted">Ошибок нет.</span>
+                        )}
+                        {detail && detail.results.some((r) => !r.ok) && (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {detail.results
+                              .filter((r) => !r.ok)
+                              .map((r, i) => (
+                                <li key={i}>
+                                  {r.fan_id}: {r.error}
+                                </li>
+                              ))}
+                          </ul>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

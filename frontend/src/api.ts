@@ -1179,3 +1179,23 @@ export async function fetchBroadcastStatus(jobId: string): Promise<BroadcastStat
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data;
 }
+
+export interface BroadcastJobSummary {
+  job_id: string;
+  creator: string;
+  text: string;
+  total: number;
+  sent: number;
+  failed: number;
+  started_by: string | null;
+  started_at: string;
+  finished_at: string | null;
+  done: boolean;
+}
+
+export async function fetchBroadcastJobs(): Promise<BroadcastJobSummary[]> {
+  const res = await fetch(manageUrl("/broadcast/jobs"), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}

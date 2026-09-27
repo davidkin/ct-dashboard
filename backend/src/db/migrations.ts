@@ -286,6 +286,34 @@ const MIGRATIONS: Migration[] = [
     ALTER TABLE links ADD COLUMN baseline_captured_at TEXT;
     `,
   },
+  {
+    id: "010_broadcast_log",
+    sql: `
+    /* Лог рассылок через OM: одна строка на джобу + одна строка на попытку
+       отправки конкретному фану — чтобы ошибки не терялись при рестарте
+       и были видны в истории на странице /broadcast. */
+    CREATE TABLE IF NOT EXISTS broadcast_jobs (
+      id TEXT PRIMARY KEY,
+      creator TEXT NOT NULL,
+      text TEXT NOT NULL,
+      total INTEGER NOT NULL,
+      sent INTEGER NOT NULL DEFAULT 0,
+      failed INTEGER NOT NULL DEFAULT 0,
+      started_by TEXT,
+      started_at TEXT NOT NULL DEFAULT (datetime('now')),
+      finished_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS broadcast_sends (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL REFERENCES broadcast_jobs(id) ON DELETE CASCADE,
+      fan_id TEXT NOT NULL,
+      ok INTEGER NOT NULL,
+      error TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_broadcast_sends_job ON broadcast_sends(job_id);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {
