@@ -249,10 +249,44 @@ function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
   const [error, setError] = useState<string | null>(null);
   const [openJob, setOpenJob] = useState<string | null>(null);
   const [detail, setDetail] = useState<BroadcastStatus | null>(null);
+  const [stoppingId, setStoppingId] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
     void load();
   }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Если есть незавершённая джоба (например, после перезагрузки страницы) —
+     опрашиваем список, пока она не закончится, чтобы статус/кнопка "Стоп"
+     не зависали навсегда. */
+  useEffect(() => {
+    const hasRunning = jobs.some((j) => !j.done);
+    if (hasRunning && pollRef.current == null) {
+      pollRef.current = window.setInterval(() => void load(), 3000);
+    } else if (!hasRunning && pollRef.current != null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    return () => {
+      if (pollRef.current != null) {
+        window.clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [jobs]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function stopJob(jobId: string) {
+    if (!confirm("Остановить эту рассылку? Уже отправленные сообщения не отменить.")) return;
+    setStoppingId(jobId);
+    try {
+      await stopBroadcast(jobId);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setStoppingId(null);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -332,7 +366,30 @@ function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
                     <td className="num">{j.sent}</td>
                     <td className={`num ${j.failed > 0 ? "down" : ""}`}>{j.failed}</td>
                     <td className="muted">{j.started_by ?? "—"}</td>
-                    <td className="muted">{j.done ? (j.stopped ? "остановлено" : "готово") : "идёт…"}</td>
+                    <td className="muted">
+                      {j.done ? (
+                        j.stopped ? (
+                          "остановлено"
+                        ) : (
+                          "готово"
+                        )
+                      ) : (
+                        <>
+                          идёт…{" "}
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void stopJob(j.job_id);
+                            }}
+                            disabled={stoppingId === j.job_id}
+                          >
+                            {stoppingId === j.job_id ? "…" : "Стоп"}
+                          </button>
+                        </>
+                      )}
+                    </td>
                   </tr>
                   {openJob === j.job_id && (
                     <tr>
