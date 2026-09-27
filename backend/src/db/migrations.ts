@@ -322,6 +322,15 @@ const MIGRATIONS: Migration[] = [
     ALTER TABLE broadcast_jobs ADD COLUMN stop_requested INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    id: "012_broadcast_resume",
+    sql: `
+    /* Полный список получателей джобы — нужен чтобы дорезолвить оставшихся
+       фанов и продолжить рассылку после рестарта бэкенда (иначе джоба
+       безвозвратно зависает с finished_at=NULL, никто её не докручивает). */
+    ALTER TABLE broadcast_jobs ADD COLUMN fan_ids_json TEXT;
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

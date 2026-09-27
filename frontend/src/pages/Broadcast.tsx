@@ -334,6 +334,7 @@ function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
               <th className="num">Всего</th>
               <th className="num">Отправлено</th>
               <th className="num">Ошибок</th>
+              <th>Прогресс</th>
               <th>Кто</th>
               <th>Статус</th>
             </tr>
@@ -341,14 +342,14 @@ function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={9} className="muted">
                   Загружаю…
                 </td>
               </tr>
             )}
             {!loading && jobs.length === 0 && (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={9} className="muted">
                   Рассылок ещё не было.
                 </td>
               </tr>
@@ -365,6 +366,14 @@ function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
                     <td className="num">{j.total}</td>
                     <td className="num">{j.sent}</td>
                     <td className={`num ${j.failed > 0 ? "down" : ""}`}>{j.failed}</td>
+                    <td style={{ minWidth: 100 }}>
+                      <div className="bc-progress bc-progress-sm">
+                        <div
+                          className="bc-progress-fill"
+                          style={{ width: `${j.total ? ((j.sent + j.failed) / j.total) * 100 : 0}%` }}
+                        />
+                      </div>
+                    </td>
                     <td className="muted">{j.started_by ?? "—"}</td>
                     <td className="muted">
                       {j.done ? (
@@ -393,7 +402,7 @@ function BroadcastHistory({ refreshKey }: { refreshKey: number }) {
                   </tr>
                   {openJob === j.job_id && (
                     <tr>
-                      <td colSpan={8} style={{ background: "rgba(255,255,255,0.03)" }}>
+                      <td colSpan={9} style={{ background: "rgba(255,255,255,0.03)" }}>
                         {!detail && <span className="muted">Загружаю…</span>}
                         {detail && detail.results.filter((r) => !r.ok).length === 0 && (
                           <span className="muted">Ошибок нет.</span>

@@ -4,7 +4,13 @@
  * Отправка идёт с троттлингом (OM: 1 запрос/сек на chats/messages), поэтому
  * на пачку в тысячи фанов это долго — крутится фоновой джобой, а прогресс и
  * ошибки сразу пишутся в broadcast_jobs/broadcast_sends (не в памяти), чтобы
- * ничего не терялось при рестарте бэкенда и было видно в истории на странице.
+ * ничего не терялось при рестарте бэкенда.
+ *
+ * Полный список получателей тоже сохраняется (fan_ids_json), поэтому джоба
+ * резюмируема: runBroadcast всегда вычисляет "кого ещё не отправляли" из базы,
+ * а не из аргумента вызова. Это значит рестарт бэкенда не бросает рассылку
+ * недоделанной навсегда — resumeInterruptedBroadcasts() на старте докручивает
+ * всё, что осталось не finished_at.
  */
 import { FastifyInstance } from "fastify";
 import { randomUUID } from "crypto";
@@ -14,40 +20,6 @@ import { getOMAccountForCreator, isRetiredCreator } from "../config/creators";
 import { listSubscriptions, resolveInternalAccountId, sendChatMessage } from "../om/client";
 
 const SEND_DELAY_MS = 1100;
-
-async function runBroadcast(jobId: string, fanIds: string[], text: string, platformAccountId: string): Promise<void> {
-  const db = getDb();
-  const insertSend = db.prepare(
-    `INSERT INTO broadcast_sends (job_id, fan_id, ok, error) VALUES (?, ?, ?, ?)`,
-  );
-  const bumpJob = db.prepare(
-    `UPDATE broadcast_jobs SET sent = sent + ?, failed = failed + ? WHERE id = ?`,
-  );
-  const stopCheck = db.prepare(`SELECT stop_requested FROM broadcast_jobs WHERE id = ?`);
-  let internalAccountId: string;
-  try {
-    internalAccountId = await resolveInternalAccountId(platformAccountId);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    insertSend.run(jobId, "(job)", 0, `не удалось определить аккаунт: ${msg}`);
-    db.prepare(`UPDATE broadcast_jobs SET failed = failed + 1, finished_at = datetime('now') WHERE id = ?`).run(jobId);
-    return;
-  }
-  for (const fanId of fanIds) {
-    const row = stopCheck.get(jobId) as { stop_requested: number } | undefined;
-    if (row?.stop_requested) break;
-    try {
-      await sendChatMessage(internalAccountId, fanId, text, platformAccountId);
-      insertSend.run(jobId, fanId, 1, null);
-      bumpJob.run(1, 0, jobId);
-    } catch (err) {
-      insertSend.run(jobId, fanId, 0, err instanceof Error ? err.message : String(err));
-      bumpJob.run(0, 1, jobId);
-    }
-    await new Promise((r) => setTimeout(r, SEND_DELAY_MS));
-  }
-  db.prepare(`UPDATE broadcast_jobs SET finished_at = datetime('now') WHERE id = ?`).run(jobId);
-}
 
 interface JobRow {
   id: string;
@@ -60,6 +32,72 @@ interface JobRow {
   started_at: string;
   finished_at: string | null;
   stop_requested: number;
+  fan_ids_json: string | null;
+}
+
+async function runBroadcast(jobId: string): Promise<void> {
+  const db = getDb();
+  const job = db.prepare(`SELECT * FROM broadcast_jobs WHERE id = ?`).get(jobId) as JobRow | undefined;
+  if (!job || job.finished_at != null || !job.fan_ids_json) return;
+
+  const platformAccountId = getOMAccountForCreator(job.creator);
+  const insertSend = db.prepare(`INSERT INTO broadcast_sends (job_id, fan_id, ok, error) VALUES (?, ?, ?, ?)`);
+  const bumpJob = db.prepare(`UPDATE broadcast_jobs SET sent = sent + ?, failed = failed + ? WHERE id = ?`);
+  const stopCheck = db.prepare(`SELECT stop_requested FROM broadcast_jobs WHERE id = ?`);
+
+  if (!platformAccountId) {
+    insertSend.run(jobId, "(job)", 0, `модель «${job.creator}» больше не настроена`);
+    db.prepare(`UPDATE broadcast_jobs SET failed = failed + 1, finished_at = datetime('now') WHERE id = ?`).run(jobId);
+    return;
+  }
+
+  let internalAccountId: string;
+  try {
+    internalAccountId = await resolveInternalAccountId(platformAccountId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    insertSend.run(jobId, "(job)", 0, `не удалось определить аккаунт: ${msg}`);
+    db.prepare(`UPDATE broadcast_jobs SET failed = failed + 1, finished_at = datetime('now') WHERE id = ?`).run(jobId);
+    return;
+  }
+
+  const allFanIds = JSON.parse(job.fan_ids_json) as string[];
+  const alreadyDone = new Set(
+    (db.prepare(`SELECT fan_id FROM broadcast_sends WHERE job_id = ?`).all(jobId) as Array<{ fan_id: string }>).map(
+      (r) => r.fan_id,
+    ),
+  );
+  const remaining = allFanIds.filter((id) => !alreadyDone.has(id));
+
+  for (const fanId of remaining) {
+    const row = stopCheck.get(jobId) as { stop_requested: number } | undefined;
+    if (row?.stop_requested) break;
+    try {
+      await sendChatMessage(internalAccountId, fanId, job.text, platformAccountId);
+      insertSend.run(jobId, fanId, 1, null);
+      bumpJob.run(1, 0, jobId);
+    } catch (err) {
+      insertSend.run(jobId, fanId, 0, err instanceof Error ? err.message : String(err));
+      bumpJob.run(0, 1, jobId);
+    }
+    await new Promise((r) => setTimeout(r, SEND_DELAY_MS));
+  }
+  db.prepare(`UPDATE broadcast_jobs SET finished_at = datetime('now') WHERE id = ?`).run(jobId);
+}
+
+/**
+ * Вызывается один раз при старте бэкенда: докручивает джобы, у которых
+ * finished_at ещё NULL (процесс умер посреди рассылки — рестарт, краш).
+ * Уважает stop_requested, если его успели проставить до рестарта.
+ */
+export async function resumeInterruptedBroadcasts(): Promise<void> {
+  const db = getDb();
+  const stuck = db
+    .prepare(`SELECT id FROM broadcast_jobs WHERE finished_at IS NULL AND fan_ids_json IS NOT NULL`)
+    .all() as Array<{ id: string }>;
+  for (const { id } of stuck) {
+    void runBroadcast(id);
+  }
 }
 
 export async function registerBroadcastRoutes(app: FastifyInstance): Promise<void> {
@@ -94,7 +132,8 @@ export async function registerBroadcastRoutes(app: FastifyInstance): Promise<voi
 
   /**
    * POST /api/broadcast/start — body { creator, fan_ids: string[], text }.
-   * Пишет джобу в broadcast_jobs, запускает фоновую отправку, сразу отдаёт job_id.
+   * Пишет джобу + полный список получателей в базу, запускает фоновую
+   * отправку, сразу отдаёт job_id.
    */
   app.post<{ Body: { creator?: string; fan_ids?: string[]; text?: string } }>(
     "/api/broadcast/start",
@@ -123,9 +162,9 @@ export async function registerBroadcastRoutes(app: FastifyInstance): Promise<voi
       const db = getDb();
       const jobId = randomUUID();
       db.prepare(
-        `INSERT INTO broadcast_jobs (id, creator, text, total, started_by) VALUES (?, ?, ?, ?, ?)`,
-      ).run(jobId, creator, text, fanIds.length, req.user?.email ?? null);
-      void runBroadcast(jobId, fanIds, text, platformAccountId);
+        `INSERT INTO broadcast_jobs (id, creator, text, total, started_by, fan_ids_json) VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(jobId, creator, text, fanIds.length, req.user?.email ?? null, JSON.stringify(fanIds));
+      void runBroadcast(jobId);
       return { data: { job_id: jobId, total: fanIds.length } };
     },
   );

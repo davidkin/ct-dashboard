@@ -20,7 +20,7 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerAdminRoutes } from "./routes/admin";
 import { registerCabinetRoutes } from "./routes/cabinet";
 import { registerReplyStatsRoutes } from "./routes/reply-stats";
-import { registerBroadcastRoutes } from "./routes/broadcast";
+import { registerBroadcastRoutes, resumeInterruptedBroadcasts } from "./routes/broadcast";
 import { currentUser, type SessionUser } from "./lib/auth";
 import { startScheduler } from "./of/scheduler";
 import { startDailyCapture } from "./daily/scheduler";
@@ -74,6 +74,7 @@ async function main() {
   startScheduler();
   startDailyCapture();
   startReplyStatsWorker();
+  void resumeInterruptedBroadcasts();
 }
 
 main().catch((err) => {

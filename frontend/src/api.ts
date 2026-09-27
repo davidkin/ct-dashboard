@@ -1179,6 +1179,7 @@ export async function stopBroadcast(jobId: string): Promise<void> {
     method: "POST",
     credentials: "include",
     headers: authHeaders(),
+    body: "{}",
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);

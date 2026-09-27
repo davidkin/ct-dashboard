@@ -1544,6 +1544,7 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .bc-progress-fill {
   height: 100%; background: var(--accent); transition: width .3s ease;
 }
+.bc-progress-sm { height: 6px; margin-top: 0; }
 
 .an-partner { display: flex; align-items: center; gap: 10px; position: relative; }
 .an-ava {
