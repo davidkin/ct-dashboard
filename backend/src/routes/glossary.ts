@@ -10,13 +10,7 @@ import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
 import { requireAdmin } from "../lib/auth";
 import { listTrackingLinks } from "../om/client";
-import {
-  getModelGroup,
-  getOMAccountForCreator,
-  isRetiredCreator,
-  listModels,
-  creatorsInModelGroup,
-} from "../config/creators";
+import { getModelGroup, getOMAccountForCreator, isRetiredCreator, listModels, creatorsInModelGroup, isPaidCampaign } from "../config/creators";
 
 interface LinkRow {
   id: number;
@@ -62,7 +56,7 @@ function naturalCmp(a: string, b: string): number {
 
 /** Ссылка платная по коду: это же правило используют отчёты. */
 function isPaidCode(code: string): boolean {
-  return code.startsWith("camp_paid");
+  return isPaidCampaign(code);
 }
 
 function parseCpf(value: unknown): number | null {

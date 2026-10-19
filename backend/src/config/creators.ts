@@ -142,6 +142,14 @@ export function activeCreatorNames(): string[] {
   return Object.keys(CREATOR_CONFIG).filter((name) => !isRetiredCreator(name));
 }
 
+/**
+ * Платная (VIP) кампания по коду: camp_paid_N у старых моделей,
+ * camp_N_ftl_paid (free trial на VIP-аккаунте) у Kimi.
+ */
+export function isPaidCampaign(code: string): boolean {
+  return code.startsWith("camp_paid") || code.endsWith("_paid");
+}
+
 export function creatorSlug(name: string): string {
   return name
     .toLowerCase()

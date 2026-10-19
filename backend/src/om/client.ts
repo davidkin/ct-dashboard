@@ -23,6 +23,16 @@ export interface OMTrackingLink {
   created_at: string;
 }
 
+interface OMTrialLink {
+  id: string;
+  name: string;
+  claims: number;
+  url: string;
+  is_active: boolean;
+  clicks: number;
+  created_at: string;
+}
+
 export interface OMTrackingLinkUser {
   link_id: string;
   fan: { id: string; name: string; username: string };
@@ -183,12 +193,16 @@ export async function listTrackingLinkUsers(
   opts: { linkId?: string; limit?: number } = {},
 ): Promise<OMTrackingLinkUser[]> {
   const limit = opts.limit ?? 750;
-  return paginate<OMTrackingLinkUser>((cursor) => {
-    const p = new URLSearchParams({ limit: String(limit) });
-    if (opts.linkId) p.set("link_id", opts.linkId);
-    if (cursor) p.set("cursor", cursor);
-    return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/tracking-link-users?${p}`;
-  }, platformAccountId);
+  /* Trial-ссылки (onlyfans.com/<model>/trial/...) живут в OM на отдельных
+     эндпоинтах, но по смыслу это те же кампании: сливаем оба списка. */
+  const fetchKind = (kind: "tracking" | "trial") =>
+    paginate<OMTrackingLinkUser>((cursor) => {
+      const p = new URLSearchParams({ limit: String(limit) });
+      if (opts.linkId) p.set("link_id", opts.linkId);
+      if (cursor) p.set("cursor", cursor);
+      return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/${kind}-link-users?${p}`;
+    }, platformAccountId);
+  return [...(await fetchKind("tracking")), ...(await fetchKind("trial"))];
 }
 
 /** tracking-links — список ссылок с агрегатами (subscribers/clicks). */
@@ -199,11 +213,26 @@ export async function listTrackingLinks(
   const start = opts.start ?? isoDaysAgo(365);
   const end = opts.end ?? isoNow();
   const limit = opts.limit ?? 1000;
-  return paginate<OMTrackingLink>((cursor) => {
+  const path = (kind: "tracking" | "trial") => (cursor?: string) => {
     const p = new URLSearchParams({ start, end, limit: String(limit) });
     if (cursor) p.set("cursor", cursor);
-    return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/tracking-links?${p}`;
-  }, platformAccountId);
+    return `/api/v0/platforms/${PLATFORM}/accounts/${platformAccountId}/${kind}-links?${p}`;
+  };
+  const tracking = await paginate<OMTrackingLink>(path("tracking"), platformAccountId);
+  /* У trial-ссылки фаны называются claims — приводим к форме tracking-ссылки. */
+  const trial = await paginate<OMTrialLink>(path("trial"), platformAccountId);
+  return [
+    ...tracking,
+    ...trial.map((t) => ({
+      id: t.id,
+      name: t.name,
+      subscribers: t.claims,
+      url: t.url,
+      is_active: t.is_active,
+      clicks: t.clicks,
+      created_at: t.created_at,
+    })),
+  ];
 }
 
 /** transactions — выручка с fan.id + timestamp. Для RevShare-компонента. */

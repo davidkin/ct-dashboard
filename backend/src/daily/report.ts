@@ -14,7 +14,7 @@
  * клики задним числом восстановить нельзя, сабы — можно за всю историю.
  */
 import { getDb } from "../db/index";
-import { modelCreatorsJson } from "../config/creators";
+import { modelCreatorsJson, isPaidCampaign } from "../config/creators";
 import { localDay, dayRange, TRACKING_TZ, todayLocal, nextCaptureAt } from "../lib/tz";
 
 export interface DailyCampaign {
@@ -158,7 +158,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
 
   const campaignMap = new Map<number, DailyCampaign>();
   for (const r of linkRows) {
-    const tier: "free" | "paid" = r.campaign_code.startsWith("camp_paid") ? "paid" : "free";
+    const tier: "free" | "paid" = isPaidCampaign(r.campaign_code) ? "paid" : "free";
     if (opts.tier && tier !== opts.tier) continue; // фильтр free/paid
     /* CPF берём с ПАРТНЁРА (Free/Paid CPF), фолбэк на CPF линка (для старых данных). */
     campaignMap.set(r.link_id, {

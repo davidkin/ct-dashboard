@@ -9,13 +9,7 @@ import { randomBytes } from "node:crypto";
 import { getDb } from "../db/index";
 import { requireAdmin } from "../lib/auth";
 import { listTrackingLinks } from "../om/client";
-import {
-  creatorsInModelGroup,
-  getCreatorType,
-  getOMAccountForCreator,
-  isRetiredCreator,
-  listModels,
-} from "../config/creators";
+import { creatorsInModelGroup, getCreatorType, getOMAccountForCreator, isRetiredCreator, listModels, isPaidCampaign } from "../config/creators";
 import { lastCompletedWeekStart, todayLocal } from "../lib/tz";
 import { pickCpf } from "../daily/report";
 
@@ -34,7 +28,7 @@ interface NewLink {
 /** creator по tier/коду: модель берём первую живую из конфига, а не захардкоженную. */
 function creatorFor(l: NewLink): string {
   if (l.creator) return l.creator;
-  const paid = l.tier === "paid" || l.campaign_code.startsWith("camp_paid");
+  const paid = l.tier === "paid" || isPaidCampaign(l.campaign_code);
   const wanted = paid ? "vip" : "free";
   const model = listModels()[0];
   const creator = model
@@ -80,7 +74,7 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
       try {
         const links = await listTrackingLinks(a.id);
         for (const l of links) {
-          const tier = l.name.startsWith("camp_paid") ? "paid" : a.tier;
+          const tier = isPaidCampaign(l.name) ? "paid" : a.tier;
           out.push({
             id: Number(l.id),
             code: l.name,
@@ -242,7 +236,7 @@ export async function registerManageRoutes(app: FastifyInstance): Promise<void> 
           .get(id) as { id: number; partner_id: number; campaign_code: string; cpf_free: number | null; cpf_paid: number | null };
 
         if (cpfChanged && link.partner_id) {
-          const tier: "free" | "paid" = link.campaign_code.startsWith("camp_paid") ? "paid" : "free";
+          const tier: "free" | "paid" = isPaidCampaign(link.campaign_code) ? "paid" : "free";
           const historyCount = db
             .prepare(`SELECT COUNT(*) AS n FROM cpf_history WHERE partner_id = ? AND tier = ?`)
             .get(link.partner_id, tier) as { n: number };

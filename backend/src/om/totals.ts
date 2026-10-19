@@ -7,7 +7,7 @@
  * модели (у Lily нумерация начинается заново и пересекается с Nekoletta).
  */
 import { listTrackingLinks } from "./client";
-import { getModelGroup, getOMAccountForCreator, listModels, creatorsInModelGroup, isRetiredModel } from "../config/creators";
+import { getModelGroup, getOMAccountForCreator, listModels, creatorsInModelGroup, isRetiredModel, isPaidCampaign } from "../config/creators";
 
 export interface OmLinkTotal {
   campaign_code: string;
@@ -37,7 +37,7 @@ export function omTotalsKey(
 
 export function tierForCreator(creator: string | null | undefined, campaignCode: string): "free" | "vip" {
   if (creator) return creator.toLowerCase().endsWith("vip") ? "vip" : "free";
-  return campaignCode.startsWith("camp_paid_") ? "vip" : "free";
+  return isPaidCampaign(campaignCode) ? "vip" : "free";
 }
 
 /**
