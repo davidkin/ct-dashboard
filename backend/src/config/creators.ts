@@ -42,7 +42,7 @@ export interface ModelOption {
 
 const MODELS: ModelOption[] = [
   { group: "Nekoletta", label: "Velora", hidden: true, retired: true },
-  { group: "Lily", label: "Lily" },
+  { group: "Lily", label: "Lily", hidden: true, retired: true },
 ];
 
 /**
@@ -119,6 +119,19 @@ export function creatorsInModelGroup(modelGroup: string): string[] {
   return Object.entries(CREATOR_CONFIG)
     .filter(([, cfg]) => cfg.modelGroup === modelGroup)
     .map(([name]) => name);
+}
+
+/** Creator-ы видимых моделей: скрытые модели не попадают ни в один экран. */
+export function visibleCreatorNames(): string[] {
+  return listModels().flatMap((m) => creatorsInModelGroup(m.group));
+}
+
+/**
+ * Фильтр по модели для SQL (json_each): выбранная модель → её creator-ы,
+ * «Все модели» → creator-ы видимых моделей (а не вообще все).
+ */
+export function modelCreatorsJson(model: string | null | undefined): string {
+  return JSON.stringify(model ? creatorsInModelGroup(model) : visibleCreatorNames());
 }
 
 /** Все настроенные creator-ы, кроме retired (за ними в OM больше не ходим). */

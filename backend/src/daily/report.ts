@@ -14,7 +14,7 @@
  * клики задним числом восстановить нельзя, сабы — можно за всю историю.
  */
 import { getDb } from "../db/index";
-import { creatorsInModelGroup } from "../config/creators";
+import { modelCreatorsJson } from "../config/creators";
 import { localDay, dayRange, TRACKING_TZ, todayLocal, nextCaptureAt } from "../lib/tz";
 
 export interface DailyCampaign {
@@ -127,7 +127,7 @@ export function buildDailyReport(opts: BuildOpts): DailyReport {
   const { creator, from, to } = opts;
   const partner = opts.partner ?? null;
   /* модель → список её creator-ов (Free+Vip); JSON, чтобы уйти в json_each прямо в SQL */
-  const modelCreators = opts.model ? JSON.stringify(creatorsInModelGroup(opts.model)) : null;
+  const modelCreators = modelCreatorsJson(opts.model);
   const days = dayRange(from, to);
 
   /* === компании (ссылки) + их CPF + партнёр-владелец === */

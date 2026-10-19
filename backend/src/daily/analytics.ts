@@ -10,7 +10,7 @@
  */
 import { getDb } from "../db/index";
 import { buildDailyReport } from "./report";
-import { creatorsInModelGroup } from "../config/creators";
+import { modelCreatorsJson } from "../config/creators";
 import { TRACKING_TZ, lastCompletedWeekStart } from "../lib/tz";
 
 export interface PartnerAnalytics {
@@ -125,7 +125,7 @@ export function buildAnalytics(
            AND date(t.occurred_at) BETWEEN @from AND @to
          GROUP BY l.partner_id`,
       )
-      .all({ from, to, modelCreators: model ? JSON.stringify(creatorsInModelGroup(model)) : null }) as Array<{ pid: number; rev: number }>;
+      .all({ from, to, modelCreators: modelCreatorsJson(model) }) as Array<{ pid: number; rev: number }>;
     for (const r of rev) revById.set(r.pid, r.rev);
   } catch {
     /* нет таблицы/данных — выручка 0 */
@@ -172,7 +172,7 @@ export function buildAnalytics(
         WHERE l.partner_id IS NOT NULL
           AND (@modelCreators IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))`,
     )
-    .all({ modelCreators: model ? JSON.stringify(creatorsInModelGroup(model)) : null }) as Array<{ pid: number }>;
+    .all({ modelCreators: modelCreatorsJson(model) }) as Array<{ pid: number }>;
   for (const { pid } of withLinks) {
     if (seen.has(pid)) continue;
     const meta = metaById.get(pid);

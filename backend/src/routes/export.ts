@@ -3,7 +3,7 @@ import { buildDailyReport } from "../daily/report";
 import { buildAnalytics } from "../daily/analytics";
 import { getDb } from "../db/index";
 import { getOmLinkTotals, omTotalsCacheAgeMs, omTotalsErrors, findOmTotal } from "../om/totals";
-import { creatorsInModelGroup, getModelGroup, listModels } from "../config/creators";
+import { getModelGroup, listModels, modelCreatorsJson } from "../config/creators";
 import { todayLocal, addDays } from "../lib/tz";
 import { getLastIntegrityReport, runIntegrityCheck } from "../daily/integrity";
 
@@ -96,7 +96,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
         return { error: "invalid or missing key" };
       }
       const model = req.query.model || null;
-      const modelCreators = model ? JSON.stringify(creatorsInModelGroup(model)) : "[]";
+      const modelCreators = modelCreatorsJson(model);
       const rows = getDb()
         .prepare(
           `SELECT p.id, p.display_name, p.telegram,
@@ -107,7 +107,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
                    WHERE l2.partner_id = p.id) AS clicks
              FROM partners p
              LEFT JOIN links l ON l.partner_id = p.id
-                   AND (@model IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
+                   AND l.creator IN (SELECT value FROM json_each(@modelCreators))
             WHERE COALESCE(p.archived, 0) = 0
             GROUP BY p.id, p.display_name, p.telegram
             ORDER BY clicks DESC, p.display_name COLLATE NOCASE`,
@@ -184,7 +184,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
       const partnerNum = req.query.partner ? Number(req.query.partner) : null;
       const partner = Number.isFinite(partnerNum) ? partnerNum : null;
       const model = req.query.model || null;
-      const modelCreators = model ? JSON.stringify(creatorsInModelGroup(model)) : "[]";
+      const modelCreators = modelCreatorsJson(model);
 
       /* наши линки + актуальный кумулятив кликов/фанов из дневных снимков
          дашборда (daily_link_clicks, последний захваченный день на линк) —
@@ -201,7 +201,7 @@ export async function registerExportRoutes(app: FastifyInstance): Promise<void> 
                          WHERE d.day = (SELECT MAX(day) FROM daily_link_clicks d2
                                          WHERE d2.link_id = d.link_id)) s ON s.link_id = l.id
             WHERE (@partner IS NULL OR l.partner_id = @partner)
-              AND (@model IS NULL OR l.creator IN (SELECT value FROM json_each(@modelCreators)))
+              AND l.creator IN (SELECT value FROM json_each(@modelCreators))
               AND l.campaign_code IS NOT NULL AND l.campaign_code <> ''`,
         )
         .all({ partner, model, modelCreators }) as Array<{

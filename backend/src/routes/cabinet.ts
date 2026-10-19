@@ -8,6 +8,7 @@ import { FastifyInstance } from "fastify";
 import { getDb } from "../db/index";
 import { buildDailyReport } from "../daily/report";
 import { todayLocal, addDays } from "../lib/tz";
+import { modelCreatorsJson } from "../config/creators";
 
 export async function registerCabinetRoutes(app: FastifyInstance): Promise<void> {
   const db = getDb();
@@ -50,9 +51,10 @@ export async function registerCabinetRoutes(app: FastifyInstance): Promise<void>
               END) AS payout
            FROM links l
            WHERE l.partner_id = ?
+             AND l.creator IN (SELECT value FROM json_each(?))
            ORDER BY l.creator, l.campaign_code COLLATE NOCASE`,
         )
-        .all(partner.id) as Array<{ id: number; creator: string; campaign_code: string; clicks: number; fans: number; payout: number }>;
+        .all(partner.id, modelCreatorsJson(null)) as Array<{ id: number; creator: string; campaign_code: string; clicks: number; fans: number; payout: number }>;
       const lifetimeTotal = lifetimeLinks.reduce(
         (acc, l) => ({ clicks: acc.clicks + l.clicks, fans: acc.fans + l.fans, payout: acc.payout + l.payout }),
         { clicks: 0, fans: 0, payout: 0 },
