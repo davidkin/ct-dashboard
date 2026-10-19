@@ -24,6 +24,8 @@ const CREATOR_CONFIG: Record<string, CreatorConfig> = {
   "Nekoletta Vip": { envKey: "ONLYFANSAPI_ACCOUNT_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN", type: "vip", modelGroup: "Nekoletta" },
   "Lily Free": { envKey: "ONLYFANSAPI_ACCOUNT_LILY_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_LILY_FREE", omTokenEnvKey: "ONLYMONSTER_TOKEN_LILY", type: "free", modelGroup: "Lily" },
   "Lily Vip": { envKey: "ONLYFANSAPI_ACCOUNT_LILY_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_LILY_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN_LILY", type: "vip", modelGroup: "Lily" },
+  "Kimi Free": { envKey: "ONLYFANSAPI_ACCOUNT_KIMI_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_KIMI_FREE", omTokenEnvKey: "ONLYMONSTER_TOKEN_KIMI", type: "free", modelGroup: "Kimi" },
+  "Kimi Vip": { envKey: "ONLYFANSAPI_ACCOUNT_KIMI_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_KIMI_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN_KIMI", type: "vip", modelGroup: "Kimi" },
 };
 
 /**
@@ -43,6 +45,7 @@ export interface ModelOption {
 const MODELS: ModelOption[] = [
   { group: "Nekoletta", label: "Velora", hidden: true, retired: true },
   { group: "Lily", label: "Lily", hidden: true, retired: true },
+  { group: "Kimi", label: "Kimi" },
 ];
 
 /**

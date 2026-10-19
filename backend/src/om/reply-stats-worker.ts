@@ -240,7 +240,7 @@ let timer: NodeJS.Timeout | null = null;
 
 export function startReplyStatsWorker(): void {
   if (timer) return;
-  if (!process.env.ONLYMONSTER_TOKEN && !process.env.ONLYMONSTER_TOKEN_LILY) {
+  if (!activeCreatorNames().some((c) => getOMTokenForCreator(c))) {
     console.log("[reply-stats] worker not started (no OM token)");
     return;
   }
