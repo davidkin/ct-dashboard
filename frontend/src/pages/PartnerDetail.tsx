@@ -80,6 +80,7 @@ export default function PartnerDetail() {
   const [statusOv, setStatusOv] = useState<"done" | "pending" | null>(null);
   const [archOv, setArchOv] = useState<boolean | null>(null);
   const [noteOv, setNoteOv] = useState<string | null>(null);
+  const [nickCopied, setNickCopied] = useState(false);
   const [weekStart, setWeekStart] = useState<string | undefined>(undefined);
   const [replyByCode, setReplyByCode] = useState<Map<string, ReplyStatsCampaign>>(new Map());
 
@@ -222,6 +223,19 @@ export default function PartnerDetail() {
               <a href={`https://t.me/${meta.telegram.replace(/^@/, "")}`} target="_blank" rel="noopener noreferrer">
                 {meta.telegram}
               </a>
+            )}
+            {meta?.telegram && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(meta.telegram!).catch(() => {});
+                  setNickCopied(true);
+                  setTimeout(() => setNickCopied(false), 1500);
+                }}
+              >
+                {nickCopied ? "Скопировано" : "Копировать"}
+              </button>
             )}
             {meta?.source && <span>· {meta.source}</span>}
           </div>
