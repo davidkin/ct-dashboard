@@ -41,15 +41,34 @@ export interface SheetRow {
   creator: string;
 }
 
+/* Смещения колонок относительно OF CAMPAIGN. По умолчанию — раскладка вкладки
+   Kinkimi; если в листе есть заголовок, берём смещения из него (во вкладке
+   Nikki между OF LINK и CPF стоят пустая колонка и Dashboard). */
+function columnOffsets(rows: string[][]) {
+  const offsets = { link: 1, cpf: 2, rev: 3, creator: 6 };
+  const header = rows.find((r) => r.some((c) => String(c ?? "").trim().toUpperCase() === "OF CAMPAIGN"));
+  if (!header) return offsets;
+  const h = header.map((c) => String(c ?? "").trim().toUpperCase());
+  const base = h.indexOf("OF CAMPAIGN");
+  const at = (name: string, fallback: number) => (h.indexOf(name) >= 0 ? h.indexOf(name) - base : fallback);
+  return {
+    link: at("OF LINK", offsets.link),
+    cpf: at("CPF", offsets.cpf),
+    rev: at("REVSHARE", offsets.rev),
+    creator: at("CREATOR", offsets.creator),
+  };
+}
+
 export function extractSheetRows(rows: string[][], creatorPrefix: string): SheetRow[] {
   const wanted = creatorPrefix.trim().toLowerCase();
+  const off = columnOffsets(rows);
   const out: SheetRow[] = [];
   rows.forEach((raw, i) => {
     const row = raw.map((c) => String(c ?? "").trim());
     const ci = row.findIndex((c) => CODE_RE.test(c));
     if (ci < 1) return;
-    const ofUrl = row[ci + 1] ?? "";
-    const creator = row[ci + 6] ?? "";
+    const ofUrl = row[ci + off.link] ?? "";
+    const creator = row[ci + off.creator] ?? "";
     if (!ofUrl.startsWith("http") || !creator.toLowerCase().startsWith(wanted)) return;
 
     const left = row.slice(0, ci - 1);
@@ -65,8 +84,8 @@ export function extractSheetRows(rows: string[][], creatorPrefix: string): Sheet
       source: row[ci - 1] || null,
       campaign: row[ci],
       ofUrl,
-      cpf: row[ci + 2] ?? "",
-      revshare: row[ci + 3] ?? "",
+      cpf: row[ci + off.cpf] ?? "",
+      revshare: row[ci + off.rev] ?? "",
       creator,
     });
   });

@@ -26,6 +26,8 @@ const CREATOR_CONFIG: Record<string, CreatorConfig> = {
   "Lily Vip": { envKey: "ONLYFANSAPI_ACCOUNT_LILY_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_LILY_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN_LILY", type: "vip", modelGroup: "Lily" },
   "Kimi Free": { envKey: "ONLYFANSAPI_ACCOUNT_KIMI_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_KIMI_FREE", omTokenEnvKey: "ONLYMONSTER_TOKEN_KIMI", type: "free", modelGroup: "Kimi" },
   "Kimi Vip": { envKey: "ONLYFANSAPI_ACCOUNT_KIMI_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_KIMI_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN_KIMI", type: "vip", modelGroup: "Kimi" },
+  "Nikki Free": { envKey: "ONLYFANSAPI_ACCOUNT_NIKKI_FREE", omEnvKey: "ONLYMONSTER_ACCOUNT_NIKKI_FREE", omTokenEnvKey: "ONLYMONSTER_TOKEN_NIKKI", type: "free", modelGroup: "Nikki" },
+  "Nikki Vip": { envKey: "ONLYFANSAPI_ACCOUNT_NIKKI_VIP", omEnvKey: "ONLYMONSTER_ACCOUNT_NIKKI_VIP", omTokenEnvKey: "ONLYMONSTER_TOKEN_NIKKI", type: "vip", modelGroup: "Nikki" },
 };
 
 /**
@@ -46,6 +48,7 @@ const MODELS: ModelOption[] = [
   { group: "Nekoletta", label: "Velora", hidden: true, retired: true },
   { group: "Lily", label: "Lily", hidden: true, retired: true },
   { group: "Kimi", label: "Kimi" },
+  { group: "Nikki", label: "Nikki" },
 ];
 
 /**
