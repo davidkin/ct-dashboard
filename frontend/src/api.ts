@@ -1284,3 +1284,48 @@ export async function updateNotionPayment(
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data;
 }
+
+/* === Массовые инвойсы в Notion за неделю === */
+export interface BulkInvoiceRow {
+  partner_id: number;
+  name: string;
+  telegram: string | null;
+  fans: number;
+  amount: number;
+  state: "ready" | "exists" | "no_nick";
+  title: string | null;
+  in_notion_partners: boolean;
+}
+export interface BulkInvoicePlan {
+  model: string;
+  notion_model: string;
+  week_start: string;
+  week_end: string;
+  date: string;
+  rows: BulkInvoiceRow[];
+}
+
+export async function fetchBulkInvoices(model: string, weekStart?: string): Promise<BulkInvoicePlan> {
+  const qs = new URLSearchParams({ model, ...(weekStart ? { week_start: weekStart } : {}) });
+  const res = await fetch(manageUrl(`/notion/bulk?${qs}`), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
+export async function createBulkInvoices(body: {
+  model: string;
+  week_start: string;
+  partner_ids: number[];
+  status: string;
+}): Promise<{ created: NotionPayment[]; skipped: { partner_id: number; reason: string }[] }> {
+  const res = await fetch(manageUrl("/notion/bulk"), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}

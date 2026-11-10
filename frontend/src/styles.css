@@ -1909,3 +1909,15 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .tag.nt-st-hold { color: #FF9F89; border-color: rgba(255,159,137,0.4); }
 .dm-sum-inv { align-self: center; white-space: nowrap; }
 .dm-sum-inv kbd { font-family: inherit; font-size: 10px; padding: 0 4px; margin-left: 4px; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; }
+
+/* Массовые инвойсы в Notion */
+.bi-wrap { max-width: 820px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.bi-title { margin: 0; font-size: 17px; }
+.bi-controls { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.bi-controls label { display: flex; flex-direction: column; gap: 4px; }
+.bi-controls select { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); height: 36px; padding: 0 10px; border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+.bi-week { display: inline-flex; align-items: center; gap: 8px; height: 36px; }
+.bi-date { margin-left: auto; align-self: center; }
+.bi-off td { opacity: 0.5; }
+.bi-result { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(93,211,158,0.4); color: #5DD39E; font-size: 13px; }
+.bi-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }

@@ -131,12 +131,14 @@ function toPayment(p: Page): NotionPayment {
   };
 }
 
-export async function findPartner(nick: string): Promise<NotionPartner | null> {
+export async function listAllPartners(): Promise<NotionPartner[]> {
+  return (await queryAll(config().partnersDb)).map(toPartner);
+}
+
+export async function findPartner(nick: string, all?: NotionPartner[]): Promise<NotionPartner | null> {
   const key = nickKey(nick);
   if (!key) return null;
-  const pages = await queryAll(config().partnersDb);
-  const hit = pages.find((p) => nickKey(text(p.properties.Partner)) === key);
-  return hit ? toPartner(hit) : null;
+  return (all ?? (await listAllPartners())).find((p) => nickKey(p.name) === key) ?? null;
 }
 
 export async function listAllPayments(): Promise<NotionPayment[]> {

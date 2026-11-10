@@ -18,6 +18,8 @@ import {
   nextPaymentTitle,
   updatePayment,
 } from "../notion/client";
+import { applyBulk, planBulk } from "../notion/bulk";
+import { lastCompletedWeekStart } from "../lib/tz";
 
 const STATUSES = ["Waiting", "Review", "HOLD", "Paid"];
 
@@ -114,6 +116,43 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
       }
       try {
         return { data: await updatePayment(req.params.pageId, patch) };
+      } catch (e) {
+        reply.code(502);
+        return { error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+  );
+
+  /**
+   * GET /api/notion/bulk?model=Kimi&week_start=YYYY-MM-DD — превью массовых инвойсов
+   * (по умолчанию прошлая завершённая неделя).
+   */
+  app.get<{ Querystring: { model?: string; week_start?: string } }>("/api/notion/bulk", async (req, reply) => {
+    if (!isNotionConfigured()) {
+      reply.code(400);
+      return { error: "Notion не настроен" };
+    }
+    try {
+      return { data: await planBulk(req.query.model || "Kimi", req.query.week_start || lastCompletedWeekStart()) };
+    } catch (e) {
+      reply.code(502);
+      return { error: e instanceof Error ? e.message : String(e) };
+    }
+  });
+
+  /** POST /api/notion/bulk — создать инвойсы. Body: { model, week_start, partner_ids, status? }. */
+  app.post<{ Body: { model?: string; week_start?: string; partner_ids?: number[]; status?: string } }>(
+    "/api/notion/bulk",
+    async (req, reply) => {
+      if (!requireAdmin(req, reply)) return;
+      const b = req.body ?? {};
+      if (!isNotionConfigured() || !b.model || !b.week_start || !Array.isArray(b.partner_ids)) {
+        reply.code(400);
+        return { error: "Нужны model, week_start, partner_ids" };
+      }
+      try {
+        const status = STATUSES.includes(b.status ?? "") ? b.status! : "Waiting";
+        return { data: await applyBulk(b.model, b.week_start, b.partner_ids.map(Number), status) };
       } catch (e) {
         reply.code(502);
         return { error: e instanceof Error ? e.message : String(e) };

@@ -13,6 +13,7 @@ import {
 } from "../api";
 import DateRangePicker from "../components/DateRangePicker";
 import OmReconcile from "../components/OmReconcile";
+import BulkInvoices from "../components/BulkInvoices";
 
 /* Главный экран «Общая аналитика». Строится поверх /export/analytics
    (та же combined-логика, что и «Таблица»). Заметки/статусы/архив — write через админ-креды. */
@@ -40,6 +41,7 @@ export default function Analytics() {
   const [to, setTo] = useState(todayISO());
   const [from, setFrom] = useState(addDays(todayISO(), -29));
   const [tier, setTier] = useState<Tier>("");
+  const [bulkOpen, setBulkOpen] = useState(false);
   /* общий диапазон дат для виджетов «Тотал залив» + «Общая выплата» */
   const [wFrom, setWFrom] = useState(addDays(todayISO(), -29));
   const [wTo, setWTo] = useState(todayISO());
@@ -164,6 +166,7 @@ export default function Analytics() {
 
   return (
     <div className="an fadeUp">
+      {bulkOpen && <BulkInvoices defaultModel={model || undefined} onClose={() => setBulkOpen(false)} />}
       {/* toolbar */}
       <div className="an-toolbar">
         <div className="seg">
@@ -253,6 +256,11 @@ export default function Analytics() {
                 {onlyActive ? "Активные партнёры" : "Все партнёры"} <span className="faint">· {filtered.length}</span>
               </h3>
               <div className="an-card-head-actions">
+                {isAdmin() && (
+                  <button className="btn btn-sm" onClick={() => setBulkOpen(true)} title="Создать инвойсы в Notion по всем партнёрам за неделю">
+                    Инвойсы в Notion
+                  </button>
+                )}
                 <button
                   className={`seg-btn an-active-toggle${onlyActive ? " active" : ""}`}
                   onClick={() => setOnlyActive((v) => !v)}
