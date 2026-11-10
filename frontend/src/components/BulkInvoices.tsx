@@ -325,6 +325,14 @@ function PayoutReportView({
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [onlyUnsent, setOnlyUnsent] = useState(false);
+  const [withNoWallet, setWithNoWallet] = useState<Set<string>>(new Set());
+  const toggleNoWallet = (nick: string) =>
+    setWithNoWallet((s0) => {
+      const n = new Set(s0);
+      if (n.has(nick)) n.delete(nick);
+      else n.add(nick);
+      return n;
+    });
   /* у кого приплюсовать прошлые незакрытые инвойсы (только в тексте отчёта) */
   const [withPrev, setWithPrev] = useState<Set<string>>(new Set());
   const textOf = (i: PayoutReportItem) =>
@@ -386,8 +394,10 @@ function PayoutReportView({
   /* Всё одним сообщением: сверху модель, блоки через «——»; только видимые
      (с фильтром «не отправленные» — только они). */
   const visible = (rep?.items ?? []).filter((i) => !onlyUnsent || !i.sent_at);
+  /* Блоки без кошелька в общее сообщение по умолчанию не идут — только по галочке. */
+  const forCopy = visible.filter((i) => i.wallet || withNoWallet.has(i.nick));
   const allText = () =>
-    (model ? `Model: ${model}\n\n` : "") + visible.map(textOf).join(sep);
+    (model ? `Model: ${model}\n\n` : "") + forCopy.map(textOf).join(sep);
 
   return (
     <div className="bi-report">
@@ -438,7 +448,7 @@ function PayoutReportView({
             </span>
             <button
               className="btn btn-sm"
-              disabled={!visible.length}
+              disabled={!forCopy.length}
               onClick={() => copy("all", allText())}
             >
               {copied === "all"
@@ -482,6 +492,19 @@ function PayoutReportView({
                 >
                   {copied === i.nick ? "Скопировано" : "Копировать"}
                 </button>
+                {!i.wallet && (
+                  <label
+                    className="bi-check bi-prev"
+                    title="Без кошелька блок не попадает в «Скопировать всё»"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={withNoWallet.has(i.nick)}
+                      onChange={() => toggleNoWallet(i.nick)}
+                    />{" "}
+                    в «Скопировать всё»
+                  </label>
+                )}
                 {i.text_with_prev && (
                   <label
                     className="bi-check bi-prev"
