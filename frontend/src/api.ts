@@ -1244,6 +1244,8 @@ export interface PartnerNotion {
   next?: Record<string, string>;
   /** невыплачено (не Paid, дубли инвойсов схлопнуты): по партнёру и по всем */
   unpaid?: { partner: number; all: number };
+  /** выплачено (Paid) / не выплачено: по партнёру и по всем */
+  totals?: { partner: { paid: number; unpaid: number }; all: { paid: number; unpaid: number } };
 }
 
 export async function fetchPartnerNotion(partnerId: number): Promise<PartnerNotion> {

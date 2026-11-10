@@ -149,17 +149,25 @@ export async function listAllPayments(): Promise<NotionPayment[]> {
  * оплачен, иначе считаем его один раз. Дубль = тот же заголовок и та же дата.
  */
 export function unpaidAmount(payments: NotionPayment[]): number {
+  return payoutTotals(payments).unpaid;
+}
+
+/** Выплачено (Paid) и не выплачено по списку инвойсов, дубли схлопнуты. */
+export function payoutTotals(payments: NotionPayment[]): { paid: number; unpaid: number } {
   const groups = new Map<string, NotionPayment[]>();
   for (const p of payments) {
     const key = `${p.title.trim().replace(/^@/, "").toLowerCase() || p.id}|${p.date ?? ""}`;
     groups.set(key, [...(groups.get(key) ?? []), p]);
   }
-  let sum = 0;
+  let paid = 0;
+  let unpaid = 0;
   for (const g of groups.values()) {
-    if (g.some((p) => p.status === "Paid")) continue;
-    sum += g[0].amount ?? 0;
+    const hit = g.find((p) => p.status === "Paid");
+    if (hit) paid += hit.amount ?? 0;
+    else unpaid += g[0].amount ?? 0;
   }
-  return Math.round(sum * 100) / 100;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return { paid: r2(paid), unpaid: r2(unpaid) };
 }
 
 /** Выплаты партнёра: по нику в заголовке или по связи с его страницей в Partners. */

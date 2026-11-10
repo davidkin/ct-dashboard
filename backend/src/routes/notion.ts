@@ -13,6 +13,7 @@ import {
   isNotionConfigured,
   listAllPayments,
   listPayments,
+  payoutTotals,
   unpaidAmount,
   nextPaymentTitle,
   updatePaymentStatus,
@@ -42,7 +43,8 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
         Object.entries(NOTION_MODEL).map(([model, nm]) => [model, nextPaymentTitle(nick, nm, payments)]),
       );
       const unpaid = { partner: unpaidAmount(payments), all: unpaidAmount(all) };
-      return { data: { configured: true, nick, partner, payments, next, unpaid } };
+      const totals = { partner: payoutTotals(payments), all: payoutTotals(all) };
+      return { data: { configured: true, nick, partner, payments, next, unpaid, totals } };
     } catch (e) {
       reply.code(502);
       return { error: e instanceof Error ? e.message : String(e) };

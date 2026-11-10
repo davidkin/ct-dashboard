@@ -123,17 +123,29 @@ export default function NotionPayments({
             </div>
           </div>
 
-          {data?.unpaid && (
+          {data?.totals && (
             <div className="nt-unpaid">
-              <div>
-                <div className="an-kpi-label">Не выплачено партнёру</div>
-                <div className="an-kpi-val accent">
-                  {money2(data.unpaid.partner)}
+              <div className="nt-tot-col">
+                <div className="an-kpi-label">Партнёр</div>
+                <div className="nt-tot-row">
+                  <span className="muted">Не выплачено</span>
+                  <b className="accent">{money2(data.totals.partner.unpaid)}</b>
+                </div>
+                <div className="nt-tot-row">
+                  <span className="muted">Выплачено</span>
+                  <b>{money2(data.totals.partner.paid)}</b>
                 </div>
               </div>
-              <div>
-                <div className="an-kpi-label">Не выплачено всего</div>
-                <div className="an-kpi-val">{money2(data.unpaid.all)}</div>
+              <div className="nt-tot-col">
+                <div className="an-kpi-label">Все партнёры</div>
+                <div className="nt-tot-row">
+                  <span className="muted">Не выплачено</span>
+                  <b className="accent">{money2(data.totals.all.unpaid)}</b>
+                </div>
+                <div className="nt-tot-row">
+                  <span className="muted">Выплачено</span>
+                  <b>{money2(data.totals.all.paid)}</b>
+                </div>
               </div>
             </div>
           )}
