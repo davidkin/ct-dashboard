@@ -1329,3 +1329,30 @@ export async function createBulkInvoices(body: {
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data;
 }
+
+/* === Отчёт по оплате трафика (текст для партнёров) === */
+export interface PayoutReportItem {
+  nick: string;
+  wallet: string | null;
+  chain: string | null;
+  amount: number;
+  fans: number;
+  invoices: { title: string; model: string | null; amount: number; fans: number; status: string | null }[];
+  text: string;
+}
+export interface PayoutReport {
+  week_start: string;
+  week_end: string;
+  date: string;
+  items: PayoutReportItem[];
+  missing_wallet: string[];
+  total: number;
+}
+
+export async function fetchPayoutReport(weekStart: string, all = false): Promise<PayoutReport> {
+  const qs = new URLSearchParams({ week_start: weekStart, ...(all ? { all: "1" } : {}) });
+  const res = await fetch(manageUrl(`/notion/report?${qs}`), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}

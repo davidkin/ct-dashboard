@@ -19,6 +19,7 @@ import {
   updatePayment,
 } from "../notion/client";
 import { applyBulk, planBulk } from "../notion/bulk";
+import { buildPayoutReport } from "../notion/report";
 import { lastCompletedWeekStart } from "../lib/tz";
 
 const STATUSES = ["Waiting", "Review", "HOLD", "Paid"];
@@ -159,4 +160,18 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
       }
     },
   );
+
+  /** GET /api/notion/report?week_start=&all=1 — текст отчёта по оплате трафика (по умолчанию только не Paid). */
+  app.get<{ Querystring: { week_start?: string; all?: string } }>("/api/notion/report", async (req, reply) => {
+    if (!isNotionConfigured()) {
+      reply.code(400);
+      return { error: "Notion не настроен" };
+    }
+    try {
+      return { data: await buildPayoutReport(req.query.week_start || lastCompletedWeekStart(), req.query.all !== "1") };
+    } catch (e) {
+      reply.code(502);
+      return { error: e instanceof Error ? e.message : String(e) };
+    }
+  });
 }

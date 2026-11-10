@@ -1921,3 +1921,12 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .bi-off td { opacity: 0.5; }
 .bi-result { padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(93,211,158,0.4); color: #5DD39E; font-size: 13px; }
 .bi-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bi-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-right: 28px; }
+.bi-report { display: flex; flex-direction: column; gap: 10px; }
+.bi-report-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bi-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.bi-report-list { display: flex; flex-direction: column; gap: 8px; }
+.bi-report-item { display: flex; justify-content: space-between; gap: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.bi-report-item pre { margin: 0; font-family: inherit; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
+.bi-report-item.no-wallet { border-color: rgba(255,107,107,0.7); background: rgba(255,107,107,0.08); }
+.bi-report-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 11px; white-space: pre-line; text-align: right; }
