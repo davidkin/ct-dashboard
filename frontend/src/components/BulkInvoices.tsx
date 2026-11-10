@@ -383,6 +383,11 @@ function PayoutReportView({
     setTimeout(() => setCopied(null), 1500);
   };
   const sep = "\n\n——\n\n";
+  /* Всё одним сообщением: сверху модель, блоки через «——»; только видимые
+     (с фильтром «не отправленные» — только они). */
+  const visible = (rep?.items ?? []).filter((i) => !onlyUnsent || !i.sent_at);
+  const allText = () =>
+    (model ? `Model: ${model}\n\n` : "") + visible.map(textOf).join(sep);
 
   return (
     <div className="bi-report">
@@ -433,13 +438,8 @@ function PayoutReportView({
             </span>
             <button
               className="btn btn-sm"
-              disabled={!rep.items.length}
-              onClick={() =>
-                copy(
-                  "all",
-                  "——\n\n" + rep.items.map(textOf).join(sep) + "\n\n——",
-                )
-              }
+              disabled={!visible.length}
+              onClick={() => copy("all", allText())}
             >
               {copied === "all" ? "Скопировано" : "Скопировать всё"}
             </button>
