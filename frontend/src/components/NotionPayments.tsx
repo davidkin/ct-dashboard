@@ -4,6 +4,7 @@ import {
   fetchExportReport,
   fetchPartnerNotion,
   isAdmin,
+  NotionPayment,
   PartnerNotion,
   updateNotionPaymentStatus,
 } from "../api";
@@ -21,8 +22,10 @@ function addDays(day: string, delta: number): string {
   dt.setUTCDate(dt.getUTCDate() + delta);
   return dt.toISOString().slice(0, 10);
 }
-const ddmm = (day: string | null) => (day ? `${day.slice(8, 10)}.${day.slice(5, 7)}` : "—");
-const money2 = (n: number | null) => (n == null ? "—" : "$" + n.toFixed(2).replace(/\.00$/, ""));
+const ddmm = (day: string | null) =>
+  day ? `${day.slice(8, 10)}.${day.slice(5, 7)}` : "—";
+const money2 = (n: number | null) =>
+  n == null ? "—" : "$" + n.toFixed(2).replace(/\.00$/, "");
 
 export default function NotionPayments({
   partnerId,
@@ -45,7 +48,9 @@ export default function NotionPayments({
     setErr(null);
     fetchPartnerNotion(partnerId)
       .then((d) => alive && setData(d))
-      .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)));
+      .catch(
+        (e) => alive && setErr(e instanceof Error ? e.message : String(e)),
+      );
     return () => {
       alive = false;
     };
@@ -53,7 +58,9 @@ export default function NotionPayments({
 
   if (data && !data.configured) return null;
 
-  const payments = data?.payments ?? [];
+  /* Дубли инвойса (тот же заголовок и дата, обычно «x-A3» и «@x-A3») показываем
+     одной карточкой: оплаченную, если такая есть. */
+  const payments = dedupe(data?.payments ?? []);
   const p = data?.partner;
   const unpaid = data?.unpaid?.partner ?? 0;
 
@@ -62,7 +69,15 @@ export default function NotionPayments({
     setErr(null);
     try {
       const upd = await updateNotionPaymentStatus(id, status);
-      setData((d) => d && { ...d, payments: (d.payments ?? []).map((x) => (x.id === id ? { ...x, status: upd.status } : x)) });
+      setData(
+        (d) =>
+          d && {
+            ...d,
+            payments: (d.payments ?? []).map((x) =>
+              x.id === id ? { ...x, status: upd.status } : x,
+            ),
+          },
+      );
       setNonce((n) => n + 1);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -81,16 +96,28 @@ export default function NotionPayments({
             </h3>
             <div className="an-card-head-actions">
               {p && (
-                <a className="btn ghost btn-sm" href={p.url} target="_blank" rel="noreferrer">
+                <a
+                  className="btn ghost btn-sm"
+                  href={p.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Карточка
                 </a>
               )}
               {isAdmin() && data?.nick && (
-                <button className="btn btn-sm" onClick={() => setFormOpen((s) => !s)}>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setFormOpen((s) => !s)}
+                >
                   {formOpen ? "Отмена" : "+ Выплата"}
                 </button>
               )}
-              <button className="btn ghost btn-sm" onClick={() => setOpen(false)} title="Свернуть">
+              <button
+                className="btn ghost btn-sm"
+                onClick={() => setOpen(false)}
+                title="Свернуть"
+              >
                 ✕
               </button>
             </div>
@@ -100,7 +127,9 @@ export default function NotionPayments({
             <div className="nt-unpaid">
               <div>
                 <div className="an-kpi-label">Не выплачено партнёру</div>
-                <div className="an-kpi-val accent">{money2(data.unpaid.partner)}</div>
+                <div className="an-kpi-val accent">
+                  {money2(data.unpaid.partner)}
+                </div>
               </div>
               <div>
                 <div className="an-kpi-label">Не выплачено всего</div>
@@ -112,15 +141,27 @@ export default function NotionPayments({
           <div className="nt-panel-body">
             {err && <div className="alert">{err}</div>}
             {!data && !err && <p className="muted">Загружаю Notion…</p>}
-            {data && !data.nick && <p className="muted">У партнёра нет Telegram-ника — не с чем сопоставить Notion.</p>}
+            {data && !data.nick && (
+              <p className="muted">
+                У партнёра нет Telegram-ника — не с чем сопоставить Notion.
+              </p>
+            )}
 
             {data?.nick && (
               <div className="nt-wallet muted">
                 {p ? (
                   p.wallet ? (
                     <>
-                      Кошелёк{p.chain ? ` (${p.chain})` : ""}: <code>{p.wallet}</code>
-                      <button className="btn btn-sm" onClick={() => navigator.clipboard.writeText(p.wallet).catch(() => {})}>
+                      Кошелёк{p.chain ? ` (${p.chain})` : ""}:{" "}
+                      <code>{p.wallet}</code>
+                      <button
+                        className="btn btn-sm"
+                        onClick={() =>
+                          navigator.clipboard
+                            .writeText(p.wallet)
+                            .catch(() => {})
+                        }
+                      >
                         Копировать
                       </button>
                     </>
@@ -151,19 +192,38 @@ export default function NotionPayments({
                 {payments.slice(0, 20).map((x) => (
                   <div key={x.id} className="nt-item">
                     <div className="nt-item-top">
-                      <a href={x.url} target="_blank" rel="noreferrer">
-                        {x.title || "—"}
-                      </a>
+                      <span>
+                        <a href={x.url} target="_blank" rel="noreferrer">
+                          {x.title || "—"}
+                        </a>
+                        {x.dupes > 0 && (
+                          <span
+                            className="faint"
+                            title="В Notion есть дубль этого инвойса"
+                          >
+                            {" "}
+                            +{x.dupes} дубль
+                          </span>
+                        )}
+                      </span>
                       <span className="accent">{money2(x.amount)}</span>
                     </div>
                     <div className="nt-item-sub muted">
                       <span>
-                        {Object.keys(NOTION_MODELS).find((k) => NOTION_MODELS[k] === x.model) ?? x.model ?? "—"} ·{" "}
-                        {ddmm(x.date)} · {x.fans ?? "—"} фанов
+                        {Object.keys(NOTION_MODELS).find(
+                          (k) => NOTION_MODELS[k] === x.model,
+                        ) ??
+                          x.model ??
+                          "—"}{" "}
+                        · {ddmm(x.date)} · {x.fans ?? "—"} фанов
                         {x.tx_link && (
                           <>
                             {" · "}
-                            <a href={x.tx_link} target="_blank" rel="noreferrer">
+                            <a
+                              href={x.tx_link}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
                               tx
                             </a>
                           </>
@@ -182,24 +242,48 @@ export default function NotionPayments({
                           ))}
                         </select>
                       ) : (
-                        <span className={`tag nt-st-${(x.status ?? "").toLowerCase()}`}>{x.status ?? "—"}</span>
+                        <span
+                          className={`tag nt-st-${(x.status ?? "").toLowerCase()}`}
+                        >
+                          {x.status ?? "—"}
+                        </span>
                       )}
                     </div>
                   </div>
                 ))}
-                {!payments.length && <p className="muted">В Notion выплат нет.</p>}
+                {!payments.length && (
+                  <p className="muted">В Notion выплат нет.</p>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      <button className={`nt-launcher${open ? " open" : ""}`} onClick={() => setOpen((s) => !s)} title="Выплаты в Notion">
+      <button
+        className={`nt-launcher${open ? " open" : ""}`}
+        onClick={() => setOpen((s) => !s)}
+        title="Выплаты в Notion"
+      >
         {open ? "✕" : "$"}
-        {!open && unpaid > 0 && <span className="nt-badge">{money2(unpaid)}</span>}
+        {!open && unpaid > 0 && (
+          <span className="nt-badge">{money2(unpaid)}</span>
+        )}
       </button>
     </>
   );
+}
+
+function dedupe(list: NotionPayment[]): (NotionPayment & { dupes: number })[] {
+  const groups = new Map<string, NotionPayment[]>();
+  for (const p of list) {
+    const key = `${p.title.trim().replace(/^@/, "").toLowerCase() || p.id}|${p.date ?? ""}`;
+    groups.set(key, [...(groups.get(key) ?? []), p]);
+  }
+  return [...groups.values()].map((g) => ({
+    ...(g.find((p) => p.status === "Paid") ?? g[0]),
+    dupes: g.length - 1,
+  }));
 }
 
 function PaymentForm({
@@ -232,11 +316,24 @@ function PaymentForm({
   useEffect(() => {
     if (!week) return;
     let alive = true;
-    fetchExportReport({ partner: partnerId, from: week, to: addDays(week, 6), all: true, source: "combined", model })
+    fetchExportReport({
+      partner: partnerId,
+      from: week,
+      to: addDays(week, 6),
+      all: true,
+      source: "combined",
+      model,
+    })
       .then((r) => {
         if (!alive) return;
         setFans(String(r.rows.reduce((s, row) => s + row.total.subs, 0)));
-        setAmount(String(Math.round(r.rows.reduce((s, row) => s + row.total.payout, 0) * 100) / 100));
+        setAmount(
+          String(
+            Math.round(
+              r.rows.reduce((s, row) => s + row.total.payout, 0) * 100,
+            ) / 100,
+          ),
+        );
       })
       .catch(() => {});
     return () => {
@@ -280,15 +377,27 @@ function PaymentForm({
       </label>
       <label>
         <span className="an-kpi-label">Неделя с (Пн)</span>
-        <input type="date" value={week} onChange={(e) => setWeek(e.target.value)} />
+        <input
+          type="date"
+          value={week}
+          onChange={(e) => setWeek(e.target.value)}
+        />
       </label>
       <label>
         <span className="an-kpi-label">Фаны</span>
-        <input type="number" value={fans} onChange={(e) => setFans(e.target.value)} />
+        <input
+          type="number"
+          value={fans}
+          onChange={(e) => setFans(e.target.value)}
+        />
       </label>
       <label>
         <span className="an-kpi-label">Сумма, $</span>
-        <input type="text" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <input
+          type="text"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
       </label>
       <label>
         <span className="an-kpi-label">Статус</span>
@@ -300,13 +409,21 @@ function PaymentForm({
       </label>
       <label className="nt-form-notes">
         <span className="an-kpi-label">Заметка</span>
-        <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <input
+          type="text"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
       </label>
       <div className="nt-form-foot">
         <span className="muted">
           {next[model] ?? ""} · дата {ddmm(date)}
         </span>
-        <button className="btn" onClick={submit} disabled={busy || !date || fans === "" || amount === ""}>
+        <button
+          className="btn"
+          onClick={submit}
+          disabled={busy || !date || fans === "" || amount === ""}
+        >
           {busy ? "Создаю…" : "Создать в Notion"}
         </button>
       </div>
