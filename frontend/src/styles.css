@@ -1930,3 +1930,7 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .bi-report-item pre { margin: 0; font-family: inherit; font-size: 13px; white-space: pre-wrap; word-break: break-all; }
 .bi-report-item.no-wallet { border-color: rgba(255,107,107,0.7); background: rgba(255,107,107,0.08); }
 .bi-report-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 11px; white-space: pre-line; text-align: right; }
+.bi-wrap { max-height: calc(100vh - 80px); overflow-y: auto; }
+.bi-report-item.sent { opacity: 0.6; }
+.bi-sent { border: 1px solid rgba(255,200,87,0.5); color: #FFC857; background: transparent; border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.bi-sent.on { border-color: rgba(93,211,158,0.5); color: #5DD39E; }

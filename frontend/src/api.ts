@@ -1339,6 +1339,7 @@ export interface PayoutReportItem {
   fans: number;
   invoices: { title: string; model: string | null; amount: number; fans: number; status: string | null }[];
   text: string;
+  sent_at: string | null;
 }
 export interface PayoutReport {
   week_start: string;
@@ -1355,4 +1356,15 @@ export async function fetchPayoutReport(weekStart: string, all = false): Promise
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data;
+}
+
+export async function setPayoutReportSent(nick: string, week_start: string, sent: boolean): Promise<void> {
+  const res = await fetch(manageUrl("/notion/report/sent"), {
+    method: "PUT",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ nick, week_start, sent }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
 }

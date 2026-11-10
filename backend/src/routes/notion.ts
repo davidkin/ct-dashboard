@@ -19,7 +19,7 @@ import {
   updatePayment,
 } from "../notion/client";
 import { applyBulk, planBulk } from "../notion/bulk";
-import { buildPayoutReport } from "../notion/report";
+import { buildPayoutReport, setReportSent } from "../notion/report";
 import { lastCompletedWeekStart } from "../lib/tz";
 
 const STATUSES = ["Waiting", "Review", "HOLD", "Paid"];
@@ -173,5 +173,16 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
       reply.code(502);
       return { error: e instanceof Error ? e.message : String(e) };
     }
+  });
+
+  /** PUT /api/notion/report/sent — отметить отчёт партнёру как отправленный. Body: { nick, week_start, sent }. */
+  app.put<{ Body: { nick?: string; week_start?: string; sent?: boolean } }>("/api/notion/report/sent", async (req, reply) => {
+    const b = req.body ?? {};
+    if (!b.nick || !b.week_start) {
+      reply.code(400);
+      return { error: "Нужны nick и week_start" };
+    }
+    setReportSent(b.nick, b.week_start, b.sent !== false);
+    return { data: { nick: b.nick, week_start: b.week_start, sent: b.sent !== false } };
   });
 }

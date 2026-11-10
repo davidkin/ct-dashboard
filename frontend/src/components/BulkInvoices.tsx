@@ -4,6 +4,7 @@ import {
   createBulkInvoices,
   fetchBulkInvoices,
   fetchPayoutReport,
+  setPayoutReportSent,
   PayoutReport,
 } from "../api";
 
@@ -300,6 +301,33 @@ function PayoutReportView({ weekStart }: { weekStart: string }) {
   const [all, setAll] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [onlyUnsent, setOnlyUnsent] = useState(false);
+
+  async function toggleSent(nick: string, sent: boolean) {
+    setRep(
+      (r) =>
+        r && {
+          ...r,
+          items: r.items.map((i) =>
+            i.nick === nick ? { ...i, sent_at: sent ? "now" : null } : i,
+          ),
+        },
+    );
+    try {
+      await setPayoutReportSent(nick, weekStart, sent);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setRep(
+        (r) =>
+          r && {
+            ...r,
+            items: r.items.map((i) =>
+              i.nick === nick ? { ...i, sent_at: sent ? null : "now" } : i,
+            ),
+          },
+      );
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -333,11 +361,19 @@ function PayoutReportView({ weekStart }: { weekStart: string }) {
           />{" "}
           включая Paid
         </label>
+        <label className="bi-check">
+          <input
+            type="checkbox"
+            checked={onlyUnsent}
+            onChange={(e) => setOnlyUnsent(e.target.checked)}
+          />{" "}
+          только не отправленные
+        </label>
         {rep && (
           <>
             <span className="muted">
-              {rep.items.length} партнёров · {money2(rep.total)} · инвойсы от{" "}
-              {ddmm(rep.date)}
+              {rep.items.length} партнёров · {money2(rep.total)} · отправлено{" "}
+              {rep.items.filter((i) => i.sent_at).length} из {rep.items.length}
             </span>
             <button
               className="btn btn-sm"
@@ -366,27 +402,36 @@ function PayoutReportView({ weekStart }: { weekStart: string }) {
         <p className="muted">Нет инвойсов к оплате на эту дату.</p>
       )}
       <div className="bi-report-list">
-        {rep?.items.map((i) => (
-          <div
-            key={i.nick}
-            className={`bi-report-item${i.wallet ? "" : " no-wallet"}`}
-          >
-            <pre>{i.text}</pre>
-            <div className="bi-report-side">
-              <button
-                className="btn btn-sm"
-                onClick={() => copy(i.nick, i.text)}
-              >
-                {copied === i.nick ? "Скопировано" : "Копировать"}
-              </button>
-              <span className="muted">
-                {i.invoices
-                  .map((x) => `${x.title} · ${x.status ?? "—"}`)
-                  .join("\n")}
-              </span>
+        {rep?.items
+          .filter((i) => !onlyUnsent || !i.sent_at)
+          .map((i) => (
+            <div
+              key={i.nick}
+              className={`bi-report-item${i.wallet ? "" : " no-wallet"}${i.sent_at ? " sent" : ""}`}
+            >
+              <pre>{i.text}</pre>
+              <div className="bi-report-side">
+                <button
+                  className={`bi-sent${i.sent_at ? " on" : ""}`}
+                  onClick={() => toggleSent(i.nick, !i.sent_at)}
+                  title="Отметить, что отчёт отправлен партнёру"
+                >
+                  {i.sent_at ? "✓ Отправлен" : "Не отправлен"}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => copy(i.nick, i.text)}
+                >
+                  {copied === i.nick ? "Скопировано" : "Копировать"}
+                </button>
+                <span className="muted">
+                  {i.invoices
+                    .map((x) => `${x.title} · ${x.status ?? "—"}`)
+                    .join("\n")}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </div>
     </div>
   );

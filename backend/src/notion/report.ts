@@ -11,6 +11,7 @@
  * Берём инвойсы Notion с датой = понедельник после недели (обе модели), кошелёк —
  * из Notion Partners. Один перевод на партнёра: инвойсы Kimi и Nikki складываем.
  */
+import { getDb } from "../db/index";
 import { addDays } from "../lib/tz";
 import { listAllPartners, listAllPayments, NotionPartner, NotionPayment, nickKey } from "./client";
 
@@ -22,6 +23,8 @@ export interface ReportItem {
   fans: number;
   invoices: { title: string; model: string | null; amount: number; fans: number; status: string | null }[];
   text: string;
+  /** когда отчёт отправлен партнёру (null — не отправлен) */
+  sent_at: string | null;
 }
 
 const ddmm = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}`;
@@ -68,6 +71,7 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) 
       `Fans: ${fans}`,
     ].join("\n");
     return {
+      sent_at: null as string | null,
       nick: g.nick,
       wallet,
       chain,
@@ -86,6 +90,8 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) 
   /* $0 (revshare без выручки, пустые недели) платить нечего — в отчёт не берём */
   items.splice(0, items.length, ...items.filter((i) => i.amount > 0));
   items.sort((a, b) => b.amount - a.amount);
+  const sent = getDb().prepare(`SELECT sent_at FROM payout_report_sent WHERE nick = ? AND week_start = ?`);
+  for (const i of items) i.sent_at = (sent.get(i.nick, weekStart) as { sent_at: string } | undefined)?.sent_at ?? null;
   return {
     week_start: weekStart,
     week_end: weekEnd,
@@ -94,4 +100,13 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) 
     missing_wallet: items.filter((i) => !i.wallet).map((i) => i.nick),
     total: Math.round(items.reduce((s, i) => s + i.amount, 0) * 100) / 100,
   };
+}
+
+export function setReportSent(nick: string, weekStart: string, sent: boolean): void {
+  const db = getDb();
+  if (sent) {
+    db.prepare(`INSERT OR REPLACE INTO payout_report_sent (nick, week_start) VALUES (?, ?)`).run(nickKey(nick), weekStart);
+  } else {
+    db.prepare(`DELETE FROM payout_report_sent WHERE nick = ? AND week_start = ?`).run(nickKey(nick), weekStart);
+  }
 }

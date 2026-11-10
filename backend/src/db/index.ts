@@ -108,6 +108,17 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_payout_status_partner ON payout_status(partner_id, week_start);
   `);
 
+  /* payout_report_sent — отправлен ли партнёру отчёт по оплате трафика за неделю.
+     Ключ — ник (как в Notion, без @, lower) + понедельник недели. */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS payout_report_sent (
+      nick TEXT NOT NULL,
+      week_start TEXT NOT NULL,
+      sent_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (nick, week_start)
+    );
+  `);
+
   /* daily_link_clicks — ночной снэпшот накопительного счётчика кликов по каждой
      компании. Единственное, что джоб реально пишет: OnlyMonster отдаёт клики
      только текущим счётчиком без истории, поэтому day-over-day дельту считаем
