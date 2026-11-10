@@ -162,13 +162,17 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
   );
 
   /** GET /api/notion/report?week_start=&all=1 — текст отчёта по оплате трафика (по умолчанию только не Paid). */
-  app.get<{ Querystring: { week_start?: string; all?: string } }>("/api/notion/report", async (req, reply) => {
+  app.get<{ Querystring: { week_start?: string; all?: string; model?: string } }>("/api/notion/report", async (req, reply) => {
     if (!isNotionConfigured()) {
       reply.code(400);
       return { error: "Notion не настроен" };
     }
     try {
-      return { data: await buildPayoutReport(req.query.week_start || lastCompletedWeekStart(), req.query.all !== "1") };
+      return { data: await buildPayoutReport(
+          req.query.week_start || lastCompletedWeekStart(),
+          req.query.all !== "1",
+          req.query.model || null,
+        ) };
     } catch (e) {
       reply.code(502);
       return { error: e instanceof Error ? e.message : String(e) };
@@ -176,13 +180,13 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
   });
 
   /** PUT /api/notion/report/sent — отметить отчёт партнёру как отправленный. Body: { nick, week_start, sent }. */
-  app.put<{ Body: { nick?: string; week_start?: string; sent?: boolean } }>("/api/notion/report/sent", async (req, reply) => {
+  app.put<{ Body: { nick?: string; week_start?: string; sent?: boolean; model?: string } }>("/api/notion/report/sent", async (req, reply) => {
     const b = req.body ?? {};
     if (!b.nick || !b.week_start) {
       reply.code(400);
       return { error: "Нужны nick и week_start" };
     }
-    setReportSent(b.nick, b.week_start, b.sent !== false);
+    setReportSent(b.nick, b.week_start, b.sent !== false, b.model || null);
     return { data: { nick: b.nick, week_start: b.week_start, sent: b.sent !== false } };
   });
 }

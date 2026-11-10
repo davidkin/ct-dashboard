@@ -109,13 +109,15 @@ function migrate(db: Database.Database): void {
   `);
 
   /* payout_report_sent — отправлен ли партнёру отчёт по оплате трафика за неделю.
-     Ключ — ник (как в Notion, без @, lower) + понедельник недели. */
+     Ключ — ник (как в Notion, без @, lower) + понедельник недели + модель
+     дашборда ('' — отчёт по всем моделям сразу). */
   db.exec(`
     CREATE TABLE IF NOT EXISTS payout_report_sent (
       nick TEXT NOT NULL,
       week_start TEXT NOT NULL,
+      model TEXT NOT NULL DEFAULT '',
       sent_at TEXT NOT NULL DEFAULT (datetime('now')),
-      PRIMARY KEY (nick, week_start)
+      PRIMARY KEY (nick, week_start, model)
     );
   `);
 

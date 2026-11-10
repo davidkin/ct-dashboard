@@ -33,7 +33,8 @@ export interface ReportItem {
 const ddmm = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}`;
 const money = (n: number) => `$${n.toFixed(2)}`;
 
-export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) {
+export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean, model: string | null = null) {
+  const notionModel = model ? NOTION_MODEL[model] : null;
   const weekEnd = addDays(weekStart, 6);
   const date = addDays(weekStart, 7);
   const [payments, partners] = await Promise.all([listAllPayments(), listAllPartners()]);
@@ -52,6 +53,7 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) 
   const groups = new Map<string, { partner?: NotionPartner; nick: string; list: NotionPayment[] }>();
   for (const p of byTitle.values()) {
     if (unpaidOnly && p.status === "Paid") continue;
+    if (notionModel && p.model !== notionModel) continue;
     const np = partnerOf(p);
     const key = nickKey(np?.name ?? p.title);
     const g = groups.get(key) ?? { partner: np, nick: key, list: [] };
@@ -107,8 +109,10 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) 
   /* $0 (revshare без выручки, пустые недели) платить нечего — в отчёт не берём */
   items.splice(0, items.length, ...items.filter((i) => i.amount > 0));
   items.sort((a, b) => b.amount - a.amount);
-  const sent = getDb().prepare(`SELECT sent_at FROM payout_report_sent WHERE nick = ? AND week_start = ?`);
-  for (const i of items) i.sent_at = (sent.get(i.nick, weekStart) as { sent_at: string } | undefined)?.sent_at ?? null;
+  const sent = getDb().prepare(`SELECT sent_at FROM payout_report_sent WHERE nick = ? AND week_start = ? AND model = ?`);
+  for (const i of items) {
+    i.sent_at = (sent.get(i.nick, weekStart, model ?? "") as { sent_at: string } | undefined)?.sent_at ?? null;
+  }
   return {
     week_start: weekStart,
     week_end: weekEnd,
@@ -119,11 +123,12 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) 
   };
 }
 
-export function setReportSent(nick: string, weekStart: string, sent: boolean): void {
+export function setReportSent(nick: string, weekStart: string, sent: boolean, model: string | null = null): void {
   const db = getDb();
+  const args = [nickKey(nick), weekStart, model ?? ""];
   if (sent) {
-    db.prepare(`INSERT OR REPLACE INTO payout_report_sent (nick, week_start) VALUES (?, ?)`).run(nickKey(nick), weekStart);
+    db.prepare(`INSERT OR REPLACE INTO payout_report_sent (nick, week_start, model) VALUES (?, ?, ?)`).run(...args);
   } else {
-    db.prepare(`DELETE FROM payout_report_sent WHERE nick = ? AND week_start = ?`).run(nickKey(nick), weekStart);
+    db.prepare(`DELETE FROM payout_report_sent WHERE nick = ? AND week_start = ? AND model = ?`).run(...args);
   }
 }

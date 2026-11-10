@@ -44,6 +44,8 @@ export default function BulkInvoices({
   const [result, setResult] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
   const [tab, setTab] = useState<"create" | "report">("create");
+  /* В отчёте можно выбрать «Все модели» (одна выплата на партнёра), в создании — нет. */
+  const [reportModel, setReportModel] = useState(model);
 
   useEffect(() => {
     let alive = true;
@@ -137,11 +139,23 @@ export default function BulkInvoices({
         <div className="bi-controls">
           <label>
             <span className="an-kpi-label">Модель</span>
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              {MODELS.map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
+            {tab === "create" ? (
+              <select value={model} onChange={(e) => setModel(e.target.value)}>
+                {MODELS.map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>
+            ) : (
+              <select
+                value={reportModel}
+                onChange={(e) => setReportModel(e.target.value)}
+              >
+                {MODELS.map((m) => (
+                  <option key={m}>{m}</option>
+                ))}
+                <option value="">Все модели</option>
+              </select>
+            )}
           </label>
           <label>
             <span className="an-kpi-label">Неделя</span>
@@ -187,7 +201,9 @@ export default function BulkInvoices({
           )}
         </div>
 
-        {tab === "report" && week && <PayoutReportView weekStart={week} />}
+        {tab === "report" && week && (
+          <PayoutReportView weekStart={week} model={reportModel} />
+        )}
 
         {tab === "create" && err && <div className="alert">{err}</div>}
         {tab === "create" && result && (
@@ -294,9 +310,15 @@ export default function BulkInvoices({
   );
 }
 
-/* Отчёт по оплате: блок текста на партнёра (обе модели сложены), кошелёк из
-   Notion Partners. Без кошелька — блок подсвечен. */
-function PayoutReportView({ weekStart }: { weekStart: string }) {
+/* Отчёт по оплате: блок текста на партнёра по выбранной модели («Все модели» —
+   обе сложены), кошелёк из Notion Partners. Без кошелька — блок подсвечен. */
+function PayoutReportView({
+  weekStart,
+  model,
+}: {
+  weekStart: string;
+  model: string;
+}) {
   const [rep, setRep] = useState<PayoutReport | null>(null);
   const [all, setAll] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -314,7 +336,7 @@ function PayoutReportView({ weekStart }: { weekStart: string }) {
         },
     );
     try {
-      await setPayoutReportSent(nick, weekStart, sent);
+      await setPayoutReportSent(nick, weekStart, sent, model || undefined);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
       setRep(
@@ -333,7 +355,7 @@ function PayoutReportView({ weekStart }: { weekStart: string }) {
     let alive = true;
     setErr(null);
     setRep(null);
-    fetchPayoutReport(weekStart, all)
+    fetchPayoutReport(weekStart, all, model || undefined)
       .then((r) => alive && setRep(r))
       .catch(
         (e) => alive && setErr(e instanceof Error ? e.message : String(e)),
@@ -341,7 +363,7 @@ function PayoutReportView({ weekStart }: { weekStart: string }) {
     return () => {
       alive = false;
     };
-  }, [weekStart, all]);
+  }, [weekStart, all, model]);
 
   const copy = (key: string, text: string) => {
     navigator.clipboard.writeText(text).catch(() => {});

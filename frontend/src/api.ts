@@ -1350,20 +1350,20 @@ export interface PayoutReport {
   total: number;
 }
 
-export async function fetchPayoutReport(weekStart: string, all = false): Promise<PayoutReport> {
-  const qs = new URLSearchParams({ week_start: weekStart, ...(all ? { all: "1" } : {}) });
+export async function fetchPayoutReport(weekStart: string, all = false, model?: string): Promise<PayoutReport> {
+  const qs = new URLSearchParams({ week_start: weekStart, ...(all ? { all: "1" } : {}), ...(model ? { model } : {}) });
   const res = await fetch(manageUrl(`/notion/report?${qs}`), { credentials: "include" });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data;
 }
 
-export async function setPayoutReportSent(nick: string, week_start: string, sent: boolean): Promise<void> {
+export async function setPayoutReportSent(nick: string, week_start: string, sent: boolean, model?: string): Promise<void> {
   const res = await fetch(manageUrl("/notion/report/sent"), {
     method: "PUT",
     credentials: "include",
     headers: authHeaders(),
-    body: JSON.stringify({ nick, week_start, sent }),
+    body: JSON.stringify({ nick, week_start, sent, model }),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
