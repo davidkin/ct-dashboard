@@ -1907,3 +1907,5 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .tag.nt-st-paid { color: #5DD39E; border-color: rgba(93,211,158,0.4); }
 .tag.nt-st-waiting, .tag.nt-st-review { color: #FFC857; border-color: rgba(255,200,87,0.4); }
 .tag.nt-st-hold { color: #FF9F89; border-color: rgba(255,159,137,0.4); }
+.dm-sum-inv { align-self: center; white-space: nowrap; }
+.dm-sum-inv kbd { font-family: inherit; font-size: 10px; padding: 0 4px; margin-left: 4px; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; }

@@ -47,6 +47,14 @@ const dsel = (
 };
 
 type Campaigns = DailyReport["campaigns"];
+
+export interface QuickInvoice {
+  fans: number;
+  amount: number;
+  /** первый и последний выделенный день */
+  from: string;
+  to: string;
+}
 type Rows = DailyReport["rows"];
 
 /* Зафиксированный слева блок: Дата + 4 колонки Total. Ширины фиксированы,
@@ -159,10 +167,20 @@ function useCellSelection(resetDeps: unknown[]) {
   // сброс выделения при смене вкладки / данных
   useEffect(() => clear(), resetDeps); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { onMouseDown, onMouseOver, stats, clear };
+  const keys = () => [...selRef.current.keys()];
+
+  return { onMouseDown, onMouseOver, stats, clear, keys };
 }
 
-function SumPopup({ stats, onClear }: { stats: SelStats; onClear: () => void }) {
+function SumPopup({
+  stats,
+  onClear,
+  onInvoice,
+}: {
+  stats: SelStats;
+  onClear: () => void;
+  onInvoice?: () => void;
+}) {
   const fmt = (n: number) =>
     stats.money ? `$${n.toFixed(2)}` : n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 
@@ -222,6 +240,11 @@ function SumPopup({ stats, onClear }: { stats: SelStats; onClear: () => void }) 
         <span>Ячеек: <b>{stats.count}</b></span>
         <span>Среднее: <b>{fmt(stats.sum / stats.count)}</b></span>
       </div>
+      {onInvoice && (
+        <button className="btn btn-sm dm-sum-inv" onClick={onInvoice} title="Создать инвойс в Notion из выделенного (клавиша N)">
+          Инвойс <kbd>N</kbd>
+        </button>
+      )}
       <button className="dm-sum-x" onClick={onClear} title="Сбросить">
         ✕
       </button>
@@ -234,11 +257,14 @@ export default function DailyMatrix({
   rows,
   partnerId,
   onChanged,
+  onQuickInvoice,
 }: {
   campaigns: Campaigns;
   rows: Rows;
   partnerId: number;
   onChanged?: () => void;
+  /** Быстрый инвойс из выделения: фаны и сумма выделенных дней/кампаний. Только на странице партнёра. */
+  onQuickInvoice?: (q: QuickInvoice) => void;
 }) {
   const [tab, setTab] = useState<"total" | "raw">("total");
   /* Что показывает зафиксированный блок Total: всё, только free или только vip.
@@ -255,6 +281,58 @@ export default function DailyMatrix({
   const canEdit = isAdminConfigured();
 
   const sel = useCellSelection([tab, rows, totalTier]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  /* Выделение → инвойс. Любая выделенная ячейка (клики/фаны/сумма) задаёт пару
+     «день × кампания» (или день × Total); по каждой паре берём фаны и выплату.
+     Total читаем из ячеек таблицы — он зависит от переключателя Free/VIP. */
+  const quickInvoice = (): QuickInvoice | null => {
+    const units = new Map<string, { scope: string; date: string }>();
+    for (const k of sel.keys()) {
+      const m = k.match(/^(t|c\d+|rc\d+)(?:c|cl|f|p)-(\d{4}-\d{2}-\d{2})$/);
+      if (!m) continue;
+      const scope = m[1].replace(/^r/, "");
+      units.set(`${scope}|${m[2]}`, { scope, date: m[2] });
+    }
+    if (!units.size) return null;
+    const domVal = (key: string) =>
+      Number(scrollRef.current?.querySelector<HTMLElement>(`[data-k="${key}"]`)?.dataset.v ?? 0) || 0;
+    let fans = 0;
+    let amount = 0;
+    const dates: string[] = [];
+    for (const { scope, date } of units.values()) {
+      dates.push(date);
+      if (scope === "t") {
+        fans += domVal(`tf-${date}`);
+        amount += domVal(`tp-${date}`);
+      } else {
+        const cell = rows.find((r) => r.date === date)?.cells[scope.slice(1)];
+        fans += cell?.subs ?? 0;
+        amount += cell?.payout ?? 0;
+      }
+    }
+    dates.sort();
+    return { fans, amount: Math.round(amount * 100) / 100, from: dates[0], to: dates[dates.length - 1] };
+  };
+  const fireInvoice = () => {
+    const q = quickInvoice();
+    if (q && onQuickInvoice) onQuickInvoice(q);
+  };
+
+  /* Хоткей N: инвойс из выделения (кроме набора текста в полях). */
+  useEffect(() => {
+    if (!onQuickInvoice || !sel.stats) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "n" && e.key.toLowerCase() !== "т") return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement;
+      if (t.closest("input, textarea, select, [contenteditable]")) return;
+      e.preventDefault();
+      fireInvoice();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
 
   return (
     <div className="an-card">
@@ -305,7 +383,7 @@ export default function DailyMatrix({
           Нет данных за период.
         </p>
       ) : (
-        <div className="dm-scroll" onMouseDown={sel.onMouseDown} onMouseOver={sel.onMouseOver}>
+        <div className="dm-scroll" ref={scrollRef} onMouseDown={sel.onMouseDown} onMouseOver={sel.onMouseOver}>
           {tab === "total" ? (
             <TotalMatrix campaigns={campaigns} rows={rows} totalTier={totalTier} />
           ) : (
@@ -314,7 +392,9 @@ export default function DailyMatrix({
         </div>
       )}
 
-      {sel.stats && <SumPopup stats={sel.stats} onClear={sel.clear} />}
+      {sel.stats && (
+        <SumPopup stats={sel.stats} onClear={sel.clear} onInvoice={onQuickInvoice ? fireInvoice : undefined} />
+      )}
     </div>
   );
 }

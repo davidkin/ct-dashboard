@@ -15,7 +15,7 @@ import {
 import { useModel } from "../hooks/useModel";
 import DailyMatrix from "../components/DailyMatrix";
 import DateRangePicker from "../components/DateRangePicker";
-import NotionPayments from "../components/NotionPayments";
+import NotionPayments, { InvoicePrefill } from "../components/NotionPayments";
 import OmReconcile from "../components/OmReconcile";
 import ReplyStatsWidget from "../components/ReplyStatsWidget";
 import { aggregateCampaigns, campaignTotals, CampSort, DEFAULT_CAMP_SORT } from "../lib/campaignAgg";
@@ -82,6 +82,7 @@ export default function PartnerDetail() {
   const [archOv, setArchOv] = useState<boolean | null>(null);
   const [noteOv, setNoteOv] = useState<string | null>(null);
   const [nickCopied, setNickCopied] = useState(false);
+  const [invoicePrefill, setInvoicePrefill] = useState<InvoicePrefill | null>(null);
   const [weekStart, setWeekStart] = useState<string | undefined>(undefined);
   const [replyByCode, setReplyByCode] = useState<Map<string, ReplyStatsCampaign>>(new Map());
 
@@ -262,7 +263,7 @@ export default function PartnerDetail() {
       </div>
 
       {/* выплаты из Notion — плавающий виджет в правом нижнем углу */}
-      <NotionPayments partnerId={pid} weekStart={weekStart} model={model || undefined} />
+      <NotionPayments partnerId={pid} weekStart={weekStart} model={model || undefined} prefill={invoicePrefill} />
 
       {/* KPI */}
       <div className="an-kpis pd-kpis">
@@ -288,6 +289,7 @@ export default function PartnerDetail() {
           rows={rep.rows}
           partnerId={pid}
           onChanged={() => setReloadNonce((n) => n + 1)}
+          onQuickInvoice={isAdmin() ? (q) => setInvoicePrefill({ ...q, nonce: Date.now() }) : undefined}
         />
       )}
 

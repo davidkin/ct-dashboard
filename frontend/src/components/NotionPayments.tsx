@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { QuickInvoice } from "./DailyMatrix";
 import {
   createNotionPayment,
   fetchExportReport,
@@ -27,14 +28,28 @@ const ddmm = (day: string | null) =>
 const money2 = (n: number | null) =>
   n == null ? "—" : "$" + n.toFixed(2).replace(/\.00$/, "");
 
+/** Понедельник недели, в которую попадает day. */
+function mondayOf(day: string): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return addDays(day, dow === 0 ? -6 : 1 - dow);
+}
+
+/** Быстрый инвойс из выделения в таблице трафика (nonce — чтобы повторный N открыл форму заново). */
+export interface InvoicePrefill extends QuickInvoice {
+  nonce: number;
+}
+
 export default function NotionPayments({
   partnerId,
   weekStart,
   model,
+  prefill,
 }: {
   partnerId: number;
   weekStart?: string;
   model?: string;
+  prefill?: InvoicePrefill | null;
 }) {
   const [data, setData] = useState<PartnerNotion | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -45,6 +60,12 @@ export default function NotionPayments({
   const [editId, setEditId] = useState<string | null>(null);
   const [editFans, setEditFans] = useState("");
   const [editAmount, setEditAmount] = useState("");
+
+  useEffect(() => {
+    if (!prefill) return;
+    setOpen(true);
+    setFormOpen(true);
+  }, [prefill]);
 
   useEffect(() => {
     let alive = true;
@@ -198,6 +219,8 @@ export default function NotionPayments({
 
             {formOpen && data?.nick && (
               <PaymentForm
+                key={prefill?.nonce ?? 0}
+                prefill={prefill ?? undefined}
                 partnerId={partnerId}
                 weekStart={weekStart}
                 defaultModel={model && NOTION_MODELS[model] ? model : "Kimi"}
@@ -352,7 +375,9 @@ function PaymentForm({
   defaultModel,
   next,
   onCreated,
+  prefill,
 }: {
+  prefill?: InvoicePrefill;
   partnerId: number;
   weekStart?: string;
   defaultModel: string;
@@ -360,11 +385,16 @@ function PaymentForm({
   onCreated: () => void;
 }) {
   const [model, setModel] = useState(defaultModel);
-  const [week, setWeek] = useState(weekStart ?? "");
-  const [fans, setFans] = useState("");
-  const [amount, setAmount] = useState("");
+  const [week, setWeek] = useState(prefill ? mondayOf(prefill.from) : weekStart ?? "");
+  const [fans, setFans] = useState(prefill ? String(prefill.fans) : "");
+  const [amount, setAmount] = useState(prefill ? String(prefill.amount) : "");
+  /* Пришли из выделения — не перетираем его цифры автоподстановкой за неделю,
+     пока сам не сменишь неделю или модель. */
+  const skipAuto = useRef(!!prefill);
   const [status, setStatus] = useState("Waiting");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(
+    prefill ? `Выделено: ${ddmm(prefill.from)}${prefill.to !== prefill.from ? `–${ddmm(prefill.to)}` : ""}` : "",
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -375,6 +405,10 @@ function PaymentForm({
   /* Подставляем фаны/выплату из дашборда за выбранную неделю (Пн–Вс) и модель. */
   useEffect(() => {
     if (!week) return;
+    if (skipAuto.current) {
+      skipAuto.current = false;
+      return;
+    }
     let alive = true;
     fetchExportReport({
       partner: partnerId,
