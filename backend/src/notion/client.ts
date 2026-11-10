@@ -192,3 +192,10 @@ export async function createPayment(input: {
   });
   return toPayment(page);
 }
+
+export async function updatePaymentStatus(pageId: string, status: string): Promise<NotionPayment> {
+  const page = await call<Page>("PATCH", `/pages/${pageId}`, {
+    properties: { Status: { select: { name: status } } },
+  });
+  return toPayment(page);
+}

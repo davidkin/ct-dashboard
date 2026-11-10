@@ -261,6 +261,9 @@ export default function PartnerDetail() {
         </div>
       </div>
 
+      {/* выплаты из Notion — плавающий виджет в правом нижнем углу */}
+      <NotionPayments partnerId={pid} weekStart={weekStart} model={model || undefined} />
+
       {/* KPI */}
       <div className="an-kpis pd-kpis">
         {kpis.map((k) => (
@@ -271,9 +274,6 @@ export default function PartnerDetail() {
           </div>
         ))}
       </div>
-
-      {/* выплаты из Notion (Payments) + создание инвойса */}
-      <NotionPayments partnerId={pid} weekStart={weekStart} model={model || undefined} />
 
       {/* виджеты «Тотал залив» + «Общая выплата» по этому партнёру (свой диапазон) */}
       <PartnerTotalsWidgets pid={pid} />

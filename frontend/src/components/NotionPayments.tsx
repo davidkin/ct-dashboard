@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
-import { createNotionPayment, fetchExportReport, fetchPartnerNotion, isAdmin, PartnerNotion } from "../api";
+import {
+  createNotionPayment,
+  fetchExportReport,
+  fetchPartnerNotion,
+  isAdmin,
+  PartnerNotion,
+  updateNotionPaymentStatus,
+} from "../api";
 
-/* Notion на странице партнёра: кошелёк из Partners, последние инвойсы из Payments
-   и создание нового. Фаны и сумма подставляются из дашборда за прошлую неделю,
+/* Notion на странице партнёра — плавающий виджет в углу (как чат поддержки):
+   кошелёк из Partners, инвойсы из Payments со сменой статуса и создание нового. Фаны и сумма подставляются из дашборда за прошлую неделю,
    дата инвойса — понедельник после неё (как в Notion). */
 
 const NOTION_MODELS: Record<string, string> = { Kimi: "Anita", Nikki: "MARIA" };
@@ -29,7 +36,9 @@ export default function NotionPayments({
   const [data, setData] = useState<PartnerNotion | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+  const [open, setOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -46,119 +55,136 @@ export default function NotionPayments({
 
   const payments = data?.payments ?? [];
   const p = data?.partner;
+  const unpaid = payments.filter((x) => x.status !== "Paid").length;
+
+  async function changeStatus(id: string, status: string) {
+    setSaving(id);
+    setErr(null);
+    try {
+      const upd = await updateNotionPaymentStatus(id, status);
+      setData((d) => d && { ...d, payments: (d.payments ?? []).map((x) => (x.id === id ? { ...x, status: upd.status } : x)) });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(null);
+    }
+  }
 
   return (
-    <div className="an-card">
-      <div className="an-card-head">
-        <h3>
-          Notion <span className="faint">· выплаты</span>
-        </h3>
-        <div className="an-card-head-actions">
-          {p && (
-            <a className="btn ghost btn-sm" href={p.url} target="_blank" rel="noreferrer">
-              Карточка партнёра
-            </a>
-          )}
-          {isAdmin() && data?.nick && (
-            <button className="btn btn-sm" onClick={() => setFormOpen((s) => !s)}>
-              {formOpen ? "Отмена" : "Создать выплату"}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {err && <div className="alert" style={{ margin: "0 20px 16px" }}>{err}</div>}
-      {!data && !err && <p className="muted" style={{ padding: "0 20px 20px" }}>Загружаю Notion…</p>}
-      {data && !data.nick && (
-        <p className="muted" style={{ padding: "0 20px 20px" }}>У партнёра нет Telegram-ника — не с чем сопоставить Notion.</p>
-      )}
-
-      {data?.nick && (
-        <div className="nt-wallet muted">
-          {p ? (
-            p.wallet ? (
-              <>
-                Кошелёк{p.chain ? ` (${p.chain})` : ""}: <code>{p.wallet}</code>
-                <button className="btn btn-sm" onClick={() => navigator.clipboard.writeText(p.wallet).catch(() => {})}>
-                  Копировать
-                </button>
-              </>
-            ) : (
-              "Кошелёк в Notion не указан"
-            )
-          ) : (
-            "Партнёра нет в Notion Partners — создастся вместе с первой выплатой"
-          )}
-        </div>
-      )}
-
-      {formOpen && data?.nick && (
-        <PaymentForm
-          partnerId={partnerId}
-          weekStart={weekStart}
-          defaultModel={model && NOTION_MODELS[model] ? model : "Kimi"}
-          next={data.next ?? {}}
-          onCreated={() => {
-            setFormOpen(false);
-            setNonce((n) => n + 1);
-          }}
-        />
-      )}
-
-      {data?.nick && (
-        <div className="an-table-wrap">
-          <table className="an-table">
-            <thead>
-              <tr>
-                <th>Инвойс</th>
-                <th>Модель</th>
-                <th>Дата</th>
-                <th className="num">Фаны</th>
-                <th className="num">Сумма</th>
-                <th>Статус</th>
-                <th>Tx</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.slice(0, 10).map((x) => (
-                <tr key={x.id} style={{ cursor: "default" }}>
-                  <td>
-                    <a href={x.url} target="_blank" rel="noreferrer">
-                      {x.title || "—"}
-                    </a>
-                  </td>
-                  <td className="muted">
-                    {Object.keys(NOTION_MODELS).find((k) => NOTION_MODELS[k] === x.model) ?? x.model ?? "—"}
-                  </td>
-                  <td>{ddmm(x.date)}</td>
-                  <td className="num">{x.fans ?? "—"}</td>
-                  <td className="num accent">{money2(x.amount)}</td>
-                  <td>
-                    <span className={`tag nt-st-${(x.status ?? "").toLowerCase()}`}>{x.status ?? "—"}</span>
-                  </td>
-                  <td>
-                    {x.tx_link ? (
-                      <a href={x.tx_link} target="_blank" rel="noreferrer">
-                        tx
-                      </a>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!payments.length && (
-                <tr>
-                  <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>
-                    В Notion выплат нет.
-                  </td>
-                </tr>
+    <>
+      {open && (
+        <div className="nt-panel">
+          <div className="nt-panel-head">
+            <h3>
+              Notion <span className="faint">· выплаты</span>
+            </h3>
+            <div className="an-card-head-actions">
+              {p && (
+                <a className="btn ghost btn-sm" href={p.url} target="_blank" rel="noreferrer">
+                  Карточка
+                </a>
               )}
-            </tbody>
-          </table>
+              {isAdmin() && data?.nick && (
+                <button className="btn btn-sm" onClick={() => setFormOpen((s) => !s)}>
+                  {formOpen ? "Отмена" : "+ Выплата"}
+                </button>
+              )}
+              <button className="btn ghost btn-sm" onClick={() => setOpen(false)} title="Свернуть">
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="nt-panel-body">
+            {err && <div className="alert">{err}</div>}
+            {!data && !err && <p className="muted">Загружаю Notion…</p>}
+            {data && !data.nick && <p className="muted">У партнёра нет Telegram-ника — не с чем сопоставить Notion.</p>}
+
+            {data?.nick && (
+              <div className="nt-wallet muted">
+                {p ? (
+                  p.wallet ? (
+                    <>
+                      Кошелёк{p.chain ? ` (${p.chain})` : ""}: <code>{p.wallet}</code>
+                      <button className="btn btn-sm" onClick={() => navigator.clipboard.writeText(p.wallet).catch(() => {})}>
+                        Копировать
+                      </button>
+                    </>
+                  ) : (
+                    "Кошелёк в Notion не указан"
+                  )
+                ) : (
+                  "Партнёра нет в Notion Partners — создастся вместе с первой выплатой"
+                )}
+              </div>
+            )}
+
+            {formOpen && data?.nick && (
+              <PaymentForm
+                partnerId={partnerId}
+                weekStart={weekStart}
+                defaultModel={model && NOTION_MODELS[model] ? model : "Kimi"}
+                next={data.next ?? {}}
+                onCreated={() => {
+                  setFormOpen(false);
+                  setNonce((n) => n + 1);
+                }}
+              />
+            )}
+
+            {data?.nick && (
+              <div className="nt-list">
+                {payments.slice(0, 20).map((x) => (
+                  <div key={x.id} className="nt-item">
+                    <div className="nt-item-top">
+                      <a href={x.url} target="_blank" rel="noreferrer">
+                        {x.title || "—"}
+                      </a>
+                      <span className="accent">{money2(x.amount)}</span>
+                    </div>
+                    <div className="nt-item-sub muted">
+                      <span>
+                        {Object.keys(NOTION_MODELS).find((k) => NOTION_MODELS[k] === x.model) ?? x.model ?? "—"} ·{" "}
+                        {ddmm(x.date)} · {x.fans ?? "—"} фанов
+                        {x.tx_link && (
+                          <>
+                            {" · "}
+                            <a href={x.tx_link} target="_blank" rel="noreferrer">
+                              tx
+                            </a>
+                          </>
+                        )}
+                      </span>
+                      {isAdmin() ? (
+                        <select
+                          className={`nt-status nt-st-${(x.status ?? "").toLowerCase()}`}
+                          value={x.status ?? ""}
+                          disabled={saving === x.id}
+                          onChange={(e) => changeStatus(x.id, e.target.value)}
+                        >
+                          {!x.status && <option value="">—</option>}
+                          {STATUSES.map((st) => (
+                            <option key={st}>{st}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`tag nt-st-${(x.status ?? "").toLowerCase()}`}>{x.status ?? "—"}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {!payments.length && <p className="muted">В Notion выплат нет.</p>}
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </div>
+
+      <button className={`nt-launcher${open ? " open" : ""}`} onClick={() => setOpen((s) => !s)} title="Выплаты в Notion">
+        {open ? "✕" : "$"}
+        {!open && unpaid > 0 && <span className="nt-badge">{unpaid}</span>}
+      </button>
+    </>
   );
 }
 

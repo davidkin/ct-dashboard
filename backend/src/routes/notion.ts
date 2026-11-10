@@ -13,6 +13,7 @@ import {
   isNotionConfigured,
   listPayments,
   nextPaymentTitle,
+  updatePaymentStatus,
 } from "../notion/client";
 
 const STATUSES = ["Waiting", "Review", "HOLD", "Paid"];
@@ -83,4 +84,23 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
       return { error: e instanceof Error ? e.message : String(e) };
     }
   });
+
+  /** PATCH /api/notion/payments/:pageId — сменить статус инвойса (Waiting/Review/HOLD/Paid). */
+  app.patch<{ Params: { pageId: string }; Body: { status?: string } }>(
+    "/api/notion/payments/:pageId",
+    async (req, reply) => {
+      if (!requireAdmin(req, reply)) return;
+      const status = req.body?.status ?? "";
+      if (!isNotionConfigured() || !STATUSES.includes(status)) {
+        reply.code(400);
+        return { error: `status: ${STATUSES.join("/")}` };
+      }
+      try {
+        return { data: await updatePaymentStatus(req.params.pageId, status) };
+      } catch (e) {
+        reply.code(502);
+        return { error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+  );
 }

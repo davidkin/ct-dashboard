@@ -1265,3 +1265,15 @@ export async function createNotionPayment(
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data;
 }
+
+export async function updateNotionPaymentStatus(pageId: string, status: string): Promise<NotionPayment> {
+  const res = await fetch(manageUrl(`/notion/payments/${pageId}`), {
+    method: "PATCH",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
