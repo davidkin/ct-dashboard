@@ -1934,3 +1934,4 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .bi-report-item.sent { opacity: 0.6; }
 .bi-sent { border: 1px solid rgba(255,200,87,0.5); color: #FFC857; background: transparent; border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .bi-sent.on { border-color: rgba(93,211,158,0.5); color: #5DD39E; }
+.bi-prev { color: #FF9F89; font-size: 12px; }

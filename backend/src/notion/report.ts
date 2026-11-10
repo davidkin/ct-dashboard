@@ -26,6 +26,10 @@ export interface ReportItem {
   fans: number;
   invoices: { title: string; model: string | null; amount: number; fans: number; status: string | null }[];
   text: string;
+  /** незакрытые (не Paid) инвойсы этого партнёра за прошлые недели */
+  prev: { title: string; date: string | null; model: string | null; amount: number; fans: number; status: string | null }[];
+  /** тот же текст, но с прошлыми долгами в Amount/Fans: «$18.80 ($15.00 + $1.80 + $2.00)»; null — долгов нет */
+  text_with_prev: string | null;
   /** когда отчёт отправлен партнёру (null — не отправлен) */
   sent_at: string | null;
 }
@@ -46,6 +50,18 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean, 
     const cur = byTitle.get(k);
     if (!cur || (p.status === "Paid" && cur.status !== "Paid")) byTitle.set(k, p);
   }
+
+  /* Прошлые незакрытые инвойсы (дата раньше текущей, не Paid, с суммой) — для
+     опции «приплюсовать долг» в отчёте. Дубли с Paid-близнецом закрыты. */
+  const all = new Map<string, NotionPayment[]>();
+  for (const p of payments.filter((x) => x.date && x.date < date && x.title.trim())) {
+    const k = `${p.title.trim().replace(/^@/, "").toLowerCase()}|${p.date}`;
+    all.set(k, [...(all.get(k) ?? []), p]);
+  }
+  const prevUnpaid = [...all.values()]
+    .filter((g) => !g.some((p) => p.status === "Paid"))
+    .map((g) => g[0])
+    .filter((p) => (p.amount ?? 0) > 0 && (!notionModel || p.model === notionModel));
 
   const partnerOf = (p: NotionPayment): NotionPartner | undefined =>
     partners.find((x) => p.partner_ids.includes(x.id)) ?? partners.find((x) => nickKey(x.name) === nickKey(p.title));
@@ -79,16 +95,32 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean, 
       byModel.size === 1
         ? `Model: ${[...byModel.keys()][0]}`
         : `Model: ${[...byModel.entries()].map(([m, a]) => `${m} (${money(a.amount)}, ${a.fans} fans)`).join(" + ")}`;
-    const text = [
-      `Оплата трафика для @${g.nick}`,
-      modelLine,
-      `Период: ${ddmm(weekStart)} - ${ddmm(weekEnd)}`,
-      "",
-      "",
-      `Wallet: ${wallet ?? "НЕ УКАЗАН"}${chain ? `  (${chain})` : ""}`,
-      `Amount: ${money(amount)}`,
-      `Fans: ${fans}`,
-    ].join("\n");
+    const prev = prevUnpaid
+      .filter((p) => nickKey(partnerOf(p)?.name ?? p.title) === g.nick)
+      .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+    const render = (withPrev: boolean) => {
+      const extra = withPrev ? prev : [];
+      const total = Math.round((amount + extra.reduce((s2, p) => s2 + (p.amount ?? 0), 0)) * 100) / 100;
+      const totalFans = fans + extra.reduce((s2, p) => s2 + (p.fans ?? 0), 0);
+      const amountLine = extra.length
+        ? `Amount: ${money(total)} (${[amount, ...extra.map((p) => p.amount ?? 0)].map(money).join(" + ")})`
+        : `Amount: ${money(amount)}`;
+      const fansLine = extra.length
+        ? `Fans: ${totalFans} (${[fans, ...extra.map((p) => p.fans ?? 0)].join(" + ")})`
+        : `Fans: ${fans}`;
+      return [
+        `Оплата трафика для @${g.nick}`,
+        modelLine,
+        `Период: ${ddmm(weekStart)} - ${ddmm(weekEnd)}`,
+        "",
+        "",
+        `Wallet: ${wallet ?? "НЕ УКАЗАН"}${chain ? `  (${chain})` : ""}`,
+        amountLine,
+        fansLine,
+      ].join("\n");
+    };
+    const text = render(false);
+    const text_with_prev = prev.length ? render(true) : null;
     return {
       sent_at: null as string | null,
       nick: g.nick,
@@ -104,6 +136,15 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean, 
         status: p.status,
       })),
       text,
+      text_with_prev,
+      prev: prev.map((p) => ({
+        title: p.title,
+        date: p.date,
+        model: p.model,
+        amount: p.amount ?? 0,
+        fans: p.fans ?? 0,
+        status: p.status,
+      })),
     };
   });
   /* $0 (revshare без выручки, пустые недели) платить нечего — в отчёт не берём */

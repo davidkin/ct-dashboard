@@ -4,6 +4,7 @@ import {
   createBulkInvoices,
   fetchBulkInvoices,
   fetchPayoutReport,
+  PayoutReportItem,
   setPayoutReportSent,
   PayoutReport,
 } from "../api";
@@ -324,6 +325,17 @@ function PayoutReportView({
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [onlyUnsent, setOnlyUnsent] = useState(false);
+  /* у кого приплюсовать прошлые незакрытые инвойсы (только в тексте отчёта) */
+  const [withPrev, setWithPrev] = useState<Set<string>>(new Set());
+  const textOf = (i: PayoutReportItem) =>
+    withPrev.has(i.nick) && i.text_with_prev ? i.text_with_prev : i.text;
+  const togglePrev = (nick: string) =>
+    setWithPrev((s0) => {
+      const n = new Set(s0);
+      if (n.has(nick)) n.delete(nick);
+      else n.add(nick);
+      return n;
+    });
 
   async function toggleSent(nick: string, sent: boolean) {
     setRep(
@@ -391,6 +403,28 @@ function PayoutReportView({
           />{" "}
           только не отправленные
         </label>
+        {rep && rep.items.some((i) => i.text_with_prev) && (
+          <label className="bi-check">
+            <input
+              type="checkbox"
+              checked={rep.items
+                .filter((i) => i.text_with_prev)
+                .every((i) => withPrev.has(i.nick))}
+              onChange={(e) =>
+                setWithPrev(
+                  new Set(
+                    e.target.checked
+                      ? rep.items
+                          .filter((i) => i.text_with_prev)
+                          .map((i) => i.nick)
+                      : [],
+                  ),
+                )
+              }
+            />{" "}
+            + долги всем ({rep.items.filter((i) => i.text_with_prev).length})
+          </label>
+        )}
         {rep && (
           <>
             <span className="muted">
@@ -403,7 +437,7 @@ function PayoutReportView({
               onClick={() =>
                 copy(
                   "all",
-                  "——\n\n" + rep.items.map((i) => i.text).join(sep) + "\n\n——",
+                  "——\n\n" + rep.items.map(textOf).join(sep) + "\n\n——",
                 )
               }
             >
@@ -431,7 +465,7 @@ function PayoutReportView({
               key={i.nick}
               className={`bi-report-item${i.wallet ? "" : " no-wallet"}${i.sent_at ? " sent" : ""}`}
             >
-              <pre>{i.text}</pre>
+              <pre>{textOf(i)}</pre>
               <div className="bi-report-side">
                 <button
                   className={`bi-sent${i.sent_at ? " on" : ""}`}
@@ -442,10 +476,29 @@ function PayoutReportView({
                 </button>
                 <button
                   className="btn btn-sm"
-                  onClick={() => copy(i.nick, i.text)}
+                  onClick={() => copy(i.nick, textOf(i))}
                 >
                   {copied === i.nick ? "Скопировано" : "Копировать"}
                 </button>
+                {i.text_with_prev && (
+                  <label
+                    className="bi-check bi-prev"
+                    title={i.prev
+                      .map(
+                        (x) => `${x.title} · ${x.status ?? "—"} · $${x.amount}`,
+                      )
+                      .join("\n")}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={withPrev.has(i.nick)}
+                      onChange={() => togglePrev(i.nick)}
+                    />{" "}
+                    + долг $
+                    {i.prev.reduce((s0, x) => s0 + x.amount, 0).toFixed(2)} (
+                    {i.prev.length})
+                  </label>
+                )}
                 <span className="muted">
                   {i.invoices
                     .map((x) => `${x.title} · ${x.status ?? "—"}`)

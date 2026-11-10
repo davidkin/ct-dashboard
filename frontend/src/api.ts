@@ -1340,6 +1340,10 @@ export interface PayoutReportItem {
   invoices: { title: string; model: string | null; amount: number; fans: number; status: string | null }[];
   text: string;
   sent_at: string | null;
+  /** незакрытые инвойсы за прошлые недели */
+  prev: { title: string; date: string | null; model: string | null; amount: number; fans: number; status: string | null }[];
+  /** текст с прошлыми долгами в Amount/Fans; null — долгов нет */
+  text_with_prev: string | null;
 }
 export interface PayoutReport {
   week_start: string;
