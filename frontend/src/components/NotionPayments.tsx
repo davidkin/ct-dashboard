@@ -385,12 +385,14 @@ function PaymentForm({
   onCreated: () => void;
 }) {
   const [model, setModel] = useState(defaultModel);
-  const [week, setWeek] = useState(prefill ? mondayOf(prefill.from) : weekStart ?? "");
+  /* Дата инвойса = понедельник после оплачиваемой недели. Правится руками и
+     НЕ трогает фанов/сумму: они подставляются один раз при открытии формы. */
+  const [date, setDate] = useState(
+    prefill ? addDays(mondayOf(prefill.from), 7) : weekStart ? addDays(weekStart, 7) : "",
+  );
   const [fans, setFans] = useState(prefill ? String(prefill.fans) : "");
   const [amount, setAmount] = useState(prefill ? String(prefill.amount) : "");
-  /* Пришли из выделения — не перетираем его цифры автоподстановкой за неделю,
-     пока сам не сменишь неделю или модель. */
-  const skipAuto = useRef(!!prefill);
+  const autoDone = useRef(!!prefill);
   const [status, setStatus] = useState("Waiting");
   const [notes, setNotes] = useState(
     prefill ? `Выделено: ${ddmm(prefill.from)}${prefill.to !== prefill.from ? `–${ddmm(prefill.to)}` : ""}` : "",
@@ -399,43 +401,27 @@ function PaymentForm({
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (weekStart && !week) setWeek(weekStart);
-  }, [weekStart, week]);
+    if (weekStart && !date) setDate(addDays(weekStart, 7));
+  }, [weekStart, date]);
 
-  /* Подставляем фаны/выплату из дашборда за выбранную неделю (Пн–Вс) и модель. */
+  /* Без выделения: один раз берём фанов/выплату из дашборда за прошлую неделю. */
   useEffect(() => {
-    if (!week) return;
-    if (skipAuto.current) {
-      skipAuto.current = false;
-      return;
-    }
-    let alive = true;
+    if (autoDone.current || !weekStart) return;
+    autoDone.current = true;
     fetchExportReport({
       partner: partnerId,
-      from: week,
-      to: addDays(week, 6),
+      from: weekStart,
+      to: addDays(weekStart, 6),
       all: true,
       source: "combined",
       model,
     })
       .then((r) => {
-        if (!alive) return;
         setFans(String(r.rows.reduce((s, row) => s + row.total.subs, 0)));
-        setAmount(
-          String(
-            Math.round(
-              r.rows.reduce((s, row) => s + row.total.payout, 0) * 100,
-            ) / 100,
-          ),
-        );
+        setAmount(String(Math.round(r.rows.reduce((s, row) => s + row.total.payout, 0) * 100) / 100));
       })
       .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [partnerId, week, model]);
-
-  const date = week ? addDays(week, 7) : "";
+  }, [partnerId, weekStart, model]);
 
   async function submit() {
     setBusy(true);
@@ -470,11 +456,11 @@ function PaymentForm({
         </select>
       </label>
       <label>
-        <span className="an-kpi-label">Неделя с (Пн)</span>
+        <span className="an-kpi-label">Дата инвойса</span>
         <input
           type="date"
-          value={week}
-          onChange={(e) => setWeek(e.target.value)}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
         />
       </label>
       <label>
@@ -511,7 +497,7 @@ function PaymentForm({
       </label>
       <div className="nt-form-foot">
         <span className="muted">
-          {next[model] ?? ""} · дата {ddmm(date)}
+          {next[model] ?? ""}
         </span>
         <button
           className="btn"
