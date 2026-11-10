@@ -1242,6 +1242,8 @@ export interface PartnerNotion {
   payments?: NotionPayment[];
   /** следующий заголовок инвойса по модели дашборда: { Kimi: "@nick-A4" } */
   next?: Record<string, string>;
+  /** невыплачено (не Paid, дубли инвойсов схлопнуты): по партнёру и по всем */
+  unpaid?: { partner: number; all: number };
 }
 
 export async function fetchPartnerNotion(partnerId: number): Promise<PartnerNotion> {

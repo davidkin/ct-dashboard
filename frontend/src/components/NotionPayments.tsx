@@ -55,7 +55,7 @@ export default function NotionPayments({
 
   const payments = data?.payments ?? [];
   const p = data?.partner;
-  const unpaid = payments.filter((x) => x.status !== "Paid").length;
+  const unpaid = data?.unpaid?.partner ?? 0;
 
   async function changeStatus(id: string, status: string) {
     setSaving(id);
@@ -63,6 +63,7 @@ export default function NotionPayments({
     try {
       const upd = await updateNotionPaymentStatus(id, status);
       setData((d) => d && { ...d, payments: (d.payments ?? []).map((x) => (x.id === id ? { ...x, status: upd.status } : x)) });
+      setNonce((n) => n + 1);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -94,6 +95,19 @@ export default function NotionPayments({
               </button>
             </div>
           </div>
+
+          {data?.unpaid && (
+            <div className="nt-unpaid">
+              <div>
+                <div className="an-kpi-label">Не выплачено партнёру</div>
+                <div className="an-kpi-val accent">{money2(data.unpaid.partner)}</div>
+              </div>
+              <div>
+                <div className="an-kpi-label">Не выплачено всего</div>
+                <div className="an-kpi-val">{money2(data.unpaid.all)}</div>
+              </div>
+            </div>
+          )}
 
           <div className="nt-panel-body">
             {err && <div className="alert">{err}</div>}
@@ -182,7 +196,7 @@ export default function NotionPayments({
 
       <button className={`nt-launcher${open ? " open" : ""}`} onClick={() => setOpen((s) => !s)} title="Выплаты в Notion">
         {open ? "✕" : "$"}
-        {!open && unpaid > 0 && <span className="nt-badge">{unpaid}</span>}
+        {!open && unpaid > 0 && <span className="nt-badge">{money2(unpaid)}</span>}
       </button>
     </>
   );

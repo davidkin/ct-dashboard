@@ -11,7 +11,9 @@ import {
   createPayment,
   findPartner,
   isNotionConfigured,
+  listAllPayments,
   listPayments,
+  unpaidAmount,
   nextPaymentTitle,
   updatePaymentStatus,
 } from "../notion/client";
@@ -28,14 +30,19 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
   app.get<{ Params: { id: string } }>("/api/partners/:id/notion", async (req, reply) => {
     if (!isNotionConfigured()) return { data: { configured: false } };
     const nick = partnerNick(Number(req.params.id));
-    if (!nick) return { data: { configured: true, nick: null, partner: null, payments: [], next: {} } };
+    if (!nick) {
+      const all = await listAllPayments().catch(() => []);
+      return { data: { configured: true, nick: null, partner: null, payments: [], next: {}, unpaid: { partner: 0, all: unpaidAmount(all) } } };
+    }
     try {
       const partner = await findPartner(nick);
-      const payments = await listPayments(nick, partner?.id ?? null);
+      const all = await listAllPayments();
+      const payments = await listPayments(nick, partner?.id ?? null, all);
       const next = Object.fromEntries(
         Object.entries(NOTION_MODEL).map(([model, nm]) => [model, nextPaymentTitle(nick, nm, payments)]),
       );
-      return { data: { configured: true, nick, partner, payments, next } };
+      const unpaid = { partner: unpaidAmount(payments), all: unpaidAmount(all) };
+      return { data: { configured: true, nick, partner, payments, next, unpaid } };
     } catch (e) {
       reply.code(502);
       return { error: e instanceof Error ? e.message : String(e) };

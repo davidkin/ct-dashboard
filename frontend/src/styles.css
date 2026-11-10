@@ -1870,10 +1870,12 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 /* Notion-блок на странице партнёра */
 .nt-launcher { position: fixed; right: 24px; bottom: 24px; z-index: 900; width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer; background: var(--accent); color: white; font-size: 22px; font-weight: 700; box-shadow: 0 6px 20px rgba(0,0,0,0.35); }
 .nt-launcher:hover { background: var(--accent-hi); }
-.nt-badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #FF6B6B; color: #fff; font-size: 11px; line-height: 20px; box-sizing: border-box; }
+.nt-badge { position: absolute; top: -6px; right: -10px; min-width: 20px; white-space: nowrap; height: 20px; padding: 0 5px; border-radius: 10px; background: #FF6B6B; color: #fff; font-size: 11px; line-height: 20px; box-sizing: border-box; }
 .nt-panel { position: fixed; right: 24px; bottom: 92px; z-index: 900; width: 420px; max-height: calc(100vh - 140px); display: flex; flex-direction: column; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,0.4); overflow: hidden; }
 .nt-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
 .nt-panel-head h3 { margin: 0; font-size: 15px; }
+.nt-unpaid { display: flex; gap: 24px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.nt-unpaid .an-kpi-val { font-size: 20px; }
 .nt-panel-body { overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
 .nt-list { display: flex; flex-direction: column; gap: 8px; }
 .nt-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }

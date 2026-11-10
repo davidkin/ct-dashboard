@@ -139,12 +139,37 @@ export async function findPartner(nick: string): Promise<NotionPartner | null> {
   return hit ? toPartner(hit) : null;
 }
 
+export async function listAllPayments(): Promise<NotionPayment[]> {
+  return (await queryAll(config().paymentsDb)).map(toPayment);
+}
+
+/**
+ * Сумма невыплаченного (всё, что не Paid). В Payments встречаются дубли инвойса
+ * («mushroom993-A3» и «@mushroom993-A3»): если хоть один дубль Paid — инвойс
+ * оплачен, иначе считаем его один раз. Дубль = тот же заголовок и та же дата.
+ */
+export function unpaidAmount(payments: NotionPayment[]): number {
+  const groups = new Map<string, NotionPayment[]>();
+  for (const p of payments) {
+    const key = `${p.title.trim().replace(/^@/, "").toLowerCase() || p.id}|${p.date ?? ""}`;
+    groups.set(key, [...(groups.get(key) ?? []), p]);
+  }
+  let sum = 0;
+  for (const g of groups.values()) {
+    if (g.some((p) => p.status === "Paid")) continue;
+    sum += g[0].amount ?? 0;
+  }
+  return Math.round(sum * 100) / 100;
+}
+
 /** Выплаты партнёра: по нику в заголовке или по связи с его страницей в Partners. */
-export async function listPayments(nick: string, partnerPageId: string | null): Promise<NotionPayment[]> {
+export async function listPayments(
+  nick: string,
+  partnerPageId: string | null,
+  all?: NotionPayment[],
+): Promise<NotionPayment[]> {
   const key = nickKey(nick);
-  const pages = await queryAll(config().paymentsDb);
-  return pages
-    .map(toPayment)
+  return (all ?? (await listAllPayments()))
     .filter((p) => nickKey(p.title) === key || (partnerPageId != null && p.partner_ids.includes(partnerPageId)))
     .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.created_time.localeCompare(a.created_time));
 }
