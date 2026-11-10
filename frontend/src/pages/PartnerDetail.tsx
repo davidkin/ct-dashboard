@@ -15,6 +15,7 @@ import {
 import { useModel } from "../hooks/useModel";
 import DailyMatrix from "../components/DailyMatrix";
 import DateRangePicker from "../components/DateRangePicker";
+import NotionPayments from "../components/NotionPayments";
 import OmReconcile from "../components/OmReconcile";
 import ReplyStatsWidget from "../components/ReplyStatsWidget";
 import { aggregateCampaigns, campaignTotals, CampSort, DEFAULT_CAMP_SORT } from "../lib/campaignAgg";
@@ -270,6 +271,9 @@ export default function PartnerDetail() {
           </div>
         ))}
       </div>
+
+      {/* выплаты из Notion (Payments) + создание инвойса */}
+      <NotionPayments partnerId={pid} weekStart={weekStart} model={model || undefined} />
 
       {/* виджеты «Тотал залив» + «Общая выплата» по этому партнёру (свой диапазон) */}
       <PartnerTotalsWidgets pid={pid} />

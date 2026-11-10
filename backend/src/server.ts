@@ -21,6 +21,7 @@ import { registerAdminRoutes } from "./routes/admin";
 import { registerCabinetRoutes } from "./routes/cabinet";
 import { registerReplyStatsRoutes } from "./routes/reply-stats";
 import { registerBroadcastRoutes, resumeInterruptedBroadcasts } from "./routes/broadcast";
+import { registerNotionRoutes } from "./routes/notion";
 import { currentUser, type SessionUser } from "./lib/auth";
 import { startScheduler } from "./of/scheduler";
 import { startDailyCapture } from "./daily/scheduler";
@@ -63,6 +64,7 @@ async function main() {
   await registerAdminRoutes(app);
   await registerCabinetRoutes(app);
   await registerReplyStatsRoutes(app);
+  await registerNotionRoutes(app);
   await registerBroadcastRoutes(app);
 
   const port = Number(process.env.PORT || 3001);

@@ -1866,3 +1866,15 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .gl-share-modal { max-width: 480px; }
 .gl-share-row { display: flex; gap: 8px; margin: 14px 0; }
 .gl-share-input { flex: 1; font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Notion-блок на странице партнёра */
+.nt-wallet { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 20px 12px; font-size: 13px; }
+.nt-wallet code { word-break: break-all; }
+.nt-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 0 20px 16px; }
+.nt-form label { display: flex; flex-direction: column; gap: 4px; }
+.nt-form select { background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); height: 36px; padding: 0 10px; border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+.nt-form-notes { grid-column: span 2; }
+.nt-form-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.tag.nt-st-paid { color: #5DD39E; border-color: rgba(93,211,158,0.4); }
+.tag.nt-st-waiting, .tag.nt-st-review { color: #FFC857; border-color: rgba(255,200,87,0.4); }
+.tag.nt-st-hold { color: #FF9F89; border-color: rgba(255,159,137,0.4); }

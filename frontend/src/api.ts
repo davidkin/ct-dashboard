@@ -1212,3 +1212,56 @@ export async function fetchBroadcastJobs(): Promise<BroadcastJobSummary[]> {
   if (!res.ok) throw new Error(json?.error || `${res.status}`);
   return json.data;
 }
+
+/* === Notion: кошелёк партнёра и инвойсы выплат (базы Partners / Payments) === */
+export interface NotionPartnerInfo {
+  id: string;
+  url: string;
+  name: string;
+  wallet: string;
+  chain: string | null;
+  type: string | null;
+  note: string;
+}
+export interface NotionPayment {
+  id: string;
+  url: string;
+  title: string;
+  model: string | null;
+  date: string | null;
+  status: string | null;
+  fans: number | null;
+  amount: number | null;
+  tx_link: string;
+  notes: string;
+}
+export interface PartnerNotion {
+  configured: boolean;
+  nick?: string | null;
+  partner?: NotionPartnerInfo | null;
+  payments?: NotionPayment[];
+  /** следующий заголовок инвойса по модели дашборда: { Kimi: "@nick-A4" } */
+  next?: Record<string, string>;
+}
+
+export async function fetchPartnerNotion(partnerId: number): Promise<PartnerNotion> {
+  const res = await fetch(manageUrl(`/partners/${partnerId}/notion`), { credentials: "include" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
+
+export async function createNotionPayment(
+  partnerId: number,
+  body: { model: string; date: string; fans: number; amount: number; status: string; notes?: string },
+): Promise<NotionPayment> {
+  const res = await fetch(manageUrl(`/partners/${partnerId}/notion/payments`), {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || `${res.status}`);
+  return json.data;
+}
