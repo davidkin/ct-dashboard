@@ -226,9 +226,14 @@ export async function createPayment(input: {
   return toPayment(page);
 }
 
-export async function updatePaymentStatus(pageId: string, status: string): Promise<NotionPayment> {
-  const page = await call<Page>("PATCH", `/pages/${pageId}`, {
-    properties: { Status: { select: { name: status } } },
-  });
+export async function updatePayment(
+  pageId: string,
+  patch: { status?: string; fans?: number; amount?: number },
+): Promise<NotionPayment> {
+  const properties: Record<string, unknown> = {};
+  if (patch.status !== undefined) properties.Status = { select: { name: patch.status } };
+  if (patch.fans !== undefined) properties.Fans = { number: patch.fans };
+  if (patch.amount !== undefined) properties.Amount = { number: patch.amount };
+  const page = await call<Page>("PATCH", `/pages/${pageId}`, { properties });
   return toPayment(page);
 }

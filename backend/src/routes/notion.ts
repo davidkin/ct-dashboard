@@ -16,7 +16,7 @@ import {
   payoutTotals,
   unpaidAmount,
   nextPaymentTitle,
-  updatePaymentStatus,
+  updatePayment,
 } from "../notion/client";
 
 const STATUSES = ["Waiting", "Review", "HOLD", "Paid"];
@@ -94,18 +94,26 @@ export async function registerNotionRoutes(app: FastifyInstance): Promise<void> 
     }
   });
 
-  /** PATCH /api/notion/payments/:pageId — сменить статус инвойса (Waiting/Review/HOLD/Paid). */
-  app.patch<{ Params: { pageId: string }; Body: { status?: string } }>(
+  /** PATCH /api/notion/payments/:pageId — поправить инвойс: статус, фаны, сумма. */
+  app.patch<{ Params: { pageId: string }; Body: { status?: string; fans?: number; amount?: number } }>(
     "/api/notion/payments/:pageId",
     async (req, reply) => {
       if (!requireAdmin(req, reply)) return;
-      const status = req.body?.status ?? "";
-      if (!isNotionConfigured() || !STATUSES.includes(status)) {
+      const b = req.body ?? {};
+      const patch: { status?: string; fans?: number; amount?: number } = {};
+      if (b.status !== undefined) patch.status = b.status;
+      if (b.fans !== undefined) patch.fans = Number(b.fans);
+      if (b.amount !== undefined) patch.amount = Math.round(Number(b.amount) * 100) / 100;
+      const bad =
+        (patch.status !== undefined && !STATUSES.includes(patch.status)) ||
+        (patch.fans !== undefined && !Number.isFinite(patch.fans)) ||
+        (patch.amount !== undefined && !Number.isFinite(patch.amount));
+      if (!isNotionConfigured() || bad || !Object.keys(patch).length) {
         reply.code(400);
-        return { error: `status: ${STATUSES.join("/")}` };
+        return { error: `Нужно status (${STATUSES.join("/")}), fans или amount` };
       }
       try {
-        return { data: await updatePaymentStatus(req.params.pageId, status) };
+        return { data: await updatePayment(req.params.pageId, patch) };
       } catch (e) {
         reply.code(502);
         return { error: e instanceof Error ? e.message : String(e) };

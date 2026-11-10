@@ -1882,6 +1882,12 @@ table.dm-table { border-collapse: separate; border-spacing: 0; width: 100%; font
 .nt-list { display: flex; flex-direction: column; gap: 8px; }
 .nt-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
 .nt-item-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13px; }
+.nt-item-amount { display: inline-flex; align-items: center; gap: 6px; }
+.nt-edit { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 13px; padding: 0 2px; }
+.nt-edit:hover { color: var(--text); }
+.nt-edit-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.nt-edit-row label { display: flex; flex-direction: column; gap: 4px; width: 90px; }
+.nt-edit-row input { width: 100%; }
 .nt-item-sub { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; margin-top: 4px; }
 .nt-status { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; height: 26px; font-size: 12px; padding: 0 6px; font-family: inherit; color: var(--text); }
 .nt-status.nt-st-paid { color: #5DD39E; }

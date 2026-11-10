@@ -1270,12 +1270,15 @@ export async function createNotionPayment(
   return json.data;
 }
 
-export async function updateNotionPaymentStatus(pageId: string, status: string): Promise<NotionPayment> {
+export async function updateNotionPayment(
+  pageId: string,
+  patch: { status?: string; fans?: number; amount?: number },
+): Promise<NotionPayment> {
   const res = await fetch(manageUrl(`/notion/payments/${pageId}`), {
     method: "PATCH",
     credentials: "include",
     headers: authHeaders(),
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(patch),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || `${res.status}`);

@@ -6,7 +6,7 @@ import {
   isAdmin,
   NotionPayment,
   PartnerNotion,
-  updateNotionPaymentStatus,
+  updateNotionPayment,
 } from "../api";
 
 /* Notion на странице партнёра — плавающий виджет в углу (как чат поддержки):
@@ -42,6 +42,9 @@ export default function NotionPayments({
   const [open, setOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editFans, setEditFans] = useState("");
+  const [editAmount, setEditAmount] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -64,26 +67,33 @@ export default function NotionPayments({
   const p = data?.partner;
   const unpaid = data?.unpaid?.partner ?? 0;
 
-  async function changeStatus(id: string, status: string) {
+  async function savePatch(id: string, patch: { status?: string; fans?: number; amount?: number }) {
     setSaving(id);
     setErr(null);
     try {
-      const upd = await updateNotionPaymentStatus(id, status);
+      const upd = await updateNotionPayment(id, patch);
       setData(
         (d) =>
           d && {
             ...d,
             payments: (d.payments ?? []).map((x) =>
-              x.id === id ? { ...x, status: upd.status } : x,
+              x.id === id ? { ...x, status: upd.status, fans: upd.fans, amount: upd.amount } : x,
             ),
           },
       );
+      setEditId(null);
       setNonce((n) => n + 1);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(null);
     }
+  }
+
+  function startEdit(x: NotionPayment) {
+    setEditId(x.id);
+    setEditFans(x.fans == null ? "" : String(x.fans));
+    setEditAmount(x.amount == null ? "" : String(x.amount));
   }
 
   return (
@@ -218,7 +228,14 @@ export default function NotionPayments({
                           </span>
                         )}
                       </span>
-                      <span className="accent">{money2(x.amount)}</span>
+                      <span className="nt-item-amount">
+                        <span className="accent">{money2(x.amount)}</span>
+                        {isAdmin() && editId !== x.id && (
+                          <button className="nt-edit" title="Поправить фанов и сумму" onClick={() => startEdit(x)}>
+                            ✎
+                          </button>
+                        )}
+                      </span>
                     </div>
                     <div className="nt-item-sub muted">
                       <span>
@@ -246,7 +263,7 @@ export default function NotionPayments({
                           className={`nt-status nt-st-${(x.status ?? "").toLowerCase()}`}
                           value={x.status ?? ""}
                           disabled={saving === x.id}
-                          onChange={(e) => changeStatus(x.id, e.target.value)}
+                          onChange={(e) => savePatch(x.id, { status: e.target.value })}
                         >
                           {!x.status && <option value="">—</option>}
                           {STATUSES.map((st) => (
@@ -261,6 +278,37 @@ export default function NotionPayments({
                         </span>
                       )}
                     </div>
+                    {editId === x.id && (
+                      <div className="nt-edit-row">
+                        <label>
+                          <span className="an-kpi-label">Фаны</span>
+                          <input type="number" value={editFans} onChange={(e) => setEditFans(e.target.value)} />
+                        </label>
+                        <label>
+                          <span className="an-kpi-label">Сумма, $</span>
+                          <input
+                            type="text"
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                          />
+                        </label>
+                        <button
+                          className="btn btn-sm"
+                          disabled={saving === x.id || editFans === "" || editAmount === ""}
+                          onClick={() =>
+                            savePatch(x.id, {
+                              fans: Number(editFans),
+                              amount: Number(editAmount.replace(",", ".")),
+                            })
+                          }
+                        >
+                          {saving === x.id ? "…" : "Сохранить"}
+                        </button>
+                        <button className="btn ghost btn-sm" onClick={() => setEditId(null)}>
+                          Отмена
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {!payments.length && (
