@@ -13,7 +13,10 @@
  */
 import { getDb } from "../db/index";
 import { addDays } from "../lib/tz";
-import { listAllPartners, listAllPayments, NotionPartner, NotionPayment, nickKey } from "./client";
+import { NOTION_MODEL, listAllPartners, listAllPayments, NotionPartner, NotionPayment, nickKey } from "./client";
+
+/** Notion-модель (Anita) → модель дашборда (Kimi). */
+const DASH_MODEL = Object.fromEntries(Object.entries(NOTION_MODEL).map(([d, n]) => [n, d]));
 
 export interface ReportItem {
   nick: string;
@@ -61,8 +64,22 @@ export async function buildPayoutReport(weekStart: string, unpaidOnly: boolean) 
     const fans = g.list.reduce((s, p) => s + (p.fans ?? 0), 0);
     const wallet = g.partner?.wallet?.trim() || null;
     const chain = g.partner?.chain ?? null;
+    /* Модель: одна — просто имя; обе — с разбивкой суммы и фанов. */
+    const byModel = new Map<string, { amount: number; fans: number }>();
+    for (const p of g.list) {
+      const m = DASH_MODEL[p.model ?? ""] ?? p.model ?? "?";
+      const a = byModel.get(m) ?? { amount: 0, fans: 0 };
+      a.amount += p.amount ?? 0;
+      a.fans += p.fans ?? 0;
+      byModel.set(m, a);
+    }
+    const modelLine =
+      byModel.size === 1
+        ? `Model: ${[...byModel.keys()][0]}`
+        : `Model: ${[...byModel.entries()].map(([m, a]) => `${m} (${money(a.amount)}, ${a.fans} fans)`).join(" + ")}`;
     const text = [
       `Оплата трафика для @${g.nick}`,
+      modelLine,
       `Период: ${ddmm(weekStart)} - ${ddmm(weekEnd)}`,
       "",
       "",
