@@ -441,7 +441,9 @@ function PayoutReportView({
               disabled={!visible.length}
               onClick={() => copy("all", allText())}
             >
-              {copied === "all" ? "Скопировано" : "Скопировать всё"}
+              {copied === "all"
+                ? "Скопировано"
+                : `Скопировать всё (${forCopy.length})`}
             </button>
           </>
         )}
