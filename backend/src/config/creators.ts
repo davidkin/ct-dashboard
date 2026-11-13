@@ -46,7 +46,7 @@ export interface ModelOption {
 
 const MODELS: ModelOption[] = [
   { group: "Nekoletta", label: "Velora", hidden: true, retired: true },
-  { group: "Lily", label: "Lily", hidden: true, retired: true },
+  { group: "Lily", label: "Lily", retired: true },
   { group: "Kimi", label: "Kimi" },
   { group: "Nikki", label: "Nikki" },
 ];
